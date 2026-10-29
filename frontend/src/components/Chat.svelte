@@ -516,12 +516,12 @@
         </div>
       {/if}
 
-      <div class="w-full flex items-center gap-3 bg-[rgba(12,14,20,0.92)] backdrop-blur-xl border border-white/10 rounded-full px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.7)] focus-within:border-white/25 transition-all">
+      <div class="w-full flex items-center gap-3 bg-[#06080d] backdrop-blur-xl border border-[var(--guide-color)] rounded-xl px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.8)] focus-within:border-[#38bdf8]/40 transition-all">
         <!-- Attachment button for local document ingestion -->
         <button
           type="button"
           onclick={() => fileInputEl?.click()}
-          class="w-7 h-7 rounded-full text-[#9ca3af] hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer"
+          class="w-7 h-7 rounded-lg text-[#9ca3af] hover:text-[#38bdf8] hover:bg-white/[0.06] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer"
           title="Import Datasheet, PDF, or Image"
         >
           <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

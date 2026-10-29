@@ -61,7 +61,7 @@
     const height = canvasEl.clientHeight || 340;
 
     threeScene = new THREE.Scene();
-    threeScene.background = new THREE.Color(0x040508);
+    threeScene.background = new THREE.Color(0x020306);
 
     threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
     threeCamera.position.set(160, 140, 180);
@@ -78,13 +78,18 @@
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
     threeScene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.9);
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.95);
     dirLight1.position.set(100, 150, 100);
     threeScene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.35);
+    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.45);
     dirLight2.position.set(-100, -80, -100);
     threeScene.add(dirLight2);
+
+    // Nualt x Atmospherik Cyan Blueprint Grid Floor
+    const grid = new THREE.GridHelper(200, 20, 0x38bdf8, 0x18202c);
+    grid.position.y = -35;
+    threeScene.add(grid);
 
     // Orbit Controls
     if ((window as any).OrbitControls) {
@@ -118,11 +123,11 @@
     geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute("normal", new THREE.BufferAttribute(norm, 3));
 
-    // Metallic satin titanium material
+    // Metallic satin titanium PBR material
     const material = new THREE.MeshStandardMaterial({
-      color: 0xd1d5db,
-      metalness: 0.6,
-      roughness: 0.35,
+      color: 0xd8dce3,
+      metalness: 0.82,
+      roughness: 0.24,
       wireframe: false,
     });
 
@@ -499,38 +504,40 @@
 </script>
 
 <aside
-  class="h-full w-full flex flex-col bg-[#07080c] border-l border-[rgba(255,255,255,0.08)] shadow-2xl overflow-hidden animate-fade-in"
+  class="h-full w-full flex flex-col bg-[#000000] border-l border-[var(--guide-color)] shadow-2xl overflow-hidden font-sans animate-fade-in"
 >
-  <!-- Studio Header -->
-  <div class="h-11 flex-shrink-0 px-4 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[#0b0d13]">
-    <div class="flex items-center gap-2">
-      <div class="w-5 h-5 rounded bg-white/[0.08] flex items-center justify-center text-[10px] font-mono text-[#10b981]">
-        ⬡
-      </div>
-      <span class="text-xs font-semibold text-white tracking-wide truncate max-w-[220px]">
-        {studioStore.activeArtifact?.title || "Artifact Viewport"}
-      </span>
-      <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">
-        Live Studio
+  <!-- Studio Header: Nualt Hairline Technical Strip -->
+  <div class="h-11 flex-shrink-0 px-4 flex items-stretch border-b border-[var(--guide-color)] bg-[#04060a] text-[11px] tech-badge font-mono">
+    <div class="flex items-center gap-2 pr-3.5 border-r border-[var(--guide-color)]">
+      <span class="text-[#38bdf8] text-xs">⬡</span>
+      <span class="font-semibold text-white tracking-wide truncate max-w-[200px]">
+        {studioStore.activeArtifact?.title || "3D VIEWPORT"}
       </span>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="flex items-center px-3 border-r border-[var(--guide-color)] text-[#38bdf8]">
+      <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_8px_#38bdf8] mr-1.5 animate-pulse"></span>
+      <span>PBR TITANIUM</span>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-stretch">
       {#if studioStore.activeArtifact?.mesh}
         <button
           onclick={() => (autoRotate = !autoRotate)}
-          class="text-[11px] px-2 py-0.5 rounded border transition-all {autoRotate
-            ? 'bg-white/10 text-white border-white/20'
-            : 'text-[#9ca3af] border-transparent hover:text-white'}"
+          class="flex items-center px-3 border-l border-[var(--guide-color)] transition-all cursor-pointer {autoRotate
+            ? 'bg-[#38bdf8]/10 text-[#38bdf8]'
+            : 'text-[#9ca3af] hover:text-white'}"
           title="Toggle 360 Turntable Orbit"
         >
-          Orbit
+          ORBIT
         </button>
       {/if}
 
       <button
         onclick={() => studioStore.close()}
-        class="text-[#9ca3af] hover:text-white transition-colors p-1 text-sm leading-none cursor-pointer"
+        class="flex items-center px-3 border-l border-[var(--guide-color)] text-[#9ca3af] hover:text-white transition-colors cursor-pointer"
         aria-label="Close Studio Canvas"
       >
         ✕
@@ -542,16 +549,31 @@
   <div class="flex-1 overflow-y-auto flex flex-col">
     <!-- MODE 1: 3D CAD MODEL -->
     {#if studioStore.activeArtifact?.render_type === "threejs_cad" || studioStore.activeArtifact?.mesh}
-      <div class="relative w-full h-[360px] bg-[#040508] border-b border-white/[0.06] flex-shrink-0">
+      <div class="relative w-full h-[360px] bg-[#020306] border-b border-[var(--guide-color)] flex-shrink-0 overflow-hidden">
         <canvas bind:this={canvasEl} class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+
+        <!-- Laser Scanning Grid Plane overlay -->
+        <div class="laser-scan-line top-1/2"></div>
+
+        <!-- Crox Spec-Sheet Telemetry HUD (Top-Left) -->
+        <div class="absolute top-3 left-3 flex flex-col gap-1 p-2 rounded bg-black/85 backdrop-blur-md border border-[var(--guide-color)] text-[10px] font-mono text-[#9ca3af] select-none pointer-events-none z-10">
+          <div class="flex items-center gap-1.5 text-[#38bdf8] font-semibold">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]"></span>
+            <span>CROX PRECISION TELEMETRY</span>
+          </div>
+          <div>BOUNDS: {currentParams.width ?? 120}×{currentParams.length ?? 80}×{currentParams.height ?? 40} mm</div>
+          <div>VOL: ~{Math.round(((currentParams.width ?? 120) * (currentParams.length ?? 80) * (currentParams.height ?? 40)) / 1000)} cm³</div>
+        </div>
+
         {#if isRecomputing}
-          <div class="absolute top-3 left-3 flex items-center gap-2 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur border border-white/10 text-[11px] text-[#10b981]">
-            <span class="w-2 h-2 rounded-full bg-[#10b981] animate-ping"></span>
-            <span>Recomputing CSG Math…</span>
+          <div class="absolute top-3 right-3 flex items-center gap-2 px-2.5 py-1 rounded bg-black/80 backdrop-blur border border-[#38bdf8]/40 text-[10px] font-mono text-[#38bdf8] z-10">
+            <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] animate-ping"></span>
+            <span>RECOMPUTING CSG…</span>
           </div>
         {/if}
-        <div class="absolute bottom-2.5 right-3 text-[10px] text-[#6b7280] select-none">
-          Click & Drag to Rotate · Scroll to Zoom
+
+        <div class="absolute bottom-2.5 right-3 text-[10px] font-mono text-[#6b7280] select-none z-10">
+          DRAG TO ORBIT · SCROLL TO ZOOM
         </div>
       </div>
 

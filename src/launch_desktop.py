@@ -552,6 +552,7 @@ try:
                 "Eq": sp.Eq, "symbols": sp.symbols, "Symbol": sp.Symbol,
                 "Integer": sp.Integer, "Float": sp.Float, "Rational": sp.Rational, "Number": sp.Number
             }
+            self._cache: Dict[str, Dict[str, Any]] = {}
             try:
                 from sympy.parsing.sympy_parser import (
                     parse_expr,
@@ -600,6 +601,14 @@ try:
             if not s:
                 return {"success": False, "error": "Mathematical expression contains disallowed syntax or keywords"}
 
+            import hashlib
+            cache_key = hashlib.sha256(s.encode("utf-8")).hexdigest()
+            if cache_key in self._cache:
+                hit = dict(self._cache[cache_key])
+                hit["cached"] = True
+                hit["latency_ms"] = 0.0
+                return hit
+
             if "=" in s and not ("==" in s or "Eq" in s or "<=" in s or ">=" in s):
                 parts = s.split("=", 1)
                 s = f"solve(Eq({parts[0].strip()}, {parts[1].strip()}))"
@@ -627,7 +636,11 @@ try:
                         num = None
                 elif isinstance(res, (int, float)):
                     num = float(res)
-                return {"success": True, "result": str(res), "latex": latex_res, "numeric_approx": num}
+                out = {"success": True, "result": str(res), "latex": latex_res, "numeric_approx": num, "cached": False}
+                if len(self._cache) > 2048:
+                    self._cache.pop(next(iter(self._cache)))
+                self._cache[cache_key] = out
+                return out
             except Exception as exc:
                 return {"success": False, "error": f"Evaluation error: {str(exc)}"}
 
@@ -902,27 +915,37 @@ class RAMGovernor:
         self.running = False
         self._thread = None
         self.peak_ram_pct = 0.0
+        self.prev_ram_pct = 0.0
+        self.rate_of_rise = 0.0
 
     def start(self, on_trip_cb, active_model: str):
         self.tripped = False
         self.running = True
         self.peak_ram_pct = 0.0
+        self.prev_ram_pct = psutil.virtual_memory().percent if psutil else 0.0
 
         def _watchdog():
             consecutive_over = 0
             while self.running:
                 try:
                     pct = psutil.virtual_memory().percent if psutil else 0.0
+                    self.rate_of_rise = pct - self.prev_ram_pct
+                    self.prev_ram_pct = pct
+
                     if pct > self.peak_ram_pct:
                         self.peak_ram_pct = pct
-                    if pct >= self.threshold_pct:
+
+                    # Predictive tripwire: RAM >= 80% and surging rapidly (>= 3.0% / interval)
+                    predictive_trip = (pct >= 80.0 and self.rate_of_rise >= 3.0)
+
+                    if pct >= self.threshold_pct or predictive_trip:
                         consecutive_over += 1
                     else:
                         consecutive_over = 0
 
-                    if consecutive_over >= 3 and not self.tripped:
+                    if consecutive_over >= 2 and not self.tripped:
                         self.tripped = True
-                        print(f"[RAM GOVERNOR] CRITICAL TRIPWIRE: RAM reached {pct:.1f}% >= {self.threshold_pct}% sustained. Aborting & evicting model {active_model}!")
+                        print(f"[RAM GOVERNOR] CRITICAL TRIPWIRE: RAM reached {pct:.1f}% (rise: +{self.rate_of_rise:.1f}%) >= {self.threshold_pct}%. Aborting & evicting model {active_model}!")
                         try:
                             evict_req = urllib.request.Request(
                                 "http://127.0.0.1:11434/api/generate",

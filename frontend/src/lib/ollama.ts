@@ -67,6 +67,16 @@ export async function checkOllamaStatus(): Promise<boolean> {
   }
 }
 
+export async function fetchTelemetry(): Promise<any> {
+  try {
+    const res = await fetch(`${getAgentHost()}/health`, { signal: AbortSignal.timeout(1500) });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {}
+  return null;
+}
+
 export async function getAvailableModels(): Promise<string[]> {
   const token = getVigyanToken();
   const headers: Record<string, string> = {};
