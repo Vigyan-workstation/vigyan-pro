@@ -28,7 +28,8 @@ from launch_desktop import (
 def test_models_catalog_integrity():
     """Verify that models catalog entries contain valid URLs, tags, and reasonable sizes."""
     assert "vigyan:1.5b" in MODELS_CATALOG
-    assert len(MODELS_CATALOG) >= 1
+    assert "vigyan:7b" in MODELS_CATALOG
+    assert len(MODELS_CATALOG) >= 2
 
     for tag, info in MODELS_CATALOG.items():
         assert info["tag"] == tag

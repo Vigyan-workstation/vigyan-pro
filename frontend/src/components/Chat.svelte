@@ -1,9 +1,10 @@
 <script lang="ts">
   // Chat.svelte — Sovereign Centered Reading Workspace with Floating Bottom Input
-  // Obsidian Titanium monochrome styling inspired by Steve Jobs Apple typography.
+  // Obsidian Titanium monochrome styling for focused scientific derivation.
   import { onMount } from "svelte";
   import { streamChat, DEFAULT_MODEL, getAgentHost, getVigyanToken } from "../lib/ollama";
   import { chatStore } from "../lib/chatStore.svelte";
+  import { studioStore } from "../lib/studioStore.svelte";
   import ThinkingBlock from "./ThinkingBlock.svelte";
   import MessageBubble from "./MessageBubble.svelte";
 
@@ -34,8 +35,8 @@
   const STARTERS = [
     { icon: "⬡", label: "3D CAD Enclosure", prompt: "Generate a 3D electronics enclosure 140x90x35mm with 2.5mm walls." },
     { icon: "∫", label: "Solve Equation", prompt: "Solve x² + x − 12 = 0 with step-by-step derivation." },
-    { icon: "⚡", label: "KiCad PCB", prompt: "Generate KiCad PCB netlist for a 555 timer astable multivibrator." },
-    { icon: "📈", label: "Plot Oscillation", prompt: "Plot the damped oscillation exp(-0.15*x)*cos(2*x) from 0 to 25." },
+    { icon: "∿", label: "Digital Waveform", prompt: "Generate SPI master write timing diagram with 8 bits data." },
+    { icon: "∂", label: "Plot Oscillation", prompt: "Plot the damped oscillation exp(-0.15*x)*cos(2*x) from 0 to 25." },
   ];
 
   function handleFileDrop(e: DragEvent) {
@@ -59,7 +60,6 @@
     const isPDF = file.type === "application/pdf" || file.name.endsWith(".pdf");
 
     if (isImage) {
-      // Read as Data URL for clean thumbnail preview (never dump raw binary into text!)
       const reader = new FileReader();
       reader.onload = async () => {
         const dataUrl = String(reader.result || "");
@@ -82,7 +82,6 @@
         chatStore.save();
         scrollToBottom();
 
-        // Call backend CPU OCR engine
         try {
           const host = getAgentHost();
           const token = getVigyanToken();
@@ -173,7 +172,7 @@
                 filename: file.name,
                 summary: data.summary || "Extracted document specifications.",
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Synthesize 3D CAD Enclosure", "Generate KiCad PCB Netlist"],
+                actions: data.suggested_actions || ["Synthesize 3D CAD Enclosure", "Generate Digital Waveform"],
               },
             });
             chatStore.save();
@@ -186,7 +185,6 @@
       reader.readAsDataURL(file);
 
     } else {
-      // Plain text, CSV, Python, KiCad files
       const reader = new FileReader();
       reader.onload = async () => {
         const content = String(reader.result || "");
@@ -250,8 +248,8 @@
   function handleActionClick(actionText: string) {
     if (actionText.includes("3D") || actionText.includes("Enclosure") || actionText.includes("CAD")) {
       send("Generate a 3D CAD enclosure based on extracted specifications.");
-    } else if (actionText.includes("KiCad") || actionText.includes("PCB") || actionText.includes("Netlist")) {
-      send("Generate KiCad PCB netlist based on extracted specifications.");
+    } else if (actionText.includes("Waveform") || actionText.includes("Timing")) {
+      send("Generate digital timing waveform based on extracted specifications.");
     } else {
       send(actionText);
     }
@@ -283,7 +281,6 @@
     }
     isStreaming = true;
 
-    // Add user message to persistent reactive store
     chatStore.messages.push({
       id: uid(),
       role: "user",
@@ -294,7 +291,6 @@
     });
     chatStore.save();
 
-    // Add placeholder assistant message
     const assistantId = uid();
     chatStore.messages.push({
       id: assistantId,
@@ -308,7 +304,6 @@
 
     scrollToBottom();
 
-    // Build conversation history
     const history = chatStore.messages
       .filter((m) => m.role === "user" || (m.role === "assistant" && m.content))
       .slice(0, -1)
@@ -338,6 +333,31 @@
           }
           if (chunk.toolData) {
             chatStore.messages[idx].toolResults.push(chunk.toolData);
+            // Auto-open Artifact Viewport for CAD, Robotics, Waveforms, or Plots
+            const td = chunk.toolData;
+            if (td.mesh || td.joint_chain || td.wavedrom_spec || td.x || td.data || td.shape) {
+              studioStore.open({
+                id: Math.random().toString(36).slice(2, 9),
+                tool: td.tool || "tool",
+                render_type: td.render_type || (td.mesh ? "threejs_cad" : td.joint_chain ? "robotics" : td.wavedrom_spec ? "wavedrom" : "plot"),
+                title: td.title || "STEM Artifact",
+                shape: td.shape,
+                parameters: td.parameters,
+                mesh: td.mesh,
+                stl_base64: td.stl_base64,
+                dimensions_mm: td.dimensions_mm,
+                arm_type: td.arm_type,
+                joint_angles_deg: td.joint_angles_deg,
+                end_effector: td.end_effector,
+                reach_mm: td.reach_mm,
+                joint_chain: td.joint_chain,
+                wavedrom_spec: td.wavedrom_spec,
+                protocol: td.protocol,
+                data: td.data,
+                x: td.x,
+                y: td.y,
+              });
+            }
           }
           scrollToBottom();
         } else if (chunk.type === "answer") {
@@ -359,6 +379,10 @@
 
     isStreaming = false;
     chatStore.save();
+    try {
+      const budget = parseInt(localStorage.getItem("vigyan_context_budget") || "2048", 10);
+      chatStore.autoCompressIfNeeded(budget);
+    } catch {}
     scrollToBottom();
   }
 
@@ -403,7 +427,7 @@
             </div>
             <h1 class="text-2xl font-bold text-white tracking-tight">Vigyan Pro</h1>
             <p class="text-[#9ca3af] text-[14px] max-w-md leading-relaxed">
-              Sovereign STEM intelligence. Exact mathematical grounding via SymPy AST, circuit simulation, and 100% offline inference.
+              Sovereign STEM intelligence. Exact mathematical grounding via SymPy AST, parametric CAD, and 100% offline inference.
             </p>
           </div>
 
@@ -412,7 +436,7 @@
             {#each STARTERS as s}
               <button
                 onclick={() => send(s.prompt)}
-                class="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#08090d] border border-white/10 text-xs text-[#9ca3af] hover:text-white hover:border-white/25 transition-all shadow-sm"
+                class="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#08090d] border border-white/10 text-xs text-[#9ca3af] hover:text-white hover:border-white/25 transition-all shadow-sm cursor-pointer"
               >
                 <span class="text-sm font-mono text-[#10b981]">{s.icon}</span>
                 <span>{s.label}</span>
@@ -422,12 +446,16 @@
         </div>
       {:else}
         <!-- Message Thread -->
-        {#each chatStore.messages as msg (msg.id)}
+        {#each chatStore.messages as msg, i (msg.id)}
           {#if msg.role === "user"}
             <MessageBubble
+              id={msg.id}
               role="user"
               content={msg.content}
               attachment={msg.attachment}
+              canTrimPrior={i > 0}
+              onDelete={(id) => chatStore.deleteMessage(id)}
+              onTrimPrior={(id) => chatStore.trimHistoryBefore(id)}
             />
           {:else}
             <div class="flex flex-col gap-2">
@@ -441,13 +469,17 @@
               {/if}
               {#if msg.content || (msg.toolResults && msg.toolResults.length > 0) || (msg.thinkingDone && msg.streaming) || msg.digest}
                 <MessageBubble
+                  id={msg.id}
                   role="assistant"
                   content={msg.content}
                   streaming={msg.streaming}
                   toolResults={msg.toolResults}
                   sympyGrounding={msg.sympyGrounding}
                   digest={msg.digest}
+                  canTrimPrior={i > 0}
                   onAction={handleActionClick}
+                  onDelete={(id) => chatStore.deleteMessage(id)}
+                  onTrimPrior={(id) => chatStore.trimHistoryBefore(id)}
                 />
               {/if}
             </div>
@@ -458,7 +490,7 @@
     </div>
   </div>
 
-  <!-- Floating Bottom Input Dock (macOS Pebble Island style) with Drag & Drop Ingestion -->
+  <!-- Floating Bottom Input Dock with Drag & Drop Ingestion -->
   <div
     class="px-4 pb-4 pt-1 flex-shrink-0 z-20 relative"
     ondragover={(e) => { e.preventDefault(); isDragging = true; }}
@@ -472,7 +504,7 @@
       type="file"
       bind:this={fileInputEl}
       onchange={handleFileInputChange}
-      accept="image/*,.pdf,.csv,.txt,.json,.py,.kicad_pcb,.stl,.md"
+      accept="image/*,.pdf,.csv,.txt,.json,.py,.stl,.md"
       class="hidden"
     />
 
@@ -489,8 +521,8 @@
         <button
           type="button"
           onclick={() => fileInputEl?.click()}
-          class="w-7 h-7 rounded-full text-[#9ca3af] hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all flex-shrink-0"
-          title="Import Datasheet, PDF, or CSV"
+          class="w-7 h-7 rounded-full text-[#9ca3af] hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer"
+          title="Import Datasheet, PDF, or Image"
         >
           <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 00.02-4.248z" clip-rule="evenodd" />
@@ -502,7 +534,7 @@
           bind:value={input}
           oninput={autoResize}
           onkeydown={handleKeydown}
-          placeholder="Ask a STEM question, generate a 3D enclosure, or drop a datasheet…"
+          placeholder="Ask a STEM problem, synthesize a 3D enclosure, or drop a document…"
           rows={1}
           disabled={isStreaming}
           class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
@@ -512,7 +544,7 @@
         {#if isStreaming}
           <button
             onclick={stop}
-            class="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 text-[#e2e8f0] hover:bg-white/20 flex items-center justify-center transition-all"
+            class="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 text-[#e2e8f0] hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer"
             title="Stop generation"
           >
             <span class="w-2.5 h-2.5 bg-white rounded-sm block"></span>

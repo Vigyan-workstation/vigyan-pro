@@ -1,6 +1,5 @@
 <script lang="ts">
   // StatusDot — Shows air-gapped sovereign status in center header
-  // Matches Steve Jobs concept: 100% Offline · 1.5B Quad-Master with subtle green dot
   interface Props {
     connected: boolean;
   }
@@ -16,6 +15,6 @@
   ></span>
   <!-- Label -->
   <span class="text-[11px] font-medium text-[#9ca3af] tracking-wide">
-    {connected ? "100% Offline · 1.5B Quad-Master" : "Connecting AI…"}
+    {connected ? "100% Offline · Sovereign Edge" : "Connecting AI…"}
   </span>
 </div>

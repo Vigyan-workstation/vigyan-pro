@@ -79,8 +79,15 @@ export async function getAvailableModels(): Promise<string[]> {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.catalog && Array.isArray(data.catalog)) {
-        return data.catalog.map((m: { tag?: string; id?: string }) => m.tag || m.id || "");
+      if (data.models && Array.isArray(data.models)) {
+        return data.models.map((m: { tag?: string; id?: string }) => m.tag || m.id || "").filter(Boolean);
+      }
+      if (data.catalog) {
+        if (Array.isArray(data.catalog)) {
+          return data.catalog.map((m: { tag?: string; id?: string }) => m.tag || m.id || "").filter(Boolean);
+        } else if (typeof data.catalog === "object") {
+          return Object.keys(data.catalog);
+        }
       }
     }
   } catch {}
@@ -122,6 +129,11 @@ export async function streamChat(
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["X-Vigyan-Token"] = token;
 
+    let userCtx = 2048;
+    try {
+      userCtx = parseInt(localStorage.getItem("vigyan_context_budget") || "2048", 10);
+    } catch {}
+
     const bridgeResp = await fetch(`${agentHost}/api/chat`, {
       method: "POST",
       headers,
@@ -129,6 +141,7 @@ export async function streamChat(
         query: latestUserMsg,
         messages: payloadMessages,
         model: model || DEFAULT_MODEL,
+        num_ctx: userCtx,
       }),
       signal,
     });
@@ -162,6 +175,14 @@ export async function streamChat(
               const parsed = JSON.parse(dataStr);
               if (eventName === "think") {
                 onChunk({ type: "thinking", text: typeof parsed === "string" ? parsed : JSON.stringify(parsed) });
+              } else if (eventName === "tier_downgrade") {
+                if (parsed && parsed.reason) {
+                  onChunk({ type: "thinking", text: `[Model Router]: ${parsed.reason}\n` });
+                }
+              } else if (eventName === "ram_governor_trip") {
+                if (parsed && parsed.ram_percent) {
+                  onChunk({ type: "thinking", text: `[RAM Governor]: Memory threshold reached (${parsed.ram_percent}%). Model evicted to prevent OOM.\n` });
+                }
               } else if (eventName === "token") {
                 onChunk({ type: "answer", text: typeof parsed === "string" ? parsed : JSON.stringify(parsed) });
               } else if (eventName === "sympy") {
@@ -194,7 +215,12 @@ export async function streamChat(
     directResp = await fetch(`${OLLAMA_BASE}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: model || DEFAULT_MODEL, messages: payloadMessages, stream: true }),
+      body: JSON.stringify({
+        model: model || DEFAULT_MODEL,
+        messages: payloadMessages,
+        stream: true,
+        options: { num_ctx: userCtx }
+      }),
       signal,
     });
   } catch (err: unknown) {

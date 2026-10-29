@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Vigyan Pro Sovereign Studio - Universal Cross-Platform Entrypoint
-Auto-detects host operating system (Linux, Windows, macOS) and executes
+Auto-detects host operating system (Linux, Windows, Darwin) and executes
 the optimized native desktop environment.
 """
 

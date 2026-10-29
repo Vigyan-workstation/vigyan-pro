@@ -1,7 +1,7 @@
 <script lang="ts">
-  // StudioCanvas.svelte — Side-by-Side Multi-Mode STEM Engineering Workstation
-  // Steve Jobs Obsidian Titanium monochrome viewport with tactile real-time controls.
-  // Supports: 3D CAD, KiCad Netlists, 6-DoF Robotics Kinematics, and WaveDrom Digital Waveforms.
+  // StudioCanvas.svelte — Obsidian Titanium Monochrome STEM Workstation Viewport
+  // Parametric physical viewport with tactile real-time controls and offline hardware exports.
+  // Supports: Parametric 3D CAD, 6-DoF Robotics Kinematics, Digital Waveforms, and Exact Curve Plots.
   import { onMount, onDestroy } from "svelte";
   import { studioStore } from "../lib/studioStore.svelte";
   import { getAgentHost, getVigyanToken } from "../lib/ollama";
@@ -26,6 +26,9 @@
 
   // WaveDrom container element
   let waveContainerEl = $state<HTMLDivElement | null>(null);
+
+  // Plotly container element
+  let plotContainerEl = $state<HTMLDivElement | null>(null);
 
   $effect(() => {
     const art = studioStore.activeArtifact;
@@ -115,7 +118,7 @@
     geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute("normal", new THREE.BufferAttribute(norm, 3));
 
-    // Quiet luxury metallic satin titanium material
+    // Metallic satin titanium material
     const material = new THREE.MeshStandardMaterial({
       color: 0xd1d5db,
       metalness: 0.6,
@@ -126,7 +129,6 @@
     threeMesh = new THREE.Mesh(geometry, material);
     threeScene.add(threeMesh);
 
-    // Compute bounding sphere to frame camera
     geometry.computeBoundingSphere();
     if (geometry.boundingSphere && threeControls) {
       const radius = geometry.boundingSphere.radius || 60;
@@ -201,6 +203,88 @@
     } catch (e) {
       console.warn("WaveDrom Studio render error:", e);
     }
+  }
+
+  // Plotly mathematical curve renderer
+  $effect(() => {
+    const art = studioStore.activeArtifact;
+    if ((art?.render_type === "plot" || art?.render_type === "stem" || art?.x || art?.expression) && plotContainerEl) {
+      setTimeout(() => renderPlot(), 50);
+    }
+  });
+
+  function evaluateFormula(expr: string, x: number): number {
+    try {
+      const clean = expr
+        .replace(/\^/g, "**")
+        .replace(/sin/g, "Math.sin")
+        .replace(/cos/g, "Math.cos")
+        .replace(/tan/g, "Math.tan")
+        .replace(/sqrt/g, "Math.sqrt")
+        .replace(/exp/g, "Math.exp")
+        .replace(/log/g, "Math.log")
+        .replace(/pi/g, "Math.PI");
+      const fn = new Function("x", `return ${clean};`);
+      const val = fn(x);
+      return isFinite(val) ? val : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  function renderPlot() {
+    if (!plotContainerEl || !(window as any).Plotly) return;
+    const art = studioStore.activeArtifact;
+    if (!art) return;
+
+    let xVals: number[] = art.x ? [...art.x] : [];
+    let yVals: number[] = art.y ? [...art.y] : [];
+
+    if (xVals.length === 0 && art.expression) {
+      for (let x = -10; x <= 10; x += 0.2) {
+        xVals.push(Math.round(x * 10) / 10);
+        yVals.push(evaluateFormula(art.expression, x));
+      }
+    }
+
+    const trace = {
+      x: xVals,
+      y: yVals,
+      mode: "lines",
+      line: {
+        color: "#10b981",
+        width: 2.5,
+      },
+      name: art.title || (art.expression ? `f(x) = ${art.expression}` : "Curve"),
+    };
+
+    const layout = {
+      title: {
+        text: art.title || (art.expression ? `f(x) = ${art.expression}` : "Curve Analysis"),
+        font: { color: "#ffffff", size: 13 },
+      },
+      paper_bgcolor: "#040508",
+      plot_bgcolor: "#0a0c12",
+      margin: { l: 45, r: 25, t: 40, b: 35 },
+      xaxis: {
+        gridcolor: "#1b1e2a",
+        zerolinecolor: "#3f4458",
+        tickfont: { color: "#9ca3af", size: 10 },
+      },
+      yaxis: {
+        gridcolor: "#1b1e2a",
+        zerolinecolor: "#3f4458",
+        tickfont: { color: "#9ca3af", size: 10 },
+      },
+      showlegend: false,
+    };
+
+    const config = {
+      displayModeBar: false,
+      responsive: true,
+    };
+
+    (window as any).Plotly.newPlot(plotContainerEl, [trace], layout, config);
   }
 
   // CAD Param changes
@@ -349,20 +433,6 @@
     URL.revokeObjectURL(url);
   }
 
-  function downloadNetlist() {
-    const art = studioStore.activeArtifact;
-    if (!art || !art.kicad_netlist) return;
-    const blob = new Blob([art.kicad_netlist], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${(art.circuit_type || "vigyan_circuit").toLowerCase()}.net`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
   function downloadWaveSVG() {
     if (!waveContainerEl) return;
     const svgEl = waveContainerEl.querySelector("svg");
@@ -400,6 +470,32 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  function downloadPlotCSV() {
+    const art = studioStore.activeArtifact;
+    if (!art) return;
+    let xVals = art.x || [];
+    let yVals = art.y || [];
+    if (xVals.length === 0 && art.expression) {
+      for (let x = -10; x <= 10; x += 0.2) {
+        xVals.push(Math.round(x * 10) / 10);
+        yVals.push(evaluateFormula(art.expression, x));
+      }
+    }
+    let csv = "x,y\n";
+    for (let i = 0; i < xVals.length; i++) {
+      csv += `${xVals[i]},${yVals[i]}\n`;
+    }
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "curve_points.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 </script>
 
 <aside
@@ -412,7 +508,7 @@
         ⬡
       </div>
       <span class="text-xs font-semibold text-white tracking-wide truncate max-w-[220px]">
-        {studioStore.activeArtifact?.title || "STEM Studio Canvas"}
+        {studioStore.activeArtifact?.title || "Artifact Viewport"}
       </span>
       <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20">
         Live Studio
@@ -428,13 +524,13 @@
             : 'text-[#9ca3af] border-transparent hover:text-white'}"
           title="Toggle 360 Turntable Orbit"
         >
-          ↻ Orbit
+          Orbit
         </button>
       {/if}
 
       <button
         onclick={() => studioStore.close()}
-        class="text-[#9ca3af] hover:text-white transition-colors p-1 text-sm leading-none"
+        class="text-[#9ca3af] hover:text-white transition-colors p-1 text-sm leading-none cursor-pointer"
         aria-label="Close Studio Canvas"
       >
         ✕
@@ -560,7 +656,7 @@
             onclick={downloadSTL}
             class="w-full py-3 px-4 rounded-xl bg-white text-black font-semibold text-xs tracking-wide flex items-center justify-center gap-2 hover:bg-slate-200 transition-all shadow-lg cursor-pointer"
           >
-            <span>⬇ Download 3D Print File (.STL)</span>
+            <span>Download 3D STL</span>
           </button>
         </div>
       </div>
@@ -568,7 +664,7 @@
     <!-- MODE 2: ROBOTICS KINEMATICS -->
     {:else if studioStore.activeArtifact?.render_type === "robotics" || studioStore.activeArtifact?.tool === "robotics_kinematics"}
       <div class="p-5 flex-1 flex flex-col gap-4">
-        <!-- Pose Viewport (2D/3D Kinematic Skeleton Projection) -->
+        <!-- Pose Viewport (Denavit-Hartenberg Kinematic Skeleton Projection) -->
         <div class="relative w-full h-[220px] bg-[#040508] rounded-xl border border-white/[0.08] overflow-hidden flex items-center justify-center">
           <svg class="w-full h-full" viewBox="-500 -500 1000 600">
             <!-- Grid Lines & Reach Circle -->
@@ -662,7 +758,7 @@
           onclick={downloadRoboticsJSON}
           class="w-full py-3 px-4 rounded-xl bg-white text-black font-semibold text-xs tracking-wide flex items-center justify-center gap-2 hover:bg-slate-200 transition-all shadow-lg cursor-pointer mt-auto"
         >
-          <span>⬇ Export Kinematics Model (.json)</span>
+          <span>Export Kinematics JSON</span>
         </button>
       </div>
 
@@ -695,46 +791,34 @@
           onclick={downloadWaveSVG}
           class="w-full py-3 px-4 rounded-xl bg-white text-black font-semibold text-xs tracking-wide flex items-center justify-center gap-2 hover:bg-slate-200 transition-all shadow-lg cursor-pointer mt-auto"
         >
-          <span>⬇ Export Vector Waveform (.svg)</span>
+          <span>Export Vector SVG</span>
         </button>
       </div>
 
-    <!-- MODE 4: KICAD PCB NETLIST -->
-    {:else if studioStore.activeArtifact?.kicad_netlist}
+    <!-- MODE 4: EXACT MATHEMATICAL CURVES & PLOTS -->
+    {:else if studioStore.activeArtifact?.render_type === "plot" || studioStore.activeArtifact?.render_type === "stem" || studioStore.activeArtifact?.x || studioStore.activeArtifact?.expression}
       <div class="p-5 flex-1 flex flex-col gap-4">
         <div>
           <h3 class="text-xs font-semibold uppercase tracking-wider text-[#9ca3af] mb-1">
-            KiCad Electronic Netlist
+            Exact Mathematical Curve
           </h3>
           <p class="text-[11px] text-[#6b7280]">
-            Generated circuit topology ready for PCB layout and routing.
+            Deterministic function visualization computed offline via SymPy AST.
           </p>
         </div>
 
-        {#if studioStore.activeArtifact?.components}
-          <div class="bg-[#0c0e14] p-3 rounded-xl border border-white/[0.06] text-xs">
-            <span class="text-[#9ca3af] block mb-2 font-semibold">Bill of Materials (BOM):</span>
-            <div class="space-y-1 font-mono text-[11px]">
-              {#each studioStore.activeArtifact.components as c}
-                <div class="flex justify-between border-b border-white/[0.04] py-0.5">
-                  <span class="text-white font-bold">{c.ref} ({c.name})</span>
-                  <span class="text-[#10b981]">{c.value} [{c.footprint}]</span>
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
-        <div class="flex-1 bg-black p-3 rounded-xl border border-white/[0.08] overflow-y-auto font-mono text-[11px] text-[#9ca3af]">
-          <pre class="whitespace-pre-wrap">{studioStore.activeArtifact.kicad_netlist}</pre>
+        <div class="flex-1 bg-[#040508] p-2 rounded-xl border border-white/[0.08] flex items-center justify-center min-h-[280px]">
+          <div bind:this={plotContainerEl} class="w-full h-72"></div>
         </div>
 
-        <button
-          onclick={downloadNetlist}
-          class="w-full py-3 px-4 rounded-xl bg-white text-black font-semibold text-xs tracking-wide flex items-center justify-center gap-2 hover:bg-slate-200 transition-all shadow-lg cursor-pointer mt-auto"
-        >
-          <span>⬇ Export KiCad Netlist (.net)</span>
-        </button>
+        <div class="mt-auto">
+          <button
+            onclick={downloadPlotCSV}
+            class="w-full py-3 px-4 rounded-xl bg-white text-black font-semibold text-xs tracking-wide flex items-center justify-center gap-2 hover:bg-slate-200 transition-all shadow-lg cursor-pointer"
+          >
+            <span>Export Curve Points CSV</span>
+          </button>
+        </div>
       </div>
 
     <!-- FALLBACK -->

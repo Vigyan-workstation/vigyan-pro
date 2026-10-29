@@ -1,13 +1,13 @@
 <script lang="ts">
   import { renderMath, extractPlottableFormula } from "../lib/katex";
-  import PlotModal from "./PlotModal.svelte";
   import StemInlineCard from "./StemInlineCard.svelte";
   import AttachmentCard from "./AttachmentCard.svelte";
-  import SecurityGateCard from "./SecurityGateCard.svelte";
+  import { studioStore } from "../lib/studioStore.svelte";
   import type { ToolResult } from "../lib/ollama";
   import type { Attachment, Digest } from "../lib/chatStore.svelte";
 
   interface Props {
+    id?: string;
     role: "user" | "assistant";
     content: string;
     streaming?: boolean;
@@ -15,9 +15,38 @@
     sympyGrounding?: string;
     attachment?: Attachment;
     digest?: Digest;
+    canTrimPrior?: boolean;
     onAction?: (actionText: string) => void;
+    onDelete?: (id: string) => void;
+    onTrimPrior?: (id: string) => void;
   }
-  let { role, content, streaming = false, toolResults = [], sympyGrounding, attachment, digest, onAction }: Props = $props();
+  let {
+    id,
+    role,
+    content,
+    streaming = false,
+    toolResults = [],
+    sympyGrounding,
+    attachment,
+    digest,
+    canTrimPrior = false,
+    onAction,
+    onDelete,
+    onTrimPrior,
+  }: Props = $props();
+
+  let copied = $state(false);
+
+  function handleCopy() {
+    if (!content) return;
+    try {
+      navigator.clipboard.writeText(content);
+      copied = true;
+      setTimeout(() => {
+        copied = false;
+      }, 1500);
+    } catch {}
+  }
 
   const isUser = $derived(role === "user");
 
@@ -31,13 +60,21 @@
     !isUser && !streaming && toolResults.length === 0 ? extractPlottableFormula(content) : null
   );
 
-  let plotModalOpen = $state(false);
+  function openFormulaPlot(expr: string) {
+    studioStore.open({
+      id: Math.random().toString(36).slice(2, 9),
+      tool: "plot",
+      render_type: "plot",
+      title: `Curve: y = ${expr}`,
+      expression: expr,
+    });
+  }
 </script>
 
-<div class="flex w-full animate-fade-in {isUser ? 'justify-end' : 'justify-start'} my-1">
+<div class="flex w-full animate-fade-in {isUser ? 'justify-end' : 'justify-start'} my-1 group">
   <div
     class="
-      max-w-[85%] leading-relaxed break-words
+      max-w-[85%] leading-relaxed break-words relative
       {isUser
         ? 'bg-[#181a24] border border-[rgba(255,255,255,0.12)] text-[#f3f4f6] px-5 py-3 rounded-2xl rounded-tr-sm font-medium shadow-md'
         : 'bg-[#08090d] border border-[rgba(255,255,255,0.08)] text-[#e2e8f0] px-5 py-4 rounded-2xl rounded-tl-sm shadow-md w-full'}
@@ -55,7 +92,7 @@
         <div class="mb-3 p-3.5 rounded-xl bg-[#0c0e14] border border-white/10 space-y-3">
           <div class="flex items-center justify-between text-xs">
             <span class="font-semibold text-white flex items-center gap-1.5">
-              <span class="text-[#10b981]">📋</span>
+              <span class="text-[#10b981]">⬡</span>
               <span>Engineering Digest: {digest.filename}</span>
             </span>
             <span class="text-[10px] text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20 font-mono">
@@ -85,7 +122,7 @@
                   onclick={() => onAction?.(act)}
                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-black hover:bg-slate-200 text-xs font-semibold shadow transition-all cursor-pointer"
                 >
-                  <span>⚡</span>
+                  <span>⬡</span>
                   <span>{act}</span>
                 </button>
               {/each}
@@ -93,20 +130,12 @@
           {/if}
         </div>
       {/if}
-      <!-- Inline STEM visualizer cards (2D curves, 3D meshes, circuits) -->
+
+      <!-- Compact Reference Pills for Engineering Artifacts -->
       {#if toolResults && toolResults.length > 0}
         <div class="mb-3 space-y-2">
           {#each toolResults as t}
-            {#if t.status === "requires_approval" || (t.command && t.risk)}
-              <SecurityGateCard
-                command={t.command}
-                risk={t.risk || "medium"}
-                reason={t.reason}
-                cwd={t.cwd}
-              />
-            {:else}
-              <StemInlineCard tool={t} />
-            {/if}
+            <StemInlineCard tool={t} />
           {/each}
         </div>
       {/if}
@@ -115,27 +144,59 @@
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       <div class="prose-vigyan text-[14px]">{@html rendered}{#if streaming}<span class="animate-blink text-[#10b981] ml-0.5">▋</span>{/if}</div>
 
-      <!-- 1-Click Interactive Plot Curve Button (for extracted formulas) -->
+      <!-- 1-Click Interactive Plot Curve Button (opens in Artifact Viewport) -->
       {#if plottableFormula}
         <button
-          onclick={() => (plotModalOpen = true)}
-          class="mt-3.5 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 text-xs font-medium transition-all"
+          onclick={() => openFormulaPlot(plottableFormula)}
+          class="mt-3.5 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 text-xs font-medium transition-all cursor-pointer"
         >
-          <span>📈</span>
-          <span>Plot Curve ({plottableFormula})</span>
+          <span>∫</span>
+          <span>Open Curve in Viewport ({plottableFormula})</span>
         </button>
       {/if}
     {/if}
+
+    <!-- Discreet Hover Micro-Toolbar for Context Actions -->
+    {#if !streaming && id}
+      <div
+        class="
+          opacity-0 group-hover:opacity-100 transition-opacity duration-150
+          flex items-center gap-1.5 mt-2.5 pt-2 border-t border-white/[0.06] text-[11px] text-[#9ca3af]
+          {isUser ? 'justify-end' : 'justify-start'}
+        "
+      >
+        <button
+          type="button"
+          onclick={handleCopy}
+          title="Copy content"
+          class="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.1] hover:text-white border border-white/[0.08] transition-colors cursor-pointer"
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+        {#if canTrimPrior && onTrimPrior}
+          <button
+            type="button"
+            onclick={() => onTrimPrior?.(id)}
+            title="Trim prior conversation turns before this point"
+            class="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-amber-500/20 hover:text-amber-300 hover:border-amber-500/30 border border-white/[0.08] transition-colors cursor-pointer"
+          >
+            Trim Prior
+          </button>
+        {/if}
+        {#if onDelete}
+          <button
+            type="button"
+            onclick={() => onDelete?.(id)}
+            title="Delete this message from context"
+            class="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/30 border border-white/[0.08] transition-colors cursor-pointer"
+          >
+            Delete
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
-
-{#if plottableFormula}
-  <PlotModal
-    formula={plottableFormula}
-    isOpen={plotModalOpen}
-    onClose={() => (plotModalOpen = false)}
-  />
-{/if}
 
 <style>
   :global(.prose-vigyan .katex) {

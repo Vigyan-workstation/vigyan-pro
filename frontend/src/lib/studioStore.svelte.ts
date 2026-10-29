@@ -1,4 +1,4 @@
-// studioStore.svelte.ts — Reactive state for the Side-by-Side STEM Engineering Studio
+// studioStore.svelte.ts — Reactive state for the Side-by-Side STEM Engineering Workstation
 // Svelte 5 runes implementation for dual-pane workstation workflow.
 
 export interface StudioArtifact {
@@ -15,14 +15,6 @@ export interface StudioArtifact {
   stl_base64?: string;
   dimensions_mm?: Record<string, number>;
   triangle_count?: number;
-  // PCB fields
-  circuit_type?: string;
-  kicad_netlist?: string;
-  components?: any[];
-  nets?: any[];
-  // WaveDrom fields
-  wavedrom_spec?: any;
-  protocol?: string;
   // Robotics fields
   arm_type?: string;
   joint_angles_deg?: number[];
@@ -30,19 +22,32 @@ export interface StudioArtifact {
   reach_mm?: number;
   joint_chain?: Array<{ x: number; y: number; z: number }>;
   metrics?: Array<{ label: string; value: string }>;
-  // Silicon EDA fields
-  module_name?: string;
-  clock_domains?: string[];
-  ports?: { inputs: string[]; outputs: string[] };
+  // WaveDrom fields
+  wavedrom_spec?: any;
+  protocol?: string;
+  // Mathematical Plotting fields
+  expression?: string;
+  latex?: string;
+  data?: any[];
+  x?: number[];
+  y?: number[];
+  x_label?: string;
+  y_label?: string;
 }
 
 class StudioStore {
   activeArtifact = $state<StudioArtifact | null>(null);
   isOpen = $state<boolean>(false);
 
-  open(artifact: StudioArtifact) {
-    this.activeArtifact = artifact;
+  open(artifact?: StudioArtifact) {
+    if (artifact) {
+      this.activeArtifact = artifact;
+    }
     this.isOpen = true;
+  }
+
+  setArtifact(artifact: StudioArtifact) {
+    this.activeArtifact = artifact;
   }
 
   close() {

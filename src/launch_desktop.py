@@ -150,7 +150,7 @@ def _discover_static_hardware() -> Dict[str, Any]:
         except Exception:
             pass
 
-    # 3. GPU Topology Discovery (NVIDIA, Linux DRM sysfs AMD/Intel, Apple Metal, Windows WMI)
+    # 3. GPU Topology Discovery (NVIDIA, Linux DRM sysfs AMD/Intel, Unified Metal, Windows WMI)
     has_nvidia = shutil.which("nvidia-smi") is not None
     nvidia_name = None
     if has_nvidia:
@@ -214,9 +214,8 @@ def _discover_static_hardware() -> Dict[str, Any]:
             except Exception:
                 pass
     elif sys.platform == "darwin":
-        if "Apple" in cpu_model:
-            gpu_vendor = "apple_metal"
-            gpu_name = f"{cpu_model} Metal GPU"
+        gpu_vendor = "metal"
+        gpu_name = f"{cpu_model} Unified GPU"
 
     _STATIC_HW_CACHE = {
         "cpu_model": cpu_model,
@@ -463,7 +462,7 @@ def get_system_telemetry(override_mode: Optional[str] = None) -> Dict[str, Any]:
                     gpu_info = f"GPU {gpu_util}% | {vram_used_mb/1024:.1f}/{vram_total_mb/1024:.1f} GB"
         except Exception:
             pass
-    elif hw.get("gpu_vendor") == "apple_metal":
+    elif hw.get("gpu_vendor") == "metal":
         has_gpu = True
         is_apu = True
         vram_total_mb = hw["ram_total_gb"] * 1024 * 0.75
@@ -923,7 +922,7 @@ class RAMGovernor:
 
                     if consecutive_over >= 3 and not self.tripped:
                         self.tripped = True
-                        print(f"⚠️ [RAM GOVERNOR] CRITICAL TRIPWIRE: RAM reached {pct:.1f}% >= {self.threshold_pct}% sustained. Aborting & evicting model {active_model}!")
+                        print(f"[RAM GOVERNOR] CRITICAL TRIPWIRE: RAM reached {pct:.1f}% >= {self.threshold_pct}% sustained. Aborting & evicting model {active_model}!")
                         try:
                             evict_req = urllib.request.Request(
                                 "http://127.0.0.1:11434/api/generate",
@@ -1044,12 +1043,40 @@ def execute_shell_command(command: str, confirmed: bool = False, cwd: Optional[s
 
 
 def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
-    """Sovereign Vigyan AI execution router locked to Vigyan AI 1.5B Quad Master."""
+    """Sovereign Vigyan AI execution router with dynamic RAM guard cascade.
+    Selects between Fast 1.5B/3B edge model and Frontier 7B model.
+    Checks available host RAM before loading 7B to prevent OOM freezes.
+    """
+    req = (requested_model or "").strip().lower()
+    telemetry = get_system_telemetry()
+    avail_gb = telemetry.get("ram_avail_gb", 0.0)
+
+    # Check if user explicitly requested 7B frontier model
+    if req in ("vigyan:7b", "7b", "frontier", "frontier-7b"):
+        has_gpu_headroom = telemetry.get("gpu_vram_free_gb", 0.0) >= 3.6
+        has_ram_headroom = avail_gb >= 3.6
+
+        if has_gpu_headroom or has_ram_headroom:
+            return {
+                "tier": 2,
+                "model": "vigyan:7b",
+                "downgraded": False,
+                "reason": "Vigyan 7B Frontier Sovereign Engine (Advanced physical engineering & deep math)"
+            }
+        else:
+            return {
+                "tier": 1,
+                "model": "vigyan:1.5b",
+                "downgraded": True,
+                "reason": f"RAM Guard: System memory headroom ({avail_gb:.1f} GB free) is below the 3.6 GB required for 7B Frontier inference. Gracefully routed to Fast 1.5B Quad Master to protect system stability."
+            }
+
+    # Default to Fast 1.5B Quad Master
     return {
         "tier": 1,
         "model": "vigyan:1.5b",
         "downgraded": False,
-        "reason": "Vigyan AI 1.5B Quad Master (Sovereign ChatML architecture)"
+        "reason": "Vigyan AI 1.5B Quad Master (Ultra-fast low-latency sovereign edge model)"
     }
 
 
@@ -1072,6 +1099,30 @@ MODELS_CATALOG = {
             os.path.expanduser("~/.vigyan/models/vigyan-1.5b-quad-master-q4_k_m.gguf"),
             os.path.expanduser("~/models/vigyan-1.5b-quad-master-q4_k_m.gguf"),
             os.path.expanduser("~/Downloads/vigyan-1.5b-quad-master-q4_k_m.gguf")
+        ],
+        "template": """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+""",
+        "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+    },
+    "vigyan:7b": {
+        "name": "Vigyan 7B Frontier Sovereign Engine",
+        "tag": "vigyan:7b",
+        "size_bytes": 3468318432,
+        "size_formatted": "3.5 GB",
+        "recommended_ram": "4 GB+ RAM or 6 GB+ VRAM (Elite STEM & physics engineering)",
+        "description": "Elite frontier model for closed-form mathematics, Denavit-Hartenberg kinematics, Verilog RTL, and analog circuit netlists.",
+        "dest_filename": "vigyan-4th-gen-7b-IQ3_M.gguf",
+        "hf_url": "https://github.com/shreyansh001boy-tech/vigyan-desktop-releases/releases/download/v2.9.0-beta/vigyan-4th-gen-7b-IQ3_M.gguf",
+        "local_candidates": [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "vigyan-4th-gen-7b-IQ3_M.gguf"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "vigyan-4th-gen-7b-IQ3_M.gguf"),
+            os.path.expanduser("~/.vigyan/models/vigyan-4th-gen-7b-IQ3_M.gguf"),
+            os.path.expanduser("~/models/vigyan-4th-gen-7b-IQ3_M.gguf"),
+            os.path.expanduser("~/Downloads/vigyan-4th-gen-7b-IQ3_M.gguf")
         ],
         "template": """{{- if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
@@ -1168,6 +1219,65 @@ def ensure_vigyan_1_5b_registered() -> bool:
         return res.returncode == 0
     except Exception as e:
         print(f"[WARN] Ollama registration error: {e}", file=sys.stderr)
+        return False
+
+
+def ensure_vigyan_7b_registered() -> bool:
+    """Autonomous verifier and auto-repair for Vigyan 7B Frontier model in Ollama."""
+    try:
+        check = subprocess.run(["ollama", "show", "vigyan:7b"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2.0)
+        if check.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    target_dir = os.path.expanduser("~/.vigyan/models")
+    os.makedirs(target_dir, exist_ok=True)
+    gguf_path = os.path.join(target_dir, "vigyan-4th-gen-7b-IQ3_M.gguf")
+
+    if not os.path.isfile(gguf_path) or os.path.getsize(gguf_path) < 1_000_000_000:
+        candidates = MODELS_CATALOG.get("vigyan:7b", {}).get("local_candidates", [])
+        found_local = None
+        for cand in candidates:
+            if cand and os.path.isfile(cand) and os.path.getsize(cand) >= 1_000_000_000:
+                found_local = cand
+                break
+        if found_local:
+            gguf_path = found_local
+        else:
+            return False
+
+    modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-7b")
+    modelfile_content = (
+        f"FROM {gguf_path}\n"
+        'TEMPLATE """{{- if .System }}<|im_start|>system\n'
+        "{{ .System }}<|im_end|>\n"
+        '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
+        "{{ .Content }}<|im_end|>\n"
+        '{{ end }}<|im_start|>assistant\n'
+        '"""\n'
+        'SYSTEM """You are Vigyan 7B, an elite sovereign neuro-symbolic physical engineering model. You derive exact closed-form mathematics, Denavit-Hartenberg kinematics, synthesizable Verilog RTL, and analog circuit netlists with absolute rigor and zero hallucination."""\n'
+        'PARAMETER stop "<|im_start|>"\n'
+        'PARAMETER stop "<|im_end|>"\n'
+        'PARAMETER stop "<|endoftext|>"\n'
+        'PARAMETER stop "User:"\n'
+        'PARAMETER stop "\\n\\nUser"\n'
+        'PARAMETER stop "Human:"\n'
+        "PARAMETER num_gpu 0\n"
+        "PARAMETER temperature 0.2\n"
+        "PARAMETER top_p 0.95\n"
+        "PARAMETER top_k 40\n"
+        "PARAMETER num_ctx 2048\n"
+    )
+    with open(modelfile_path, "w", encoding="utf-8") as mf:
+        mf.write(modelfile_content)
+
+    try:
+        print("[INFO] Auto-repair: Registering vigyan:7b into Ollama...", file=sys.stderr)
+        res = subprocess.run(["ollama", "create", "vigyan:7b", "-f", modelfile_path], capture_output=True, timeout=180)
+        return res.returncode == 0
+    except Exception as e:
+        print(f"[WARN] Ollama 7b registration error: {e}", file=sys.stderr)
         return False
 
 
@@ -1418,7 +1528,7 @@ def grep_workspace_files(query: str, path: str = ".") -> Dict[str, Any]:
         except Exception:
             pass
 
-    # Universal cross-platform pure-Python search fallback (Windows / macOS / minimal environments)
+    # Universal cross-platform pure-Python search fallback (minimal environments)
     try:
         q_lower = query.lower()
         count = 0
@@ -1829,12 +1939,12 @@ def calc_physics(sim_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return {"tool": "physics_sim", "success": False, "error": f"Unknown sim type: '{stype}' (supported: kepler_orbit, projectile)"}
 
 
-def compress_conversation_history(messages: List[Dict[str, str]], max_tokens_est: int = 650) -> List[Dict[str, str]]:
+def compress_conversation_history(messages: List[Dict[str, str]], max_tokens_est: int = 2048) -> List[Dict[str, str]]:
     """
     Sliding Window + Micro-Summary Compressor.
     Preserves system axioms & original user goal, condenses intermediate turns into
     a compact bulleted memory summary, and streams the latest 4 turns verbatim.
-    Prevents overflowing the 1024-token budget on long sessions.
+    Prevents overflowing the context budget on long sessions while retaining depth.
     """
     if not messages or len(messages) <= 5:
         return messages
@@ -2012,6 +2122,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             rec_tag = "vigyan:1.5b"
             payload = {
                 "catalog": MODELS_CATALOG,
+                "models": list(MODELS_CATALOG.values()),
                 "recommended_tag": rec_tag,
                 "system_ram_gb": ram_gb,
                 "downloads": _DOWNLOAD_MGR.get_status()
@@ -2027,17 +2138,15 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             st = _DOWNLOAD_MGR.get_status(query_tag)
             self._send_cors(200)
             self.wfile.write(json.dumps(st).encode("utf-8"))
-        elif self.path.startswith("/api/workspace/list"):
-            from urllib.parse import parse_qs, urlparse
-            qs = parse_qs(urlparse(self.path).query)
-            p = qs.get("path", ["."])[0]
-            res = list_workspace_dir(p)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
         elif self.path.startswith("/api/system/update/check"):
-            res = check_github_update()
             self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
+            self.wfile.write(json.dumps({
+                "current_version": __version__,
+                "latest_version": __version__,
+                "update_available": False,
+                "release_notes": "100% Offline Air-Gapped Workstation.",
+                "air_gapped": True
+            }).encode("utf-8"))
         else:
             # Universal cross-platform static file serving (dist/ priority then src/)
             clean_path = self.path.split("?")[0]
@@ -2127,7 +2236,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
 
         if self.path.startswith("/api/models/evict"):
             tag = body.get("model") or body.get("tag") or ""
-            targets = [tag] if tag else ["vigyan:1.5b"]
+            targets = [tag] if tag else ["vigyan:1.5b", "vigyan:7b"]
             evicted = []
             for m in targets:
                 try:
@@ -2144,48 +2253,6 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             stats = get_system_telemetry()
             self._send_cors(200)
             self.wfile.write(json.dumps({"success": True, "evicted": evicted, "telemetry": stats}).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/workspace/list"):
-            p = body.get("path", ".")
-            res = list_workspace_dir(p)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/workspace/read"):
-            p = body.get("path", "")
-            s = int(body.get("start_line", 1))
-            e = int(body.get("end_line", 200))
-            res = read_workspace_file(p, s, e)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/workspace/write"):
-            p = body.get("path", "")
-            c = body.get("content", "")
-            ov = bool(body.get("overwrite", False))
-            res = write_workspace_file(p, c, ov)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/workspace/grep"):
-            q = body.get("query", "")
-            p = body.get("path", ".")
-            res = grep_workspace_files(q, p)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/agent/execute_cmd"):
-            cmd = body.get("command", "")
-            confirmed = bool(body.get("confirmed", False))
-            cwd = body.get("cwd")
-            res = execute_shell_command(cmd, confirmed=confirmed, cwd=cwd)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
         if self.path.startswith("/api/tools/cad/recompute"):
@@ -2295,208 +2362,6 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 cites = [f"[{a['domain']}: {a['law']}] {a['equation']}" for a in enrichment["graph_axioms"]]
                 _emit("memory", "<br>• " + "<br>• ".join(cites))
 
-            # Fast-path deterministic STEM visualizer card generation
-            deterministic_executed = False
-            q_lower = user_query.lower()
-            
-            # 1. Plotting Intent
-            if any(w in q_lower for w in ("plot", "graph", "curve", "oscillat")):
-                m_plot = re.search(r"(?:plot|graph)\s+(?:the\s+)?(?:damped\s+oscillation\s+)?(?:function\s+)?(?:f\(x\)\s*=\s*)?([^\n,;]+?)\s+from\s+([-\d\.]+)\s+to\s+([-\d\.]+)", q_lower)
-                if m_plot:
-                    expr_str, x_min_str, x_max_str = m_plot.groups()
-                    expr_clean = expr_str.replace("with high resolution", "").replace("with resolution", "").replace("with high", "").strip()
-                    expr_clean = re.sub(r"\s+(?:with|in|for|at|using)\b.*$", "", expr_clean)
-                    try:
-                        x_min = float(x_min_str)
-                        x_max = float(x_max_str)
-                        plot_res = evaluate_plot(expression=expr_clean, x_min=x_min, x_max=x_max, points=300, title=f"f(x) = {expr_clean}")
-                        if plot_res.get("success"):
-                            _emit("tool_result", plot_res)
-                            deterministic_executed = True
-                    except Exception:
-                        pass
-                elif "damped" in q_lower or ("exp" in q_lower and "cos" in q_lower):
-                    plot_res = evaluate_plot(expression="exp(-0.15*x)*cos(2*x)", x_min=0.0, x_max=25.0, points=300, title="Damped Oscillation f(x) = exp(-0.15x)cos(2x)")
-                    if plot_res.get("success"):
-                        _emit("tool_result", plot_res)
-                        deterministic_executed = True
-                elif "sin" in q_lower and "exp" in q_lower:
-                    plot_res = evaluate_plot(expression="sin(x)*exp(-0.2*x)", x_min=0.0, x_max=20.0, points=300, title="Damped Sine Wave f(x) = sin(x)*exp(-0.2x)")
-                    if plot_res.get("success"):
-                        _emit("tool_result", plot_res)
-                        deterministic_executed = True
-
-            # 2. Circuit Intent
-            if not deterministic_executed and any(w in q_lower for w in ("circuit", "filter", "cutoff", "rc lowpass", "rlc", "555")):
-                if "rc" in q_lower or "filter" in q_lower:
-                    circ_res = calc_circuit("rc_filter", {"r": 10000.0, "c": 1e-7, "filter_type": "lowpass"})
-                    _emit("tool_result", circ_res)
-                    deterministic_executed = True
-                elif "rlc" in q_lower or "reson" in q_lower:
-                    circ_res = calc_circuit("rlc_resonance", {"r": 10.0, "l": 0.01, "c": 1e-6, "config": "series"})
-                    _emit("tool_result", circ_res)
-                    deterministic_executed = True
-                elif "555" in q_lower or "timer" in q_lower:
-                    circ_res = calc_circuit("555_timer", {"r1": 10000.0, "r2": 47000.0, "c": 1e-6})
-                    _emit("tool_result", circ_res)
-                    deterministic_executed = True
-
-            # 3. Physics / Orbit Intent
-            if not deterministic_executed and any(w in q_lower for w in ("orbit", "kepler", "satellite", "projectile", "ballistic")):
-                if "orbit" in q_lower or "kepler" in q_lower or "satellite" in q_lower:
-                    phys_res = calc_physics("kepler_orbit", {"a": 7000.0, "e": 0.05, "body": "earth"})
-                    _emit("tool_result", phys_res)
-                    deterministic_executed = True
-                elif "projectile" in q_lower or "ballistic" in q_lower:
-                    phys_res = calc_physics("projectile", {"velocity": 50.0, "angle_deg": 45.0, "height": 0.0})
-                    _emit("tool_result", phys_res)
-                    deterministic_executed = True
-
-            # 4. Material Science Intent
-            if not deterministic_executed and any(w in q_lower for w in ("/material", "crystallography", "unit cell", "bragg", "fcc", "bcc", "hcp", "perovskite", "eutectic", "lever rule")):
-                mat_type = "crystal_lattice"
-                lat_type = "FCC"
-                if "phase" in q_lower or "eutectic" in q_lower or "lever" in q_lower:
-                    mat_type = "phase_diagram"
-                elif "xrd" in q_lower or "bragg" in q_lower or "diffraction" in q_lower:
-                    mat_type = "xrd"
-                elif "bcc" in q_lower:
-                    lat_type = "BCC"
-                elif "hcp" in q_lower:
-                    lat_type = "HCP"
-                elif "diamond" in q_lower:
-                    lat_type = "Diamond"
-                elif "perovskite" in q_lower:
-                    lat_type = "Perovskite"
-                
-                mat_res = {
-                    "tool": "material_science",
-                    "render_type": "material_science",
-                    "success": True,
-                    "title": f"Crystallographic Analysis ({lat_type if mat_type == 'crystal_lattice' else mat_type.title()})",
-                    "type": mat_type,
-                    "latticeType": lat_type,
-                    "materialName": f"{lat_type} Crystal Matrix",
-                    "parameters": {"temperature": 220, "composition": 40}
-                }
-                _emit("tool_result", mat_res)
-                deterministic_executed = True
-
-            # 5. Molecular Biology Intent
-            if not deterministic_executed and any(w in q_lower for w in ("/biology", "dna", "double helix", "bilayer", "membrane", "glycolysis", "krebs", "tca")):
-                bio_type = "dna_helix"
-                if "membrane" in q_lower or "lipid" in q_lower or "channel" in q_lower:
-                    bio_type = "cell_membrane"
-                elif "protein" in q_lower or "folding" in q_lower or "sheet" in q_lower:
-                    bio_type = "protein_folding"
-                elif "respiration" in q_lower or "glycolysis" in q_lower or "krebs" in q_lower or "tca" in q_lower:
-                    bio_type = "metabolic_pathway"
-                
-                bio_res = {
-                    "tool": "biology_viewer",
-                    "render_type": "biology_viewer",
-                    "success": True,
-                    "title": f"Biological System: {bio_type.replace('_', ' ').title()}",
-                    "type": bio_type,
-                    "parameters": {"channelOpen": True, "atpYield": 32}
-                }
-                _emit("tool_result", bio_res)
-                deterministic_executed = True
-
-            # 6. Advanced 3D Math Intent
-            if not deterministic_executed and any(w in q_lower for w in ("/math3d", "saddle", "hyperbolic paraboloid", "vector field", "curl", "divergence", "taylor series")):
-                m_type = "saddle"
-                if "vector" in q_lower or "curl" in q_lower or "div" in q_lower:
-                    m_type = "vector_field"
-                elif "taylor" in q_lower or "series" in q_lower:
-                    m_type = "taylor_series"
-                
-                math_res = {
-                    "tool": "math_visualizer",
-                    "render_type": "math_visualizer",
-                    "success": True,
-                    "title": f"Higher Mathematics: {m_type.replace('_', ' ').title()}",
-                    "type": m_type,
-                    "parameters": {"a": 2.0, "b": 2.0, "degree": 5}
-                }
-                _emit("tool_result", math_res)
-                deterministic_executed = True
-
-            # 7. Clinical Decision Support Intent
-            if not deterministic_executed and any(w in q_lower for w in ("/medical", "stemi", "ecg", "septic shock", "pulmonary embolism", "differential diagnosis")):
-                med_condition = "stemi"
-                if "shock" in q_lower or "sepsis" in q_lower:
-                    med_condition = "septic_shock"
-                elif "embolism" in q_lower or "pe" in q_lower:
-                    med_condition = "pulmonary_embolism"
-                
-                med_res = {
-                    "tool": "medical_viewer",
-                    "render_type": "medical_viewer",
-                    "success": True,
-                    "title": f"Clinical Protocol: {med_condition.replace('_', ' ').upper()}",
-                    "condition": med_condition
-                }
-                _emit("tool_result", med_res)
-                deterministic_executed = True
-
-            # 8. CAD & 3D Solid Geometry Intent (Parametric CSG & STL)
-            if not deterministic_executed and any(w in q_lower for w in ("cad", "enclosure", "3d box", "mounting bracket", "3d print", "gear", "cylinder", "solid geometry")):
-                import tools
-                cad_shape = "enclosure"
-                cad_params = {"width": 120.0, "length": 80.0, "height": 35.0, "wall": 2.5}
-                if "gear" in q_lower:
-                    cad_shape = "gear"
-                    cad_params = {"num_teeth": 18, "module": 2.0, "thickness": 8.0, "bore": 5.0}
-                elif "cylinder" in q_lower or "rod" in q_lower or "shaft" in q_lower:
-                    cad_shape = "cylinder"
-                    cad_params = {"radius": 25.0, "height": 60.0}
-                elif "box" in q_lower and "enclosure" not in q_lower:
-                    cad_shape = "box"
-                    cad_params = {"width": 80.0, "length": 80.0, "height": 40.0}
-                
-                m_dim = re.search(r"(\d+(?:\.\d+)?)\s*(?:x|\*)\s*(\d+(?:\.\d+)?)\s*(?:x|\*)\s*(\d+(?:\.\d+)?)", q_lower)
-                if m_dim and cad_shape in ("enclosure", "box"):
-                    try:
-                        cad_params["width"] = float(m_dim.group(1))
-                        cad_params["length"] = float(m_dim.group(2))
-                        cad_params["height"] = float(m_dim.group(3))
-                    except Exception:
-                        pass
-
-                cad_res = tools.dispatch_tool("cad_model_generate", {
-                    "shape": cad_shape,
-                    "title": f"Parametric {cad_shape.title()} ({cad_params.get('width', 120):.0f}x{cad_params.get('length', 80):.0f}x{cad_params.get('height', 35):.0f}mm)" if "width" in cad_params else f"Parametric {cad_shape.title()}",
-                    "params": cad_params
-                })
-                if cad_res.get("success"):
-                    _emit("tool_result", cad_res)
-                    deterministic_executed = True
-
-            # 9. Electronics PCB & KiCad Netlist Intent
-            if not deterministic_executed and any(w in q_lower for w in ("pcb", "netlist", "kicad", "555 timer", "astable", "circuit board")):
-                import tools
-                pcb_res = tools.dispatch_tool("pcb_netlist_generate", {
-                    "circuit_type": "555_astable",
-                    "title": "KiCad PCB Netlist (555 Timer Astable)",
-                    "params": {"r1": 10000.0, "r2": 47000.0, "c1": 1e-6}
-                })
-                if pcb_res.get("success"):
-                    _emit("tool_result", pcb_res)
-                    deterministic_executed = True
-
-            # 10. Robotics Kinematics Intent
-            if not deterministic_executed and any(w in q_lower for w in ("robotics", "kinematics", "dh matrix", "robot arm", "denavit")):
-                import tools
-                rob_res = tools.dispatch_tool("robotics_kinematics", {
-                    "manipulator_type": "2dof_planar",
-                    "joint_angles_deg": [30.0, 45.0],
-                    "link_lengths": [10.0, 8.0]
-                })
-                if rob_res.get("success"):
-                    _emit("tool_result", rob_res)
-                    deterministic_executed = True
-
             tool_spec = ""
             try:
                 import tools
@@ -2505,8 +2370,9 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 pass
 
             sys_prompt = (
-                "You are Vigyan AI 1.5B Quad Master, a sovereign STEM, math, and physics intelligence system architected by Shreyansh Singh. "
-                "Solve problems with mathematical precision, concise explanations, and clean LaTeX ($$...$$). Be direct, rigorous, and professional."
+                "You are Vigyan AI, a sovereign STEM, math, and physics intelligence system architected by Shreyansh Singh. "
+                "Solve problems with mathematical precision, concise explanations, and clean LaTeX ($$...$$). Be direct, rigorous, and professional. "
+                "When requested to synthesize 3D CAD geometry, 6-DoF robotics kinematics, digital bus waveforms, or mathematical plots, emit structured <tool_call> JSON specifications."
                 f"{tool_spec}"
             )
             if enrichment.get("sympy"):
@@ -2523,10 +2389,27 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
 
             try:
                 hybrid = enrichment["hybrid"]
+                user_ctx = None
+                try:
+                    if body.get("num_ctx"):
+                        user_ctx = int(body.get("num_ctx"))
+                    elif body.get("options", {}).get("num_ctx"):
+                        user_ctx = int(body.get("options", {}).get("num_ctx"))
+                except Exception:
+                    user_ctx = None
+
+                # RAM-Safe Dynamic Context Budget Clamping
+                target_ctx = user_ctx or 2048
+                avail_ram = telemetry.get("ram_avail_gb", 4.0)
+                if target_ctx > 4096 and avail_ram < 4.0:
+                    target_ctx = 4096
+                if target_ctx > 2048 and avail_ram < 2.5:
+                    target_ctx = 2048
+
                 raw_messages = body.get("messages") or []
                 if raw_messages:
                     full_msgs = [{"role": "system", "content": sys_prompt}] + raw_messages
-                    model_messages = compress_conversation_history(full_msgs, max_tokens_est=650)
+                    model_messages = compress_conversation_history(full_msgs, max_tokens_est=target_ctx)
                 else:
                     model_messages = [
                         {"role": "system", "content": sys_prompt},
@@ -2540,24 +2423,15 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 except Exception:
                     user_temp = 0.05
 
-                user_ctx = None
-                try:
-                    if body.get("num_ctx"):
-                        user_ctx = int(body.get("num_ctx"))
-                    elif body.get("options", {}).get("num_ctx"):
-                        user_ctx = int(body.get("options", {}).get("num_ctx"))
-                except Exception:
-                    user_ctx = None
-
                 ollama_payload = {
                     "model": active_model,
                     "messages": model_messages,
                     "options": {
                         "num_gpu": hybrid["num_gpu"],
                         "num_thread": hybrid["num_thread"],
-                        "num_ctx": user_ctx or 1024,
+                        "num_ctx": target_ctx,
                         "num_batch": 64,
-                        "num_predict": 1024,
+                        "num_predict": min(target_ctx, 2048),
                         "temperature": user_temp,
                         "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "User:", "\n\nUser", "Human:"]
                     },
@@ -2587,7 +2461,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                         "evicted_model": active_model,
                         "fallback": "vigyan:1.5b"
                     })
-                    _emit("token", f"\n\n⚠️ **[RAM Governor Safety Alert]**: Memory reached {pct:.1f}% (≥ {gov_thresh:.0f}% threshold). Model `{active_model}` was unloaded to prevent system lockup.")
+                    _emit("token", f"\n\n**[RAM Governor Safety Alert]**: Memory reached {pct:.1f}% (≥ {gov_thresh:.0f}% threshold). Model `{active_model}` was unloaded to prevent system lockup.")
 
                 governor = RAMGovernor(threshold_pct=gov_thresh, interval_sec=0.1)
                 governor.start(_on_ram_trip, active_model)
@@ -2669,28 +2543,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 t_data = json.loads(t_str.strip())
                 t_name = t_data.get("name")
                 t_args = t_data.get("arguments", {})
-                if t_name == "execute_cmd":
-                    cmd = t_args.get("command", "")
-                    exec_res = execute_shell_command(cmd, confirmed=False)
-                    if exec_res.get("status") == "requires_approval":
-                        emit_fn("requires_approval", exec_res)
-                    else:
-                        emit_fn("tool_result", exec_res)
-                elif t_name == "list_dir":
-                    emit_fn("tool_result", {"tool": "list_dir", "result": list_workspace_dir(t_args.get("path", "."))})
-                elif t_name == "read_file":
-                    emit_fn("tool_result", {"tool": "read_file", "result": read_workspace_file(t_args.get("path", ""), t_args.get("start_line", 1), t_args.get("end_line", 200))})
-                elif t_name == "write_file":
-                    p = t_args.get("path", "")
-                    c = t_args.get("content", "")
-                    w_res = write_workspace_file(p, c, overwrite=False)
-                    if w_res.get("status") == "requires_approval":
-                        emit_fn("requires_approval", w_res)
-                    else:
-                        emit_fn("tool_result", {"tool": "write_file", "result": w_res})
-                elif t_name == "grep_files":
-                    emit_fn("tool_result", {"tool": "grep_files", "result": grep_workspace_files(t_args.get("query", ""), t_args.get("path", "."))})
-                elif t_name == "sympy_eval":
+                if t_name == "sympy_eval":
                     expr = t_args.get("expression", "")
                     if _SYMPY_ENGINE:
                         eval_res = _SYMPY_ENGINE.evaluate_expression(expr)
@@ -3013,6 +2866,7 @@ def main():
     def _prewarm_moe():
         time.sleep(2.0)  # Wait for UI window to finish layout
         ensure_vigyan_1_5b_registered()
+        ensure_vigyan_7b_registered()
         try:
             pw_req = urllib.request.Request(
                 "http://127.0.0.1:11434/api/generate",

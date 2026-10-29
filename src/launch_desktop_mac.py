@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Vigyan Pro Sovereign Studio - Native macOS Desktop Launcher
-Utilizes Apple Cocoa WKWebView on macOS (Intel and Apple Silicon M1/M2/M3/M4)
-with native window vibrancy, pitch-black obsidian theme, Smart Hybrid GPU+CPU Compute Engine,
-and Embedded Neuro-Symbolic Bridge (SymPy AST + KùzuDB GraphRAG + Plotly).
+Vigyan Pro Sovereign Studio - Native Desktop Launcher
+Utilizes Cocoa WKWebView with native window vibrancy, pitch-black obsidian theme,
+Smart Hybrid GPU+CPU Compute Engine, and Embedded Neuro-Symbolic Bridge.
 Zero Browser Chrome. 100% Native Desktop Window.
 """
 
@@ -57,10 +56,11 @@ def launch_mac():
     except Exception as exc:
         print(f"[Vigyan Pro] Notice: Ollama supervisor started or running externally: {exc}", file=sys.stderr)
 
-    # 2.5 Ensure Vigyan AI 1.5B Quad Master is registered into Ollama
+    # 2.5 Ensure Vigyan AI 1.5B Quad Master and Vigyan 7B Frontier are registered into Ollama
     try:
-        from launch_desktop import ensure_vigyan_1_5b_registered
+        from launch_desktop import ensure_vigyan_1_5b_registered, ensure_vigyan_7b_registered
         ensure_vigyan_1_5b_registered()
+        ensure_vigyan_7b_registered()
     except Exception as exc:
         print(f"[Vigyan Pro] Sovereign model registration notice: {exc}", file=sys.stderr)
 
@@ -89,7 +89,7 @@ def launch_mac():
     except Exception as e:
         print(f"[Vigyan Pro] Cocoa pywebview notice: {e}")
 
-    # 4. Fallback: Chromium / Chrome / Brave / Edge App Mode on macOS
+    # 4. Fallback: Chromium / Chrome / Brave / Edge App Mode
     chrome_paths = [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "/Applications/Chromium.app/Contents/MacOS/Chromium",

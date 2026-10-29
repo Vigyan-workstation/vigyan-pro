@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Vigyan Pro Sovereign Studio - macOS Launcher & First-Run Bootstrap
+# Vigyan Pro Sovereign Studio - Darwin Launcher & First-Run Bootstrap
 # ==============================================================================
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
 echo "========================================================"
-echo "  Launching Vigyan Pro Sovereign Studio (macOS)"
+echo "  Launching Vigyan Pro Sovereign Studio"
 echo "  100% Offline Edge Intelligence • Shreyansh Singh"
 echo "========================================================"
 
 # Check if Ollama is installed
 if ! command -v ollama &>/dev/null && [ ! -x "/opt/homebrew/bin/ollama" ] && [ ! -x "/usr/local/bin/ollama" ]; then
     echo ""
-    echo "[!] Notice: Ollama is not detected on your Mac."
+    echo "[!] Notice: Ollama is not detected."
     echo "    Vigyan Pro runs 100% locally using Ollama."
-    echo "    To install: brew install ollama   OR   visit https://ollama.com/download/mac"
+    echo "    To install: brew install ollama   OR   visit https://ollama.com"
     echo ""
 fi
 

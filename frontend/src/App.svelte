@@ -1,6 +1,6 @@
 <script lang="ts">
   // App.svelte — Root Obsidian Executive Frame
-  // Minimalist, quiet luxury desktop interface inspired by Steve Jobs Apple typography.
+  // Minimalist sovereign engineering workstation interface.
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
@@ -43,23 +43,23 @@
     <!-- Center: Sovereign Status Pill with Glowing Green Micro-Dot -->
     <StatusDot connected={ollamaConnected} />
 
-    <!-- Right: Executive Actions (+ New Chat, Studio Canvas & Settings Gear) -->
+    <!-- Right: Executive Actions (+ New Chat, Artifact Viewport & Settings Gear) -->
     <div class="flex items-center gap-2">
       {#if studioStore.activeArtifact && !studioStore.isOpen}
         <button
           onclick={() => (studioStore.isOpen = true)}
-          class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 hover:bg-[#10b981]/20 transition-all shadow-sm"
-          title="Re-open STEM Studio Canvas"
+          class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/30 hover:bg-[#10b981]/20 transition-all shadow-sm cursor-pointer"
+          title="Re-open Artifact Viewport"
         >
           <span>⬡</span>
-          <span>Studio Canvas</span>
+          <span>Artifact Viewport</span>
         </button>
       {/if}
 
       {#if chatStore.messages.length > 0}
         <button
           onclick={() => chatStore.clear()}
-          class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-[#9ca3af] hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 transition-all shadow-sm"
+          class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-[#9ca3af] hover:text-white bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-white/20 transition-all shadow-sm cursor-pointer"
           title="Start fresh conversation"
         >
           <span class="text-xs leading-none">+</span>
@@ -70,7 +70,7 @@
       <!-- Settings gear -->
       <button
         onclick={() => (settingsOpen = !settingsOpen)}
-        class="w-8 h-8 flex items-center justify-center rounded-full text-[#9ca3af] hover:text-white hover:bg-white/[0.08] transition-all"
+        class="w-8 h-8 flex items-center justify-center rounded-full text-[#9ca3af] hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
         aria-label="Settings"
         title="Settings"
       >
@@ -85,7 +85,7 @@
     </div>
   </header>
 
-  <!-- Main: Responsive Split Workspace (Centered Chat + Side-by-Side Studio Canvas) -->
+  <!-- Main: Responsive Split Workspace (Centered Chat + Side-by-Side Artifact Viewport) -->
   <main class="flex-1 overflow-hidden relative flex">
     <div class="h-full transition-all duration-300 {studioStore.isOpen ? 'w-[52%] border-r border-[rgba(255,255,255,0.08)]' : 'w-full'}">
       <Chat {model} {fontSize} />

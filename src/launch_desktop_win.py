@@ -158,10 +158,11 @@ def launch_webview2():
     # Universal cross-platform URL: prefer local HTTP server to avoid Edge/Chromium file:// CORS restrictions
     target_url = f"http://127.0.0.1:{bridge_port}/" if bridge_started else f"file:///{index_path.replace(os.sep, '/')}"
 
-    # Ensure Vigyan AI 1.5B Quad Master is registered into Ollama
+    # Ensure Vigyan AI 1.5B Quad Master and Vigyan 7B Frontier are registered into Ollama
     try:
-        from launch_desktop import ensure_vigyan_1_5b_registered
+        from launch_desktop import ensure_vigyan_1_5b_registered, ensure_vigyan_7b_registered
         ensure_vigyan_1_5b_registered()
+        ensure_vigyan_7b_registered()
     except Exception as exc:
         print(f"[Vigyan Pro] Sovereign model registration notice: {exc}")
 

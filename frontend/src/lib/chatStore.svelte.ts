@@ -67,6 +67,37 @@ class ChatStore {
     }
   }
 
+  deleteMessage(id: string) {
+    this.messages = this.messages.filter((m) => m.id !== id);
+    this.save();
+  }
+
+  trimHistoryBefore(id: string) {
+    const idx = this.messages.findIndex((m) => m.id === id);
+    if (idx > 0) {
+      this.messages = this.messages.slice(idx);
+      this.save();
+    }
+  }
+
+  estimateTotalTokens(): number {
+    const totalChars = this.messages.reduce(
+      (sum, m) => sum + (m.content?.length || 0) + (m.thinking?.length || 0),
+      0
+    );
+    return Math.max(0, Math.round(totalChars / 4));
+  }
+
+  autoCompressIfNeeded(maxContextBudget: number = 2048): boolean {
+    if (this.messages.length <= 5) return false;
+    const estimated = this.estimateTotalTokens();
+    if (estimated >= maxContextBudget * 0.75) {
+      const res = this.compress();
+      return res.olderCount > 0;
+    }
+    return false;
+  }
+
   compress(): { tokensSaved: number; count: number; olderCount: number } {
     if (this.messages.length <= 4) return { tokensSaved: 0, count: this.messages.length, olderCount: 0 };
 

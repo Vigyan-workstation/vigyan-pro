@@ -48,7 +48,7 @@
             <span class="text-xs font-semibold text-[#e2e8f0]">
               {streaming
                 ? "Working through mathematical reasoning (SymPy AST Engine)…"
-                : (hasSymPy ? `✓ Verified in ${stepCount} steps (SymPy Engine)` : `Reasoning Chain (${stepCount} steps)`)}
+                : (hasSymPy ? `Verified in ${stepCount} steps (SymPy Engine)` : `Reasoning Chain (${stepCount} steps)`)}
             </span>
           </div>
 
@@ -56,7 +56,7 @@
             <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/25 px-2 py-0.5 rounded-full">
               {hasSymPy ? "AST Grounded" : "Verified"}
             </span>
-            <span class="text-[11px] text-[#9ca3af] ml-1">▲ collapse</span>
+            <span class="text-[11px] text-[#9ca3af] ml-1">collapse</span>
           </div>
         </button>
 
@@ -71,7 +71,7 @@
         onclick={() => (expanded = true)}
         class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#08090d] border border-[rgba(255,255,255,0.09)] hover:border-white/20 text-xs text-[#9ca3af] hover:text-white transition-all shadow-sm"
       >
-        <span class="text-[#10b981] font-bold">✓</span>
+        <span class="text-[#10b981] font-mono">•</span>
         <span class="font-medium text-[#e2e8f0]">
           {hasSymPy ? `Verified in ${stepCount} steps (SymPy Engine)` : `Reasoning Chain (${stepCount} steps)`}
         </span>
