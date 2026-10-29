@@ -54,111 +54,92 @@
 
 <div class="h-screen w-screen flex flex-col bg-[#000000] text-[#f3f4f6] select-none overflow-hidden font-sans">
 
-  <!-- Nualt Hairline Technical Control Deck: 44px (h-11) rigid 1px guide grid -->
-  <header class="h-11 flex-shrink-0 flex items-stretch border-b border-[var(--guide-color)] bg-[#04060a] z-30 overflow-x-auto text-[11px] tech-badge font-mono">
+  <!-- Executive Minimalist Control Deck: 44px (h-11) whisper-quiet top-bar -->
+  <header class="h-11 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--guide-color)] bg-[#020408]/80 backdrop-blur-md z-30 select-none">
 
-    <!-- Cell 1: Monogram & Workstation Identity -->
-    <div class="flex items-center gap-2.5 px-4 border-r border-[var(--guide-color)] bg-[#000000] flex-shrink-0">
-      <div class="w-5 h-5 rounded bg-white/[0.08] border border-white/20 flex items-center justify-center">
-        <svg class="w-3 h-3 text-[#38bdf8]" viewBox="0 0 100 100" fill="currentColor">
-          <polygon points="50,90 20,20 38,20 50,65 62,20 80,20" />
-        </svg>
+    <!-- Left: Brand Identity & Active Model -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <div class="w-5 h-5 rounded bg-white/[0.06] border border-white/15 flex items-center justify-center">
+          <svg class="w-3 h-3 text-[#38bdf8]" viewBox="0 0 100 100" fill="currentColor">
+            <polygon points="50,90 20,20 38,20 50,65 62,20 80,20" />
+          </svg>
+        </div>
+        <span class="text-[13px] font-medium tracking-tight text-white">Vigyan Pro</span>
+        <span class="text-[9px] font-mono px-1 py-0.2 rounded bg-white/[0.04] border border-white/10 text-[#6b7280]">v3.1</span>
       </div>
-      <span class="text-[12px] font-semibold tracking-wider text-white">VIGYAN PRO</span>
-      <span class="text-[9px] px-1 py-0.2 rounded bg-white/[0.05] border border-white/10 text-[#9ca3af]">v3.1</span>
-    </div>
 
-    <!-- Cell 2: Foundation Model Cascade Indicator -->
-    <div class="flex items-center gap-2 px-3.5 border-r border-[var(--guide-color)] flex-shrink-0">
-      <span class="text-[#6b7280]">MODEL:</span>
-      {#if model.includes("7b")}
-        {#if isCascaded}
-          <span class="flex items-center gap-1.5 text-[#f59e0b]">
+      <!-- Divider -->
+      <span class="text-white/10">/</span>
+
+      <!-- Model Status Pill -->
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] font-mono">
+        {#if model.includes("7b")}
+          {#if isCascaded}
             <span class="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-pulse"></span>
-            <span>7B → 1.5B (RAM ESCAPE)</span>
-          </span>
+            <span class="text-[#f59e0b]">7B → 1.5B Cascade</span>
+          {:else}
+            <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]"></span>
+            <span class="text-white/90">7B Frontier</span>
+          {/if}
         {:else}
-          <span class="flex items-center gap-1.5 text-[#38bdf8]">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_8px_#38bdf8]"></span>
-            <span>7B FRONTIER</span>
-          </span>
-        {/if}
-      {:else}
-        <span class="flex items-center gap-1.5 text-[#10b981]">
           <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
-          <span>1.5B QUAD-MASTER</span>
-        </span>
-      {/if}
-    </div>
-
-    <!-- Cell 3: Context Budget Badge -->
-    <div class="flex items-center gap-1.5 px-3.5 border-r border-[var(--guide-color)] flex-shrink-0">
-      <span class="text-[#6b7280]">CTX:</span>
-      <span class="text-white bg-white/[0.04] px-1.5 py-0.5 rounded border border-white/10 tracking-wider">
-        {contextTier}
-      </span>
-    </div>
-
-    <!-- Cell 4: RAM Telemetry & Tripwire Status -->
-    <div class="flex items-center gap-2 px-3.5 border-r border-[var(--guide-color)] flex-shrink-0">
-      <span class="text-[#6b7280]">RAM:</span>
-      <div class="flex items-center gap-1.5">
-        <span class="{ramPercent >= 85 ? 'text-[#ef4444]' : ramPercent >= 70 ? 'text-[#f59e0b]' : 'text-white'}">
-          {ramUsedGb} / {ramTotalGb} GB
-        </span>
-        <span class="text-[9px] text-[#6b7280]">({ramPercent}%)</span>
+          <span class="text-white/90">1.5B Quad-Master</span>
+        {/if}
       </div>
     </div>
 
-    <!-- Cell 5: SymPy AST Cache Indicator -->
-    <div class="hidden md:flex items-center gap-1.5 px-3.5 border-r border-[var(--guide-color)] text-[#10b981] flex-shrink-0">
-      <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
-      <span class="text-[#9ca3af]">AST:</span>
-      <span class="text-[#10b981]">0ms VERIFIED</span>
+    <!-- Center: Whisper-Quiet Telemetry Capsule -->
+    <div class="hidden sm:flex items-center gap-2.5 px-3 py-1 rounded-full bg-black/40 border border-white/[0.06] text-[10px] font-mono text-[#8b949e]">
+      <span>{contextTier}</span>
+      <span class="text-white/10">•</span>
+      <span class="{ramPercent >= 85 ? 'text-[#ef4444]' : ramPercent >= 70 ? 'text-[#f59e0b]' : 'text-[#8b949e]'}">
+        {ramUsedGb}G RAM ({ramPercent}%)
+      </span>
+      <span class="text-white/10">•</span>
+      <span class="text-[#10b981]">AST 0ms</span>
     </div>
 
-    <!-- Spacer to push right-hand actions -->
-    <div class="flex-1"></div>
-
-    <!-- Cell 6: 3D Studio Canvas Toggle -->
-    <button
-      onclick={() => (studioStore.isOpen = !studioStore.isOpen)}
-      class="flex items-center gap-2 px-4 border-l border-[var(--guide-color)] transition-all cursor-pointer select-none flex-shrink-0 {studioStore.isOpen ? 'bg-[#38bdf8]/10 text-[#38bdf8] border-b-2 border-b-[#38bdf8]' : 'text-[#9ca3af] hover:text-white hover:bg-white/[0.03]'}"
-      title="Toggle 3D STEM & Hardware Canvas"
-    >
-      <span class="text-sm">⬡</span>
-      <span>3D STUDIO</span>
-      {#if studioStore.activeArtifact}
-        <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]"></span>
-      {/if}
-    </button>
-
-    <!-- Cell 7: New Chat (when messages exist) -->
-    {#if chatStore.messages.length > 0}
+    <!-- Right: Frictionless Executive Actions -->
+    <div class="flex items-center gap-1.5">
+      <!-- 3D Studio Toggle -->
       <button
-        onclick={() => chatStore.clear()}
-        class="flex items-center gap-1.5 px-3.5 border-l border-[var(--guide-color)] text-[#9ca3af] hover:text-white hover:bg-white/[0.03] transition-all cursor-pointer flex-shrink-0"
-        title="Start fresh conversation"
+        onclick={() => (studioStore.isOpen = !studioStore.isOpen)}
+        class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer {studioStore.isOpen ? 'bg-[#38bdf8]/15 text-[#38bdf8] border border-[#38bdf8]/30 shadow-sm' : 'text-[#9ca3af] hover:text-white hover:bg-white/[0.05] border border-transparent'}"
+        title="Toggle 3D STEM & Hardware Canvas"
       >
-        <span>+ NEW</span>
+        <span class="text-xs">⬡</span>
+        <span class="text-[11px]">3D Studio</span>
+        {#if studioStore.activeArtifact}
+          <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]"></span>
+        {/if}
       </button>
-    {/if}
 
-    <!-- Cell 8: Settings Gear -->
-    <button
-      onclick={() => (settingsOpen = !settingsOpen)}
-      class="flex items-center justify-center px-3.5 border-l border-[var(--guide-color)] text-[#9ca3af] hover:text-white hover:bg-white/[0.03] transition-all cursor-pointer flex-shrink-0"
-      aria-label="Settings"
-      title="Settings"
-    >
-      <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-        <path
-          fill-rule="evenodd"
-          d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-          clip-rule="evenodd"
-        />
-      </svg>
-    </button>
+      {#if chatStore.messages.length > 0}
+        <button
+          onclick={() => chatStore.clear()}
+          class="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-transparent"
+          title="Start fresh conversation"
+        >
+          <span>+ New</span>
+        </button>
+      {/if}
+
+      <button
+        onclick={() => (settingsOpen = !settingsOpen)}
+        class="w-7 h-7 flex items-center justify-center rounded-lg text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer"
+        aria-label="Settings"
+        title="Settings"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+          <path
+            fill-rule="evenodd"
+            d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+            clip-rule="evenodd"
+          />
+        </svg>
+      </button>
+    </div>
   </header>
 
   <!-- Main: Nualt Architectural Blueprint Split Grid -->

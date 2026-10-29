@@ -76,8 +76,8 @@
     class="
       max-w-[90%] leading-relaxed break-words relative
       {isUser
-        ? 'bg-[#0c1017] border border-[var(--guide-color)] text-[#f3f4f6] px-4 py-3 rounded-lg font-medium shadow-sm'
-        : 'bg-[#04060a] border border-[var(--guide-color)] text-[#e2e8f0] px-5 py-4 rounded-lg shadow-sm w-full'}
+        ? 'bg-[#0e121a] border border-white/[0.08] text-[#f3f4f6] px-4 py-3 rounded-2xl rounded-tr-sm font-normal shadow-sm'
+        : 'bg-[#030508] border border-white/[0.05] text-[#e2e8f0] px-5 py-4 rounded-xl shadow-sm w-full'}
     "
   >
     {#if isUser}
@@ -85,17 +85,9 @@
         <AttachmentCard {attachment} />
       {/if}
       {#if content}
-        <p class="whitespace-pre-wrap text-[14px]">{content}</p>
+        <p class="whitespace-pre-wrap text-[14px] leading-relaxed">{content}</p>
       {/if}
     {:else}
-      <!-- Technical Monospace Header Chip -->
-      <div class="flex items-center justify-between text-[10px] tech-badge font-mono text-[#6b7280] pb-2 mb-2.5 border-b border-[var(--guide-color)] select-none">
-        <span class="flex items-center gap-1.5 text-[#38bdf8]">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]"></span>
-          <span>VIGYAN PRO SOVEREIGN ENGINE</span>
-        </span>
-        <span class="text-[#4b5563]">AIR-GAPPED • ZERO EGRESS</span>
-      </div>
 
       {#if digest}
         <div class="mb-3 p-3.5 rounded-xl bg-[#0c0e14] border border-white/10 space-y-3">

@@ -516,7 +516,7 @@
         </div>
       {/if}
 
-      <div class="w-full flex items-center gap-3 bg-[#06080d] backdrop-blur-xl border border-[var(--guide-color)] rounded-xl px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.8)] focus-within:border-[#38bdf8]/40 transition-all">
+      <div class="w-full flex items-center gap-3 bg-[#06080e]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.85)] focus-within:border-[#38bdf8]/40 transition-all">
         <!-- Attachment button for local document ingestion -->
         <button
           type="button"
@@ -563,8 +563,8 @@
         {/if}
       </div>
 
-      <p class="text-[10px] text-[#6b7280] text-center mt-2 tracking-wide select-none">
-        100% Air-Gapped · Sovereign Compute · SymPy AST & Parametric CSG
+      <p class="text-[10px] font-mono text-[#6b7280] text-center mt-2 tracking-wide select-none">
+        100% Offline & Private · SymPy AST Verified · Zero Cloud Egress
       </p>
     </div>
   </div>
