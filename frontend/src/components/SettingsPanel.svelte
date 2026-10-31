@@ -86,9 +86,6 @@
             Active
           </span>
         </div>
-        <p class="text-[11px] text-[#6b7280] leading-relaxed pt-1 border-t border-white/[0.05]">
-          Air-gapped on-device neural engine. All reasoning, calculus derivations, and symbolic verifications execute strictly on local hardware with zero external network egress.
-        </p>
       </div>
     </section>
 

@@ -1004,7 +1004,12 @@ class RAMGovernor:
 
                     if consecutive_over >= 2 and not self.tripped:
                         self.tripped = True
-                        print(f"[RAM GOVERNOR] CRITICAL TRIPWIRE: RAM reached {pct:.1f}% (rise: +{self.rate_of_rise:.1f}%) >= {self.threshold_pct}%. Aborting & evicting model {active_model}!")
+                        print(f"[RAM GOVERNOR] CRITICAL TRIPWIRE: RAM reached {pct:.1f}% (rise: +{self.rate_of_rise:.1f}%) >= {self.threshold_pct}%. Aborting & releasing inference slots!")
+                        try:
+                            if LLAMA_SUPERVISOR:
+                                LLAMA_SUPERVISOR.release_slot(0)
+                        except Exception:
+                            pass
                         try:
                             evict_req = urllib.request.Request(
                                 "http://127.0.0.1:11434/api/generate",
@@ -2137,6 +2142,19 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 hb_t = threading.Thread(target=_heartbeat_worker, daemon=True)
                 hb_t.start()
 
+                governor_tripped = [False]
+                def _on_ram_trip(pct):
+                    governor_tripped[0] = True
+                    _emit("ram_governor_trip", {
+                        "ram_percent": pct,
+                        "threshold": 92.0,
+                        "evicted_model": active_model,
+                    })
+                    _emit("token", f"\n\n**[RAM Safety Guard]**: System memory reached {pct:.1f}%. Generation was safely stopped to protect your PC from freezing.")
+
+                governor = RAMGovernor(threshold_pct=92.0, interval_sec=0.1)
+                governor.start(_on_ram_trip, active_model)
+
                 accumulated_text = ""
                 streamed_from_llama = False
 
@@ -2152,7 +2170,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                         _emit("status", {"type": "ready", "message": "Inference stream active"})
                         streamed_from_llama = True
                         for raw_line in resp:
-                            if not client_connected[0]:
+                            if governor_tripped[0] or not client_connected[0]:
                                 break
                             line_s = raw_line.decode("utf-8", errors="replace").strip()
                             if not line_s or line_s.startswith(":"):
@@ -2181,7 +2199,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 except Exception as ls_exc:
                     print(f"[WARN] llama-server stream unavailable: {ls_exc}; trying Ollama fallback", file=sys.stderr)
 
-                if not streamed_from_llama:
+                if not streamed_from_llama and not governor_tripped[0]:
                     # Fallback to local Ollama daemon if available
                     try:
                         ollama_payload = {
@@ -2209,7 +2227,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                             hb_stop.set()
                             _emit("status", {"type": "ready", "message": "Inference stream active (fallback)"})
                             for line in resp:
-                                if not client_connected[0]:
+                                if governor_tripped[0] or not client_connected[0]:
                                     break
                                 line_s = line.decode("utf-8").strip()
                                 if not line_s:
@@ -2247,6 +2265,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                         else:
                             _emit("token", f"[Neuro-Symbolic Engine Initializing: {ls_exc}]")
 
+                governor.stop()
                 hb_stop.set()
                 self._parse_and_execute_tools(accumulated_text, _emit)
 

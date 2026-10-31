@@ -103,6 +103,28 @@ def find_model_path(preferred_path: Optional[str] = None) -> Optional[str]:
     return None
 
 
+def get_available_memory_gb() -> float:
+    """Returns available RAM in gigabytes using psutil or /proc/meminfo fallback."""
+    try:
+        import psutil
+        return psutil.virtual_memory().available / (1024 ** 3)
+    except Exception:
+        pass
+    try:
+        meminfo = {}
+        with open("/proc/meminfo", "r") as f:
+            for line in f:
+                parts = line.split(":")
+                if len(parts) == 2:
+                    meminfo[parts[0].strip()] = int(parts[1].split()[0])
+        avail_kb = meminfo.get("MemAvailable", meminfo.get("MemFree", 0))
+        if avail_kb > 0:
+            return avail_kb / (1024 ** 2)
+    except Exception:
+        pass
+    return 8.0  # Safe default if undetectable
+
+
 def _with_parent_death_signal(command: list[str]) -> list[str]:
     """Ask Linux kernel to SIGTERM the child if parent process dies (e.g. setpriv wrapper)."""
     if not sys.platform.startswith("linux"):
@@ -113,10 +135,15 @@ def _with_parent_death_signal(command: list[str]) -> list[str]:
 
 
 def _linux_preexec() -> None:
-    """Preexec hook for Linux subprocesses: creates a new process group and registers PR_SET_PDEATHSIG."""
+    """Preexec hook for Linux subprocesses: creates a new process group, sets background niceness, and registers PR_SET_PDEATHSIG."""
     if sys.platform.startswith("linux"):
         try:
             os.setpgrp()
+        except Exception:
+            pass
+        try:
+            # Deprioritize CPU compute relative to desktop GUI / window compositor (prevents UI freeze/stutter)
+            os.nice(5)
         except Exception:
             pass
         try:
@@ -148,6 +175,13 @@ class LlamaServerSupervisor:
         extra_env: Optional[dict[str, str]] = None,
         extra_args: Optional[Sequence[str]] = None,
     ) -> None:
+        # Dynamic RAM Guard: If available RAM is constrained (<2.5 GB), clamp ctx_size to 2048 to prevent OOM
+        if ctx_size > 2048:
+            avail_gb = get_available_memory_gb()
+            if avail_gb < 2.5:
+                ctx_size = 2048
+                logger.info("Host available RAM is low (%.2f GB < 2.5 GB). Clamped ctx_size to 2048.", avail_gb)
+
         self._model_path = model_path
         self._server_bin = server_bin
         self._host = host
@@ -216,6 +250,9 @@ class LlamaServerSupervisor:
             "--ctx-size", str(self._ctx_size),
             "--batch-size", str(self._batch_size),
             "--threads", str(self._threads),
+            "--parallel", "1",
+            "--cache-type-k", "q8_0",
+            "--cache-type-v", "q8_0",
             "--no-jinja",
             "--chat-template", "chatml",
             "--host", str(self._host),
@@ -249,6 +286,17 @@ class LlamaServerSupervisor:
                         return True
                 return False
         except Exception:
+            return False
+
+    def release_slot(self, slot_id: int = 0) -> bool:
+        """Tell llama-server to flush and release the KV cache for a given slot."""
+        url = f"http://{self._host}:{self._port}/slots/{slot_id}?action=release"
+        try:
+            req = urllib.request.Request(url, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                return resp.status in (200, 204)
+        except Exception as exc:
+            logger.debug("Failed to release slot %d: %s", slot_id, exc)
             return False
 
     def wait_until_ready(self, timeout: float = 15.0) -> bool:
@@ -293,6 +341,9 @@ class LlamaServerSupervisor:
             child_env["LD_LIBRARY_PATH"] = f"{bin_dir}:{cur_ld}" if cur_ld else bin_dir
 
         preexec = _linux_preexec if (self._die_with_parent and sys.platform.startswith("linux")) else None
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000)
 
         self._process = subprocess.Popen(
             command,
@@ -300,6 +351,7 @@ class LlamaServerSupervisor:
             stderr=subprocess.DEVNULL,
             env=child_env,
             preexec_fn=preexec,
+            creationflags=creationflags,
         )
 
         if self._die_with_parent and sys.platform == "win32":

@@ -25,8 +25,9 @@ from gi.repository import Gtk, WebKit2, GLib
 
 import launch_desktop
 import tools
+import tempfile
 
-OUT_DIR = pathlib.Path("/home/hello/.gemini/antigravity/brain/1fca0b4e-6514-4310-b212-2eb1fd38ca46")
+OUT_DIR = pathlib.Path(tempfile.gettempdir()) / "vigyan_screenshots"
 OUT_PNG = OUT_DIR / "vigyan_pro_wavedrom_studio_verified.png"
 
 def run_snapshot():

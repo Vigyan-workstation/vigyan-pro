@@ -45,17 +45,19 @@ class TestLlamaServerSupervisor(unittest.TestCase):
         self.assertTrue(os.path.exists(model_path))
 
     def test_build_command_standard_parameters(self):
-        sup = self._track(
-            LlamaServerSupervisor(
-                model_path="/fake/models/vigyan-3b.gguf",
-                server_bin="/fake/bin/llama-server",
-                host="127.0.0.1",
-                port=8086,
-                ctx_size=4096,
-                batch_size=256,
-                threads=4,
+        from unittest.mock import patch
+        with patch("llama_supervisor.get_available_memory_gb", return_value=8.0):
+            sup = self._track(
+                LlamaServerSupervisor(
+                    model_path="/fake/models/vigyan-3b.gguf",
+                    server_bin="/fake/bin/llama-server",
+                    host="127.0.0.1",
+                    port=8086,
+                    ctx_size=4096,
+                    batch_size=256,
+                    threads=4,
+                )
             )
-        )
         cmd = sup.build_command()
         self.assertEqual(cmd[0], "/fake/bin/llama-server")
         self.assertIn("--model", cmd)
@@ -66,6 +68,12 @@ class TestLlamaServerSupervisor(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--batch-size") + 1], "256")
         self.assertIn("--threads", cmd)
         self.assertEqual(cmd[cmd.index("--threads") + 1], "4")
+        self.assertIn("--parallel", cmd)
+        self.assertEqual(cmd[cmd.index("--parallel") + 1], "1")
+        self.assertIn("--cache-type-k", cmd)
+        self.assertEqual(cmd[cmd.index("--cache-type-k") + 1], "q8_0")
+        self.assertIn("--cache-type-v", cmd)
+        self.assertEqual(cmd[cmd.index("--cache-type-v") + 1], "q8_0")
         self.assertIn("--no-jinja", cmd)
         self.assertIn("--chat-template", cmd)
         self.assertEqual(cmd[cmd.index("--chat-template") + 1], "chatml")
@@ -266,6 +274,65 @@ class TestLlamaServerSupervisor(unittest.TestCase):
                 else:
                     os.environ.pop("VIGYAN_MODEL_PATH", None)
 
+    def test_dynamic_context_clamping(self):
+        """Verify context window dynamically clamps to 2048 if available RAM is <2.5GB."""
+        from unittest.mock import patch
+
+        # Case 1: Low RAM (< 2.5 GB) -> clamped to 2048
+        with patch("llama_supervisor.get_available_memory_gb", return_value=1.8):
+            sup_low = self._track(LlamaServerSupervisor(ctx_size=4096))
+            self.assertEqual(sup_low._ctx_size, 2048)
+
+        # Case 2: Ample RAM (> 2.5 GB) -> retains requested 4096
+        with patch("llama_supervisor.get_available_memory_gb", return_value=5.0):
+            sup_high = self._track(LlamaServerSupervisor(ctx_size=4096))
+            self.assertEqual(sup_high._ctx_size, 4096)
+
+    def test_release_slot_lifecycle(self):
+        """Verify release_slot sends POST to /slots/{slot_id}?action=release and handles status codes."""
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import threading
+
+        slot_requests = []
+        response_code = 200
+
+        class MockSlotHandler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                nonlocal response_code
+                slot_requests.append(self.path)
+                self.send_response(response_code)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+        server = HTTPServer(("127.0.0.1", 0), MockSlotHandler)
+        port = server.server_port
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+
+        try:
+            sup = self._track(LlamaServerSupervisor(host="127.0.0.1", port=port))
+
+            # 1. Successful slot release (HTTP 200)
+            response_code = 200
+            self.assertTrue(sup.release_slot(0))
+            self.assertIn("/slots/0?action=release", slot_requests)
+
+            # 2. Slot release returns HTTP 500
+            response_code = 500
+            self.assertFalse(sup.release_slot(0))
+
+            # 3. Closed port returns False without throwing exception
+            closed_sup = self._track(LlamaServerSupervisor(host="127.0.0.1", port=59998))
+            self.assertFalse(closed_sup.release_slot(0))
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()
+
