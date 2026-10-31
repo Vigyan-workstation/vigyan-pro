@@ -13,21 +13,12 @@
   let model = $state(DEFAULT_MODEL);
   let fontSize = $state<"sm" | "md" | "lg">("md");
 
-  // Live telemetry state for Nualt Control Deck
+  // Telemetry preserved for diagnostics & tooltip inspections
   let ramUsedGb = $state<number>(1.8);
   let ramTotalGb = $state<number>(7.0);
   let ramPercent = $state<number>(26);
-  let contextTier = $state<string>("4K EXT");
 
   onMount(() => {
-    // Read stored context setting
-    try {
-      const storedCtx = localStorage.getItem("vigyan_context_window");
-      if (storedCtx === "2048") contextTier = "2K STD";
-      else if (storedCtx === "8192") contextTier = "8K DEEP";
-      else contextTier = "4K EXT";
-    } catch {}
-
     const handleGlobalKeydown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
       if (isMeta && e.key.toLowerCase() === "k") {
@@ -67,44 +58,32 @@
   <!-- Executive Minimalist Control Deck: 44px (h-11) whisper-quiet top-bar -->
   <header class="h-11 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--guide-color)] bg-[#020408]/90 backdrop-blur-md z-30 select-none">
 
-    <!-- Left: Brand Identity & Active Model -->
-    <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2">
-        <div class="w-5 h-5 rounded bg-white/[0.06] border border-white/15 flex items-center justify-center shadow-inner">
-          <svg class="w-3 h-3 text-[#10b981]" viewBox="0 0 100 100" fill="currentColor">
-            <polygon points="50,90 20,20 38,20 50,65 62,20 80,20" />
-          </svg>
-        </div>
-        <span class="text-[13px] font-medium tracking-tight text-white">Vigyan Pro</span>
-        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-[#9ca3af]">v3.2</span>
+    <!-- Left: Refined Brand Identity -->
+    <div class="flex items-center gap-2.5">
+      <div class="w-5 h-5 rounded bg-white/[0.06] border border-white/15 flex items-center justify-center shadow-inner">
+        <svg class="w-3 h-3 text-[#10b981]" viewBox="0 0 100 100" fill="currentColor">
+          <polygon points="50,90 20,20 38,20 50,65 62,20 80,20" />
+        </svg>
       </div>
-
-      <!-- Divider -->
-      <span class="text-white/10">/</span>
-
-      <!-- Core Engine Status Pill (3-State Truth Indicator) -->
-      <div
-        class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] font-mono select-none"
-        title={ollamaConnected ? "Engine Connected & Grounded" : "Engine Reconnecting..."}
-      >
-        <span
-          class="w-1.5 h-1.5 rounded-full transition-all duration-300 {ollamaConnected ? 'bg-[#10b981] shadow-[0_0_6px_#10b981]' : 'bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse'}"
-        ></span>
-        <span class="text-white/90">{model.replace('vigyan:', 'Vigyan-').toUpperCase()}</span>
-      </div>
+      <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-[#9ca3af]">v3.2</span>
     </div>
 
-    <!-- Center: Whisper-Quiet Telemetry Capsule -->
-    <div class="hidden sm:flex items-center gap-2.5 px-3 py-1 rounded-full bg-black/50 border border-white/[0.06] text-[10px] font-mono text-[#8b949e]">
-      <span>{contextTier}</span>
-      <span class="text-white/10">•</span>
-      <span class="{ramPercent >= 85 ? 'text-[#ef4444]' : ramPercent >= 70 ? 'text-[#f59e0b]' : 'text-[#8b949e]'}">
-        {ramUsedGb}G RAM ({ramPercent}%)
+    <!-- Center: Whisper-Quiet Status Capsule -->
+    <div
+      class="hidden sm:flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.07] text-[11px] text-[#9ca3af] select-none transition-all shadow-sm"
+      title={ollamaConnected
+        ? `Sovereign Engine Active • ${ramUsedGb}G / ${ramTotalGb}G RAM (${ramPercent}%) • 100% Offline`
+        : "Connecting to local engine…"}
+    >
+      <span
+        class="w-1.5 h-1.5 rounded-full transition-all duration-300 {ollamaConnected
+          ? 'bg-[#10b981] shadow-[0_0_6px_#10b981]'
+          : 'bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse'}"
+      ></span>
+      <span class="font-medium tracking-wide text-[#cbd5e1]">
+        {ollamaConnected ? "Offline & Grounded" : "Connecting…"}
       </span>
-      <span class="text-white/10">•</span>
-      <span class="text-[#10b981]">LanceDB &lt;1.2ms</span>
-      <span class="text-white/10">•</span>
-      <span class="text-[#38bdf8]">AST 0ms</span>
     </div>
 
     <!-- Right: Frictionless Executive Actions -->
@@ -112,8 +91,8 @@
       {#if chatStore.messages.length > 0}
         <button
           onclick={() => chatStore.clear()}
-          class="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-transparent"
-          title="Start fresh conversation"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-transparent"
+          title="Start fresh conversation (Cmd+K)"
         >
           <span>+ New</span>
         </button>
@@ -122,8 +101,8 @@
       <button
         onclick={() => (settingsOpen = !settingsOpen)}
         class="w-7 h-7 flex items-center justify-center rounded-lg text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer"
-        aria-label="Settings"
-        title="Settings"
+        aria-label="Preferences"
+        title="Preferences (Cmd+,)"
       >
         <svg viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
           <path

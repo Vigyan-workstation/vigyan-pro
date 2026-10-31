@@ -71,10 +71,10 @@
   }
 
   const STARTERS = [
-    { icon: "⚡", label: "RLC Transient Response", prompt: "Derive and plot the step response of an underdamped series RLC circuit with R=20, L=0.1H, C=100uF." },
-    { icon: "∫", label: "Exact Calculus", prompt: "Solve x² + x − 12 = 0 with step-by-step derivation." },
-    { icon: "∿", label: "Digital Waveform", prompt: "Generate SPI master write timing diagram with 8 bits data." },
-    { icon: "∂", label: "Damped Oscillation", prompt: "Plot the damped oscillation exp(-0.15*x)*cos(2*x) from 0 to 25." },
+    { icon: "⚡", label: "Transient Analysis", prompt: "Derive and plot the step response of an underdamped series RLC circuit with R=20Ω, L=0.1H, and C=100µF." },
+    { icon: "∫", label: "Symbolic Calculus", prompt: "Evaluate the integral of x^2 * exp(-x) dx from 0 to infinity with full step-by-step derivation." },
+    { icon: "∿", label: "Waveform Timing", prompt: "Generate an SPI bus timing diagram illustrating a master write cycle with 8 data bits." },
+    { icon: "∂", label: "Damped Oscillation", prompt: "Plot the damped oscillation curve exp(-0.15*x)*cos(2*x) from x = 0 to 25." },
   ];
 
   function handleFileDrop(e: DragEvent) {
@@ -106,7 +106,7 @@
         chatStore.messages.push({
           id: uid(),
           role: "user",
-          content: `Ingested image '${file.name}' for sovereign engineering analysis.`,
+          content: `Attached image '${file.name}' for analysis.`,
           thinking: "",
           thinkingDone: true,
           streaming: false,
@@ -140,22 +140,22 @@
             chatStore.messages.push({
               id: uid(),
               role: "assistant",
-              content: data.text || "Image processed via Sovereign Native OCR.",
-              thinking: "Executed local CPU Tesseract OCR engine with zero cloud telemetry.\n",
+              content: data.text || "Image processed successfully on-device.",
+              thinking: "Extracted parameters locally with private on-device analysis.\n",
               thinkingDone: true,
               streaming: false,
               digest: {
                 filename: file.name,
-                summary: data.summary || "Extracted engineering parameters from image.",
+                summary: data.summary || "Extracted parameters from attached image.",
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Evaluate Mathematical Proof"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Plot Parameter Curve"],
               },
             });
             chatStore.save();
             scrollToBottom();
           }
         } catch (err) {
-          console.error("OCR Ingest error:", err);
+          console.error("Image Ingest error:", err);
         }
       };
       reader.readAsDataURL(file);
@@ -169,7 +169,7 @@
         chatStore.messages.push({
           id: uid(),
           role: "user",
-          content: `Ingested datasheet '${file.name}' for specification extraction.`,
+          content: `Attached document '${file.name}' for analysis.`,
           thinking: "",
           thinkingDone: true,
           streaming: false,
@@ -202,7 +202,7 @@
             chatStore.messages.push({
               id: uid(),
               role: "assistant",
-              content: data.text || "Document processed via Sovereign PDF Parser.",
+              content: data.text || "Document processed via offline parser.",
               thinking: "Extracted document structure and parameters via offline parser.\n",
               thinkingDone: true,
               streaming: false,
@@ -210,7 +210,7 @@
                 filename: file.name,
                 summary: data.summary || "Extracted document specifications.",
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Generate Digital Waveform", "Generate PCB Netlist"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Generate Timing Waveform", "Plot Parameter Curve"],
               },
             });
             chatStore.save();
@@ -229,7 +229,7 @@
         chatStore.messages.push({
           id: uid(),
           role: "user",
-          content: `Ingested document '${file.name}'.`,
+          content: `Attached document '${file.name}'.`,
           thinking: "",
           thinkingDone: true,
           streaming: false,
@@ -262,14 +262,14 @@
               id: uid(),
               role: "assistant",
               content: data.summary,
-              thinking: "Parsed text parameters directly on local machine.\n",
+              thinking: "Parsed text parameters directly on local device.\n",
               thinkingDone: true,
               streaming: false,
               digest: {
                 filename: file.name,
                 summary: data.summary,
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Generate PCB Netlist"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Plot Parameter Curve"],
               },
             });
             chatStore.save();
@@ -284,12 +284,12 @@
   }
 
   function handleActionClick(actionText: string) {
-    if (actionText.includes("Netlist") || actionText.includes("PCB") || actionText.includes("Circuit")) {
-      send("Generate the SPICE/KiCad circuit netlist and design topology based on extracted specifications.");
-    } else if (actionText.includes("Waveform") || actionText.includes("Timing")) {
+    if (actionText.includes("Waveform") || actionText.includes("Timing")) {
       send("Generate digital timing waveform based on extracted specifications.");
     } else if (actionText.includes("Proof") || actionText.includes("Analytical")) {
-      send("Derive the step-by-step analytical proof and SymPy equations for these parameters.");
+      send("Derive the step-by-step analytical proof and verified equations for these parameters.");
+    } else if (actionText.includes("Plot") || actionText.includes("Curve")) {
+      send("Plot the parameter response curve based on the extracted values.");
     } else {
       send(actionText);
     }
@@ -363,8 +363,8 @@
           scrollToBottom();
         } else if (chunk.type === "sympy") {
           chatStore.messages[idx].sympyGrounding = chunk.text;
-          if (!chatStore.messages[idx].thinking.includes("SymPy")) {
-            chatStore.messages[idx].thinking = `[SymPy AST Verified]: ${chunk.text}\n` + chatStore.messages[idx].thinking;
+          if (!chatStore.messages[idx].thinking.includes("Symbolically Verified")) {
+            chatStore.messages[idx].thinking = `[Symbolically Verified]: ${chunk.text}\n` + chatStore.messages[idx].thinking;
           }
           scrollToBottom();
         } else if (chunk.type === "tool_result") {
@@ -429,8 +429,8 @@
       <div class="w-16 h-16 rounded-2xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-center justify-center text-3xl text-[#10b981] mb-3 shadow-[0_0_24px_rgba(16,185,129,0.3)]">
         ⇪
       </div>
-      <div class="text-base font-semibold text-white tracking-wide">Drop Datasheet or Document to Index</div>
-      <div class="text-xs font-mono text-[#9ca3af] mt-1">Direct in-process LanceDB indexing &amp; SymPy analysis</div>
+      <div class="text-base font-semibold text-white tracking-wide">Drop Document or Image to Analyze</div>
+      <div class="text-xs text-[#9ca3af] mt-1">Instant on-device analysis and mathematical verification</div>
     </div>
   {/if}
 
@@ -453,7 +453,7 @@
             </div>
             <h1 class="text-2xl font-bold text-white tracking-tight">Vigyan Pro</h1>
             <p class="text-[#9ca3af] text-[14px] max-w-md leading-relaxed">
-              Sovereign STEM intelligence. Exact mathematical grounding via SymPy AST, in-process LanceDB RAG, and 100% offline inference.
+              Sovereign scientific intelligence. Exact mathematical derivations, offline document analysis, and zero cloud footprint.
             </p>
           </div>
 
@@ -541,7 +541,7 @@
           type="button"
           onclick={() => fileInputEl?.click()}
           class="w-7 h-7 rounded-lg text-[#9ca3af] hover:text-[#38bdf8] hover:bg-white/[0.06] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer"
-          title="Import Datasheet, PDF, or Image"
+          title="Attach document or image"
         >
           <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 00.02-4.248z" clip-rule="evenodd" />
@@ -553,7 +553,7 @@
           bind:value={input}
           oninput={autoResize}
           onkeydown={handleKeydown}
-          placeholder="Ask a STEM problem, derive a proof, verify a circuit, or drop a document…"
+          placeholder="Ask a scientific question, derive a proof, analyze a circuit, or drop a document…"
           rows={1}
           disabled={isStreaming}
           class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
@@ -564,7 +564,7 @@
           <button
             onclick={stop}
             class="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 text-[#e2e8f0] hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer"
-            title="Stop generation (Escape)"
+            title="Halt generation (Escape)"
           >
             <span class="w-2.5 h-2.5 bg-white rounded-sm block"></span>
           </button>
@@ -573,7 +573,7 @@
             onclick={() => send(input)}
             disabled={!input.trim()}
             class="flex-shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all shadow-md font-bold cursor-pointer"
-            title="Send (Enter or Cmd+Enter)"
+            title="Send (Enter)"
           >
             <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 translate-y-[-0.5px]">
               <path fill-rule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clip-rule="evenodd"/>
@@ -583,7 +583,7 @@
       </div>
 
       <p class="text-[10px] font-mono text-[#6b7280] text-center mt-2 tracking-wide select-none">
-        100% Offline &amp; Private · SymPy AST Verified · In-Process LanceDB · Zero Cloud Egress
+        100% Offline &amp; Private · Verified Symbolic Mathematics · On-Device Intelligence
       </p>
     </div>
   </div>

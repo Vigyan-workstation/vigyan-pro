@@ -91,7 +91,7 @@
               <span>Engineering Digest: {digest.filename}</span>
             </span>
             <span class="text-[10px] text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded border border-[#10b981]/20 font-mono">
-              OCR Processed
+              Document Analyzed
             </span>
           </div>
 
@@ -146,7 +146,7 @@
           class="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 text-xs font-medium transition-all cursor-pointer"
         >
           <span>∫</span>
-          <span>Plot Curve Inline ({plottableFormula})</span>
+          <span>Plot Curve: y = {plottableFormula}</span>
         </button>
       {/if}
 

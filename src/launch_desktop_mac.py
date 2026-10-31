@@ -56,12 +56,11 @@ def launch_mac():
     except Exception as exc:
         print(f"[Vigyan Pro] Notice: Ollama supervisor started or running externally: {exc}", file=sys.stderr)
 
-    # 2.5 Ensure Vigyan 3B Quad-Master, 1.5B, and 7B Frontier are registered into Ollama
+    # 2.5 Ensure Vigyan 3B Quad-Master and 1.5B are registered into Ollama
     try:
-        from launch_desktop import ensure_vigyan_3b_registered, ensure_vigyan_1_5b_registered, ensure_vigyan_7b_registered
+        from launch_desktop import ensure_vigyan_3b_registered, ensure_vigyan_1_5b_registered
         ensure_vigyan_3b_registered()
         ensure_vigyan_1_5b_registered()
-        ensure_vigyan_7b_registered()
     except Exception as exc:
         print(f"[Vigyan Pro] Sovereign model registration notice: {exc}", file=sys.stderr)
 

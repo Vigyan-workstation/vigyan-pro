@@ -1,6 +1,6 @@
 <script lang="ts">
   // ThinkingBlock — Ramanujan reasoning drawer & verified card
-  // Shows step-by-step reasoning verified by local SymPy AST Engine.
+  // Shows step-by-step reasoning verified by local symbolic engine.
   interface Props {
     text: string;
     streaming: boolean;
@@ -39,7 +39,7 @@
         <!-- Header -->
         <button
           onclick={() => (expanded = false)}
-          class="w-full flex items-center justify-between px-4 py-2.5 bg-[#0c0e14] hover:bg-white/[0.03] transition-colors"
+          class="w-full flex items-center justify-between px-4 py-2.5 bg-[#0c0e14] hover:bg-white/[0.03] transition-colors cursor-pointer"
         >
           <div class="flex items-center gap-2.5">
             <span
@@ -47,16 +47,19 @@
             ></span>
             <span class="text-xs font-semibold text-[#e2e8f0]">
               {streaming
-                ? "Working through mathematical reasoning (SymPy AST Engine)…"
-                : (hasSymPy ? `Verified in ${stepCount} steps (SymPy Engine)` : `Reasoning Chain (${stepCount} steps)`)}
+                ? "Reasoning through mathematical derivation…"
+                : (hasSymPy ? `Symbolically verified in ${stepCount} steps` : `Reasoning chain (${stepCount} steps)`)}
             </span>
           </div>
 
           <div class="flex items-center gap-2">
             <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/25 px-2 py-0.5 rounded-full">
-              {hasSymPy ? "AST Grounded" : "Verified"}
+              {hasSymPy ? "Symbolically Verified" : "Verified"}
             </span>
-            <span class="text-[11px] text-[#9ca3af] ml-1">collapse</span>
+            <span class="text-[11px] text-[#9ca3af] ml-1 flex items-center gap-0.5">
+              <span>Hide</span>
+              <span class="text-[9px]">▴</span>
+            </span>
           </div>
         </button>
 
@@ -69,16 +72,16 @@
       <!-- Collapsed Pill -->
       <button
         onclick={() => (expanded = true)}
-        class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#08090d] border border-[rgba(255,255,255,0.09)] hover:border-white/20 text-xs text-[#9ca3af] hover:text-white transition-all shadow-sm"
+        class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#08090d] border border-[rgba(255,255,255,0.09)] hover:border-white/20 text-xs text-[#9ca3af] hover:text-white transition-all shadow-sm cursor-pointer"
       >
         <span class="text-[#10b981] font-mono">•</span>
         <span class="font-medium text-[#e2e8f0]">
-          {hasSymPy ? `Verified in ${stepCount} steps (SymPy Engine)` : `Reasoning Chain (${stepCount} steps)`}
+          {hasSymPy ? `Symbolically verified (${stepCount} steps)` : `Reasoning chain (${stepCount} steps)`}
         </span>
-        <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 px-1.5 py-0.2 rounded border border-[#10b981]/20">
-          AST Grounded
+        <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded-full border border-[#10b981]/20">
+          {hasSymPy ? "Symbolically Verified" : "Reasoning"}
         </span>
-        <span class="text-[10px] text-[#52525b] ml-1">▼</span>
+        <span class="text-[10px] text-[#71717a] ml-1">▾</span>
       </button>
     {/if}
   </div>

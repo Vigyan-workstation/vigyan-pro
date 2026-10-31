@@ -106,7 +106,10 @@ export async function getAvailableModels(): Promise<string[]> {
     const res = await fetch(`${OLLAMA_BASE}/api/tags`, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return [DEFAULT_MODEL];
     const data = await res.json();
-    return (data.models ?? []).map((m: { name: string }) => m.name);
+    const models = (data.models ?? [])
+      .map((m: { name: string }) => m.name)
+      .filter((name: string) => !name.includes("7b") && !name.includes("frontier"));
+    return models.length > 0 ? models : [DEFAULT_MODEL];
   } catch {
     return [DEFAULT_MODEL];
   }

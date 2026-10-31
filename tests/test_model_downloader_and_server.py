@@ -19,6 +19,7 @@ if src_dir not in sys.path:
 from launch_desktop import (
     MODELS_CATALOG,
     ModelDownloadManager,
+    select_cascade_model,
     grep_workspace_files,
     start_neuro_symbolic_bridge_server,
     _SESSION_TOKEN,
@@ -27,9 +28,22 @@ from launch_desktop import (
 
 def test_models_catalog_integrity():
     """Verify that models catalog entries contain valid URLs, tags, and reasonable sizes."""
-    assert "vigyan:1.5b" in MODELS_CATALOG
-    assert "vigyan:7b" in MODELS_CATALOG
-    assert len(MODELS_CATALOG) >= 2
+    assert "vigyan:3b" in MODELS_CATALOG
+    assert "vigyan:7b" not in MODELS_CATALOG
+    assert len(MODELS_CATALOG) >= 1
+
+
+def test_select_cascade_model_unified_3b():
+    """Verify select_cascade_model routes to vigyan:3b flagship engine (or 1.5b if explicitly requested)."""
+    for test_req in ("vigyan:7b", "7b", "frontier", "vigyan:3b", "default", ""):
+        res = select_cascade_model(test_req, "Solve laplacian eigenfunction")
+        assert res["model"] == "vigyan:3b"
+        assert res["downgraded"] is False
+        assert "57.50% GSM8K" in res["reason"]
+
+    # Explicit 1.5B request
+    res_15 = select_cascade_model("vigyan:1.5b", "Fast query")
+    assert res_15["model"] == "vigyan:1.5b"
 
     for tag, info in MODELS_CATALOG.items():
         assert info["tag"] == tag

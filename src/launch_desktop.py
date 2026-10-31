@@ -1141,34 +1141,13 @@ def execute_shell_command(command: str, confirmed: bool = False, cwd: Optional[s
 
 
 def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
-    """Sovereign Vigyan AI execution router with dynamic RAM guard cascade.
-    Selects between Flagship Vigyan-3B Quad-Master, Fast 1.5B, and Frontier 7B.
+    """Sovereign Vigyan AI execution router.
+    Flagship Vigyan-3B Quad-Master IQ3_M is the primary sovereign engine,
+    with Vigyan AI 1.5B Quad-Master available for ultra-fast edge inference.
     """
     req = (requested_model or "").strip().lower()
-    telemetry = get_system_telemetry()
-    avail_gb = telemetry.get("ram_avail_gb", 0.0)
 
-    # 1. Explicit 7B request
-    if req in ("vigyan:7b", "7b", "frontier", "frontier-7b"):
-        has_gpu_headroom = telemetry.get("gpu_vram_free_gb", 0.0) >= 3.6
-        has_ram_headroom = avail_gb >= 3.6
-
-        if has_gpu_headroom or has_ram_headroom:
-            return {
-                "tier": 3,
-                "model": "vigyan:7b",
-                "downgraded": False,
-                "reason": "Vigyan 7B Frontier Sovereign Engine (Multi-page scientific research)"
-            }
-        else:
-            return {
-                "tier": 1,
-                "model": "vigyan:3b",
-                "downgraded": True,
-                "reason": f"RAM Guard: Memory headroom ({avail_gb:.1f} GB free) is below 3.6 GB. Routed to Vigyan-3B Quad-Master."
-            }
-
-    # 2. Explicit 1.5B request
+    # 1. Explicit 1.5B request
     if req in ("vigyan:1.5b", "1.5b"):
         return {
             "tier": 1,
@@ -1177,7 +1156,7 @@ def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
             "reason": "Vigyan AI 1.5B Quad Master (Ultra-fast edge inference)"
         }
 
-    # 3. Default to Flagship Vigyan-3B Quad-Master (57.50% GSM8K certified)
+    # 2. Flagship Vigyan-3B Quad-Master (57.50% GSM8K certified)
     return {
         "tier": 2,
         "model": "vigyan:3b",
@@ -1247,24 +1226,6 @@ MODELS_CATALOG = {
         "dest_filename": "vigyan-1.5b-quad-master-q4_k_m.gguf",
         "hf_url": "https://github.com/shreyansh001boy-tech/vigyan-desktop-releases/releases/download/v2.9.0-beta/vigyan-1.5b-quad-master-q4_k_m.gguf",
         "local_candidates": _build_model_candidates("vigyan-1.5b-quad-master-q4_k_m.gguf"),
-        "template": """{{- if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
-{{ .Content }}<|im_end|>
-{{ end }}<|im_start|>assistant
-""",
-        "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
-    },
-    "vigyan:7b": {
-        "name": "Vigyan 7B Frontier Sovereign Engine",
-        "tag": "vigyan:7b",
-        "size_bytes": 3468318432,
-        "size_formatted": "3.5 GB",
-        "recommended_ram": "4 GB+ RAM or 6 GB+ VRAM (Elite STEM & physics engineering)",
-        "description": "Elite frontier model for closed-form mathematics, Denavit-Hartenberg kinematics, Verilog RTL, and analog circuit netlists.",
-        "dest_filename": "vigyan-4th-gen-7b-IQ3_M.gguf",
-        "hf_url": "https://github.com/shreyansh001boy-tech/vigyan-desktop-releases/releases/download/v2.9.0-beta/vigyan-4th-gen-7b-IQ3_M.gguf",
-        "local_candidates": _build_model_candidates("vigyan-4th-gen-7b-IQ3_M.gguf"),
         "template": """{{- if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
 {{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
@@ -1450,64 +1411,6 @@ def ensure_vigyan_1_5b_registered() -> bool:
         print(f"[WARN] Ollama registration error: {e}", file=sys.stderr)
         return False
 
-
-def ensure_vigyan_7b_registered() -> bool:
-    """Autonomous verifier and auto-repair for Vigyan 7B Frontier model in Ollama."""
-    try:
-        check = subprocess.run(["ollama", "show", "vigyan:7b"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2.0)
-        if check.returncode == 0:
-            return True
-    except Exception:
-        pass
-
-    target_dir = os.path.expanduser("~/.vigyan/models")
-    os.makedirs(target_dir, exist_ok=True)
-    gguf_path = os.path.join(target_dir, "vigyan-4th-gen-7b-IQ3_M.gguf")
-
-    if not os.path.isfile(gguf_path) or os.path.getsize(gguf_path) < 1_000_000_000:
-        candidates = MODELS_CATALOG.get("vigyan:7b", {}).get("local_candidates", [])
-        found_local = None
-        for cand in candidates:
-            if cand and os.path.isfile(cand) and os.path.getsize(cand) >= 1_000_000_000:
-                found_local = cand
-                break
-        if found_local:
-            gguf_path = found_local
-        else:
-            return False
-
-    modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-7b")
-    modelfile_content = (
-        f'FROM "{gguf_path}"\n'
-        'TEMPLATE """{{- if .System }}<|im_start|>system\n'
-        "{{ .System }}<|im_end|>\n"
-        '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
-        "{{ .Content }}<|im_end|>\n"
-        '{{ end }}<|im_start|>assistant\n'
-        '"""\n'
-        'SYSTEM """You are Vigyan 7B, an elite sovereign neuro-symbolic physical engineering model. You derive exact closed-form mathematics, Denavit-Hartenberg kinematics, synthesizable Verilog RTL, and analog circuit netlists with absolute rigor and zero hallucination."""\n'
-        'PARAMETER stop "<|im_start|>"\n'
-        'PARAMETER stop "<|im_end|>"\n'
-        'PARAMETER stop "<|endoftext|>"\n'
-        'PARAMETER stop "User:"\n'
-        'PARAMETER stop "\\n\\nUser"\n'
-        'PARAMETER stop "Human:"\n'
-        "PARAMETER num_gpu 0\n"
-        "PARAMETER temperature 0.2\n"
-        "PARAMETER top_p 0.95\n"
-        "PARAMETER top_k 40\n"
-        "PARAMETER num_ctx 2048\n"
-    )
-    with open(modelfile_path, "w", encoding="utf-8") as mf:
-        mf.write(modelfile_content)
-
-    try:
-        print("[INFO] Auto-repair: Registering vigyan:7b into Ollama...", file=sys.stderr)
-        res = subprocess.run(["ollama", "create", "vigyan:7b", "-f", modelfile_path], capture_output=True, timeout=180)
-        return res.returncode == 0
-    except Exception as e:
-        print(f"[WARN] Ollama 7b registration error: {e}", file=sys.stderr)
-        return False
 
 
 class ModelDownloadManager:
@@ -2480,7 +2383,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
 
         if self.path.startswith("/api/models/evict"):
             tag = body.get("model") or body.get("tag") or ""
-            targets = [tag] if tag else ["vigyan:1.5b", "vigyan:7b"]
+            targets = [tag] if tag else ["vigyan:1.5b"]
             evicted = []
             for m in targets:
                 try:
@@ -3117,7 +3020,6 @@ def main():
         time.sleep(2.0)  # Wait for UI window to finish layout
         ensure_vigyan_3b_registered()
         ensure_vigyan_1_5b_registered()
-        ensure_vigyan_7b_registered()
         for pm in ("vigyan:3b", "vigyan:1.5b"):
             try:
                 pw_req = urllib.request.Request(

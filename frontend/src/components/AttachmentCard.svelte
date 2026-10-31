@@ -52,7 +52,7 @@
       </span>
     </div>
     <div class="text-[11px] text-[#9ca3af] mt-0.5">
-      {formatBytes(attachment.size)} · Ingested for Sovereign STEM Analysis
+      {formatBytes(attachment.size)} · Ready for on-device analysis
     </div>
   </div>
 </div>
