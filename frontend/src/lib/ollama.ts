@@ -136,9 +136,9 @@ export async function streamChat(
   const token = getVigyanToken();
   const agentHost = getAgentHost();
 
-  let userCtx = 2048;
+  let userCtx = 4096;
   try {
-    userCtx = parseInt(localStorage.getItem("vigyan_context_budget") || "2048", 10);
+    userCtx = parseInt(localStorage.getItem("vigyan_context_budget") || "4096", 10);
   } catch {}
 
   // ATTEMPT 1: Sovereign Neuro-Symbolic Bridge
@@ -198,7 +198,9 @@ export async function streamChat(
                   onChunk({ type: "thinking", text: `[RAM Governor]: Memory threshold reached (${parsed.ram_percent}%). Model evicted to prevent OOM.\n` });
                 }
               } else if (eventName === "token") {
-                onChunk({ type: "answer", text: typeof parsed === "string" ? parsed : JSON.stringify(parsed) });
+                let tokenText = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+                tokenText = tokenText.replace(/<\/sstream>/g, "").replace(/<solution>/g, "").replace(/<\/solution>/g, "");
+                if (tokenText) onChunk({ type: "answer", text: tokenText });
               } else if (eventName === "sympy") {
                 onChunk({ type: "sympy", text: typeof parsed === "string" ? parsed : JSON.stringify(parsed) });
               } else if (eventName === "tool_result") {
@@ -210,7 +212,10 @@ export async function streamChat(
               }
             } catch {
               // Raw string fallback
-              if (eventName === "token") onChunk({ type: "answer", text: dataStr });
+              if (eventName === "token") {
+                let tokenText = dataStr.replace(/<\/sstream>/g, "").replace(/<solution>/g, "").replace(/<\/solution>/g, "");
+                if (tokenText) onChunk({ type: "answer", text: tokenText });
+              }
             }
           }
           if (isStreamDone) break;
@@ -236,7 +241,24 @@ export async function streamChat(
         model: model || DEFAULT_MODEL,
         messages: payloadMessages,
         stream: true,
-        options: { num_ctx: userCtx }
+        options: {
+          num_ctx: userCtx || 4096,
+          num_batch: 256,
+          num_thread: 4,
+          repeat_penalty: 1.15,
+          repeat_last_n: 64,
+          stop: [
+            "<|im_start|>",
+            "<|im_end|>",
+            "<|endoftext|>",
+            "</sstream>",
+            "<solution>",
+            "</solution>",
+            "User:",
+            "\n\nUser",
+            "Human:"
+          ]
+        }
       }),
       signal,
     });
@@ -262,6 +284,8 @@ export async function streamChat(
   let inThink = false;
 
   const flush = (raw: string) => {
+    raw = raw.replace(/<\/sstream>/g, "").replace(/<solution>/g, "").replace(/<\/solution>/g, "");
+    if (!raw) return;
     let i = 0;
     while (i < raw.length) {
       if (inThink) {

@@ -301,26 +301,23 @@ def compute_hybrid_allocation(
     on_battery = bool(power.get("on_battery", False))
     battery_pct = int(power.get("battery_pct", 100))
 
-    # 1. Thread allocation: bind to physical cores; throttle on battery to prevent heat & drain
-    if mode == "cpu_eco" or (mode == "auto" and on_battery and battery_pct < 40):
+    # 1. Thread allocation: bind to physical cores for peak AVX2 FMA throughput without hyperthreading contention
+    if mode == "cpu_eco":
         num_thread = max(2, phys_cores - 2)
-    elif on_battery:
-        num_thread = max(2, phys_cores - 1)
     else:
         num_thread = phys_cores
 
-    # 2. Context window & batch scaling to prevent RAM/swap thrashing & OOM killer
-    if ram_total_gb < 6.0 or ram_avail_gb < 2.5:
-        num_ctx = 1024
-        num_batch = 64
+    # 2. Context window & batch scaling (Vigyan-3B IQ3_M uses only 1.4GB; 4096 ctx KV cache is ~200MB)
+    if ram_total_gb < 6.0:
+        num_ctx = 2048
+        num_batch = 128
     elif ram_total_gb < 10.0:
-        # 7-8 GB laptops (e.g., Ryzen 5 7520U with 6.95 GB usable RAM)
-        # Lock to 1024-1536 context to keep KV cache minimal (~200MB instead of 1.2GB)
-        num_ctx = 1024 if ram_avail_gb < 3.5 else 1536
-        num_batch = 64
-    elif ram_total_gb < 18.0:
-        num_ctx = 4096
+        # 7-8 GB laptops (e.g., AMD Ryzen 5 7520U with 6.95 GB usable RAM)
+        num_ctx = 4096 if ram_avail_gb >= 2.0 else 2048
         num_batch = 256
+    elif ram_total_gb < 18.0:
+        num_ctx = 8192 if ram_avail_gb >= 4.0 else 4096
+        num_batch = 512
     else:
         num_ctx = 16384 if mode == "max_gpu" and ram_total_gb >= 24.0 else 8192
         num_batch = 512
@@ -333,7 +330,7 @@ def compute_hybrid_allocation(
         num_gpu = 99
         strategy_label = "Max GPU Offload (All Layers)"
     elif mode == "balanced":
-        num_gpu = 16 if is_apu or vram_total_mb < 6000 else 28
+        num_gpu = 16 if (is_apu or vram_total_mb < 6000) else 28
         strategy_label = f"Balanced Split ({num_gpu} GPU L + {num_thread}C CPU)"
     else:
         # Smart Auto-Hybrid Policy ("auto")
@@ -344,8 +341,6 @@ def compute_hybrid_allocation(
             num_gpu = 99
             strategy_label = f"Full dGPU Offload ({num_thread}C Assist)"
         elif is_apu or effective_gpu_mem_mb >= 1500:
-            # Integrated APU (like Radeon 610M with VRAM + GTT shared pool) or mid-VRAM GPU:
-            # Split attention/FFN layers across GPU & physical CPU cores for best throughput without OOM
             if ram_avail_gb >= 3.2:
                 num_gpu = 20 if not on_battery else 12
             elif ram_avail_gb >= 2.0:
@@ -1136,8 +1131,8 @@ MODELS_CATALOG = {
 def ensure_vigyan_3b_registered() -> bool:
     """Autonomous verifier and auto-repair for Flagship Vigyan 3B Quad-Master in Ollama."""
     try:
-        check = subprocess.run(["ollama", "show", "vigyan:3b"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2.0)
-        if check.returncode == 0:
+        check = subprocess.run(["ollama", "show", "vigyan:3b"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2.0, text=True)
+        if check.returncode == 0 and "</sstream>" in check.stdout and "4096" in check.stdout:
             return True
     except Exception:
         pass
@@ -1200,20 +1195,27 @@ def ensure_vigyan_3b_registered() -> bool:
         'PARAMETER stop "<|im_start|>"\n'
         'PARAMETER stop "<|im_end|>"\n'
         'PARAMETER stop "<|endoftext|>"\n'
+        'PARAMETER stop "</sstream>"\n'
+        'PARAMETER stop "<solution>"\n'
+        'PARAMETER stop "</solution>"\n'
         'PARAMETER stop "User:"\n'
         'PARAMETER stop "\\n\\nUser"\n'
         'PARAMETER stop "Human:"\n'
         "PARAMETER num_gpu 0\n"
+        "PARAMETER num_thread 4\n"
+        "PARAMETER num_batch 256\n"
+        "PARAMETER num_ctx 4096\n"
+        "PARAMETER repeat_penalty 1.15\n"
+        "PARAMETER repeat_last_n 64\n"
         "PARAMETER temperature 0.2\n"
         "PARAMETER top_p 0.95\n"
         "PARAMETER top_k 40\n"
-        "PARAMETER num_ctx 2048\n"
     )
     with open(modelfile_path, "w", encoding="utf-8") as mf:
         mf.write(modelfile_content)
 
     try:
-        print("[INFO] Auto-repair: Registering vigyan:3b into Ollama...", file=sys.stderr)
+        print("[INFO] Auto-repair: Registering vigyan:3b into Ollama with STEM reasoning parameters...", file=sys.stderr)
         res = subprocess.run(["ollama", "create", "vigyan:3b", "-f", modelfile_path], capture_output=True, timeout=180)
         return res.returncode == 0
     except Exception as e:
@@ -2154,12 +2156,14 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 except Exception:
                     user_ctx = None
 
-                # RAM-Safe Dynamic Context Budget Clamping
-                target_ctx = user_ctx or 2048
+                # RAM-Safe Dynamic Context Budget Clamping (Default 4096, scalable to 8192)
+                target_ctx = user_ctx or hybrid.get("num_ctx", 4096)
                 avail_ram = telemetry.get("ram_avail_gb", 4.0)
-                if target_ctx > 4096 and avail_ram < 4.0:
+                if target_ctx > 8192 and avail_ram < 5.0:
+                    target_ctx = 8192
+                if target_ctx > 4096 and avail_ram < 2.0:
                     target_ctx = 4096
-                if target_ctx > 2048 and avail_ram < 2.5:
+                if target_ctx > 2048 and avail_ram < 1.0:
                     target_ctx = 2048
 
                 raw_messages = body.get("messages") or []
@@ -2186,10 +2190,22 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                         "num_gpu": hybrid["num_gpu"],
                         "num_thread": hybrid["num_thread"],
                         "num_ctx": target_ctx,
-                        "num_batch": 64,
-                        "num_predict": min(target_ctx, 2048),
+                        "num_batch": hybrid.get("num_batch", 256),
+                        "num_predict": min(target_ctx, 4096),
+                        "repeat_penalty": 1.15,
+                        "repeat_last_n": 64,
                         "temperature": user_temp,
-                        "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "User:", "\n\nUser", "Human:"]
+                        "stop": [
+                            "<|im_start|>",
+                            "<|im_end|>",
+                            "<|endoftext|>",
+                            "</sstream>",
+                            "<solution>",
+                            "</solution>",
+                            "User:",
+                            "\n\nUser",
+                            "Human:"
+                        ]
                     },
                     "stream": True,
                 }
@@ -2257,6 +2273,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                             chunk = json.loads(line_s)
                             tok = chunk.get("message", {}).get("content", "")
                             if tok:
+                                if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
+                                    clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
+                                    if clean_tok.strip():
+                                        accumulated_text += clean_tok
+                                        _emit("token", clean_tok)
+                                    break
                                 accumulated_text += tok
                                 _emit("token", tok)
                 finally:
