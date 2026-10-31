@@ -14,7 +14,7 @@ class VigyanSTEMGraph:
             candidates = [
                 os.path.join(os.path.dirname(os.path.abspath(__file__)), "db_store.db"),
                 os.path.expanduser("~/.vigyan/knowledge_graph/db_store.db"),
-                "/home/hello/vigyan_masterpiece/knowledge_graph/db_store.db"
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "knowledge_graph", "db_store.db")
             ]
             for c in candidates:
                 if os.path.exists(c):

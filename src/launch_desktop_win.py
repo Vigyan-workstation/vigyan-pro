@@ -74,16 +74,17 @@ def get_windows_telemetry(mode: str = "auto") -> dict:
 
     if not has_gpu and sys.platform == "win32":
         try:
+            # 1. Try modern PowerShell CIM query (works on Windows 10 and Windows 11 24H2)
             res = subprocess.run(
-                ["wmic", "path", "win32_VideoController", "get", "Name,AdapterRAM", "/format:csv"],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=0.6
+                ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -Property Name,AdapterRAM | ConvertTo-Csv -NoTypeInformation"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.0
             )
-            if res.returncode == 0:
+            if res.returncode == 0 and res.stdout.strip():
                 for line in res.stdout.splitlines():
-                    cols = [c.strip() for c in line.strip().split(",")]
-                    if len(cols) >= 3 and cols[2] and cols[2] != "Name":
+                    cols = [c.strip('"\r\n ') for c in line.split(",")]
+                    if len(cols) >= 2 and cols[0] and cols[0] != "Name":
                         has_gpu = True
-                        gpu_name = cols[2]
+                        gpu_name = cols[0]
                         try:
                             vram_total_mb = round(int(cols[1]) / (1024 ** 2), 1)
                         except Exception:
@@ -92,6 +93,28 @@ def get_windows_telemetry(mode: str = "auto") -> dict:
                         break
         except Exception:
             pass
+
+        if not has_gpu:
+            try:
+                # 2. Legacy WMIC fallback
+                res = subprocess.run(
+                    ["wmic", "path", "win32_VideoController", "get", "Name,AdapterRAM", "/format:csv"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=0.6
+                )
+                if res.returncode == 0:
+                    for line in res.stdout.splitlines():
+                        cols = [c.strip() for c in line.strip().split(",")]
+                        if len(cols) >= 3 and cols[2] and cols[2] != "Name":
+                            has_gpu = True
+                            gpu_name = cols[2]
+                            try:
+                                vram_total_mb = round(int(cols[1]) / (1024 ** 2), 1)
+                            except Exception:
+                                vram_total_mb = 2048.0
+                            gpu_info = f"{gpu_name[:22]} ({vram_total_mb/1024:.1f} GB)"
+                            break
+            except Exception:
+                pass
 
     num_thread = max(2, physical_cores - 1) if (mode == "cpu_eco" or on_battery) else physical_cores
     num_ctx = 4096 if ram_total_gb < 10 else 8192
@@ -158,9 +181,10 @@ def launch_webview2():
     # Universal cross-platform URL: prefer local HTTP server to avoid Edge/Chromium file:// CORS restrictions
     target_url = f"http://127.0.0.1:{bridge_port}/" if bridge_started else f"file:///{index_path.replace(os.sep, '/')}"
 
-    # Ensure Vigyan AI 1.5B Quad Master and Vigyan 7B Frontier are registered into Ollama
+    # Ensure Vigyan 3B Quad-Master, 1.5B, and 7B Frontier are registered into Ollama
     try:
-        from launch_desktop import ensure_vigyan_1_5b_registered, ensure_vigyan_7b_registered
+        from launch_desktop import ensure_vigyan_3b_registered, ensure_vigyan_1_5b_registered, ensure_vigyan_7b_registered
+        ensure_vigyan_3b_registered()
         ensure_vigyan_1_5b_registered()
         ensure_vigyan_7b_registered()
     except Exception as exc:
@@ -193,9 +217,16 @@ def launch_webview2():
     ]
     edge_exe = next((p for p in edge_paths if os.path.exists(p)), "msedge.exe")
 
+    edge_profile_dir = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local")), "vigyan", "edge_profile")
+    try:
+        os.makedirs(edge_profile_dir, exist_ok=True)
+    except Exception:
+        pass
+
     cmd = [
         edge_exe,
         f"--app={target_url}",
+        f"--user-data-dir={edge_profile_dir}",
         "--window-size=1340,760",
         "--enable-features=OverlayScrollbar",
         "--force-dark-mode"
@@ -208,6 +239,13 @@ def launch_webview2():
         print(f"Failed to launch Edge app mode: {e}")
         import webbrowser
         webbrowser.open(target_url)
+        print(f"[Vigyan Pro] Workstation running at {target_url}. Press Ctrl+C to stop.")
+        try:
+            while True:
+                import time
+                time.sleep(1.0)
+        except KeyboardInterrupt:
+            return True
         return True
 
 

@@ -23,6 +23,45 @@
 
   onMount(() => {
     scrollToBottom();
+
+    let dragCounter = 0;
+    const onWindowDragEnter = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter++;
+      isDragging = true;
+    };
+    const onWindowDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        isDragging = false;
+      }
+    };
+    const onWindowDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    const onWindowDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter = 0;
+      isDragging = false;
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        processIngestedFile(files[0]);
+      }
+    };
+
+    window.addEventListener("dragenter", onWindowDragEnter);
+    window.addEventListener("dragleave", onWindowDragLeave);
+    window.addEventListener("dragover", onWindowDragOver);
+    window.addEventListener("drop", onWindowDrop);
+
+    return () => {
+      window.removeEventListener("dragenter", onWindowDragEnter);
+      window.removeEventListener("dragleave", onWindowDragLeave);
+      window.removeEventListener("dragover", onWindowDragOver);
+      window.removeEventListener("drop", onWindowDrop);
+    };
   });
 
   function autoResize() {
@@ -171,7 +210,7 @@
                 filename: file.name,
                 summary: data.summary || "Extracted document specifications.",
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Synthesize 3D CAD Enclosure", "Generate Digital Waveform"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Generate Digital Waveform", "Generate PCB Netlist"],
               },
             });
             chatStore.save();
@@ -230,7 +269,7 @@
                 filename: file.name,
                 summary: data.summary,
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Synthesize 3D CAD Enclosure"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Generate PCB Netlist"],
               },
             });
             chatStore.save();
@@ -245,10 +284,12 @@
   }
 
   function handleActionClick(actionText: string) {
-    if (actionText.includes("3D") || actionText.includes("Enclosure") || actionText.includes("CAD")) {
-      send("Generate a 3D CAD enclosure based on extracted specifications.");
+    if (actionText.includes("Netlist") || actionText.includes("PCB") || actionText.includes("Circuit")) {
+      send("Generate the SPICE/KiCad circuit netlist and design topology based on extracted specifications.");
     } else if (actionText.includes("Waveform") || actionText.includes("Timing")) {
       send("Generate digital timing waveform based on extracted specifications.");
+    } else if (actionText.includes("Proof") || actionText.includes("Analytical")) {
+      send("Derive the step-by-step analytical proof and SymPy equations for these parameters.");
     } else {
       send(actionText);
     }
@@ -361,7 +402,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       send(input);
     }
@@ -380,7 +421,18 @@
   }
 </script>
 
-<div class="flex flex-col h-full bg-[#000000] text-[#f3f4f6] {fontClass[fontSize]}">
+<div class="flex flex-col h-full bg-[#000000] text-[#f3f4f6] {fontClass[fontSize]} relative">
+
+  <!-- Full-Window Obsidian Frosted Drag Overlay -->
+  {#if isDragging}
+    <div class="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none animate-fade-in border-2 border-dashed border-[#10b981]/60 m-3 rounded-2xl select-none">
+      <div class="w-16 h-16 rounded-2xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-center justify-center text-3xl text-[#10b981] mb-3 shadow-[0_0_24px_rgba(16,185,129,0.3)]">
+        ⇪
+      </div>
+      <div class="text-base font-semibold text-white tracking-wide">Drop Datasheet or Document to Index</div>
+      <div class="text-xs font-mono text-[#9ca3af] mt-1">Direct in-process LanceDB indexing &amp; SymPy analysis</div>
+    </div>
+  {/if}
 
   <!-- Centered Message Canvas (768px reading container) -->
   <div
@@ -401,7 +453,7 @@
             </div>
             <h1 class="text-2xl font-bold text-white tracking-tight">Vigyan Pro</h1>
             <p class="text-[#9ca3af] text-[14px] max-w-md leading-relaxed">
-              Sovereign STEM intelligence. Exact mathematical grounding via SymPy AST, parametric CAD, and 100% offline inference.
+              Sovereign STEM intelligence. Exact mathematical grounding via SymPy AST, in-process LanceDB RAG, and 100% offline inference.
             </p>
           </div>
 
@@ -478,18 +530,11 @@
       type="file"
       bind:this={fileInputEl}
       onchange={handleFileInputChange}
-      accept="image/*,.pdf,.csv,.txt,.json,.py,.stl,.md"
+      accept="image/*,.pdf,.csv,.txt,.json,.py,.md"
       class="hidden"
     />
 
     <div class="max-w-[720px] mx-auto w-full flex flex-col items-center">
-      {#if isDragging}
-        <div class="w-full mb-2 py-3 px-4 rounded-2xl bg-[#10b981]/15 border-2 border-dashed border-[#10b981] flex items-center justify-center gap-2 text-xs text-[#10b981] font-semibold animate-pulse">
-          <span>⇪</span>
-          <span>Drop PDF, CSV, or Datasheet to Analyze with Sovereign AI</span>
-        </div>
-      {/if}
-
       <div class="w-full flex items-center gap-3 bg-[#06080e]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.85)] focus-within:border-[#38bdf8]/40 transition-all">
         <!-- Attachment button for local document ingestion -->
         <button
@@ -508,7 +553,7 @@
           bind:value={input}
           oninput={autoResize}
           onkeydown={handleKeydown}
-          placeholder="Ask a STEM problem, synthesize a 3D enclosure, or drop a document…"
+          placeholder="Ask a STEM problem, derive a proof, verify a circuit, or drop a document…"
           rows={1}
           disabled={isStreaming}
           class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
@@ -519,7 +564,7 @@
           <button
             onclick={stop}
             class="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 text-[#e2e8f0] hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer"
-            title="Stop generation"
+            title="Stop generation (Escape)"
           >
             <span class="w-2.5 h-2.5 bg-white rounded-sm block"></span>
           </button>
@@ -528,7 +573,7 @@
             onclick={() => send(input)}
             disabled={!input.trim()}
             class="flex-shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all shadow-md font-bold cursor-pointer"
-            title="Send (Enter)"
+            title="Send (Enter or Cmd+Enter)"
           >
             <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 translate-y-[-0.5px]">
               <path fill-rule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clip-rule="evenodd"/>
@@ -538,7 +583,7 @@
       </div>
 
       <p class="text-[10px] font-mono text-[#6b7280] text-center mt-2 tracking-wide select-none">
-        100% Offline & Private · SymPy AST Verified · Zero Cloud Egress
+        100% Offline &amp; Private · SymPy AST Verified · In-Process LanceDB · Zero Cloud Egress
       </p>
     </div>
   </div>

@@ -79,7 +79,7 @@
         <AttachmentCard {attachment} />
       {/if}
       {#if content}
-        <p class="whitespace-pre-wrap text-[14px] leading-relaxed">{content}</p>
+        <p class="whitespace-pre-wrap text-[14px] leading-relaxed select-text">{content}</p>
       {/if}
     {:else}
 
@@ -95,14 +95,14 @@
             </span>
           </div>
 
-          <p class="text-xs text-[#9ca3af] leading-relaxed">
+          <p class="text-xs text-[#9ca3af] leading-relaxed select-text">
             {digest.summary}
           </p>
 
           {#if digest.metrics && digest.metrics.length > 0}
             <div class="flex flex-wrap gap-1.5 pt-1">
               {#each digest.metrics as m}
-                <span class="text-[11px] font-mono bg-white/[0.05] border border-white/10 text-white px-2 py-0.5 rounded">
+                <span class="text-[11px] font-mono bg-white/[0.05] border border-white/10 text-white px-2 py-0.5 rounded select-text">
                   {m}
                 </span>
               {/each}
@@ -137,7 +137,7 @@
 
       <!-- Assistant text response with offline KaTeX typography -->
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-      <div class="prose-vigyan text-[14px]">{@html rendered}{#if streaming}<span class="animate-blink text-[#10b981] ml-0.5">▋</span>{/if}</div>
+      <div class="prose-vigyan text-[14px] select-text">{@html rendered}{#if streaming}<span class="animate-blink text-[#10b981] ml-0.5">▋</span>{/if}</div>
 
       <!-- 1-Click Interactive Plot Curve Button (renders in-situ) -->
       {#if plottableFormula && !activePlotExpr}

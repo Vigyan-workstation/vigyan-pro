@@ -45,9 +45,9 @@ export function renderMath(text: string): string {
   });
 
   // 4. Inline Math: $ ... $ (avoid currency amounts like $100)
-  src = src.replace(/(?:^|[\s(])\$([^$\n]+)\$(?=[\s),.?!:;]|$)/g, (fullMatch, tex) => {
+  src = src.replace(/(^|[\s(])\$([^$\n]+)\$(?=[\s),.?!:;]|$)/g, (fullMatch, prefix, tex) => {
     if (!/^\d+[\s.,]/.test(tex) && tex.length < 120 && !tex.includes("\n")) {
-      return ` ${makePlaceholder(renderKatexSafe(tex.trim(), false))}`;
+      return `${prefix}${makePlaceholder(renderKatexSafe(tex.trim(), false))}`;
     }
     return fullMatch;
   });

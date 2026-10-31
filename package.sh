@@ -241,6 +241,41 @@ exec "$DIR/src/launch_mac.sh" "$@"
 EOF
 chmod +x "$MAC_STAGE/Vigyan-Pro.command"
 
+# Native macOS .app Bundle Structure
+APP_BUNDLE="$MAC_STAGE/Vigyan Pro.app"
+mkdir -p "$APP_BUNDLE/Contents/MacOS"
+mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Vigyan-Pro</string>
+    <key>CFBundleIdentifier</key>
+    <string>in.experimentlab.vigyanpro</string>
+    <key>CFBundleName</key>
+    <string>Vigyan Pro</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${VERSION}</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+cat <<'EOF' > "$APP_BUNDLE/Contents/MacOS/Vigyan-Pro"
+#!/usr/bin/env bash
+BUNDLE_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+exec "$BUNDLE_DIR/src/launch_mac.sh" "$@"
+EOF
+chmod +x "$APP_BUNDLE/Contents/MacOS/Vigyan-Pro"
+
 MAC_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal.tar.gz"
 tar -czf "$MAC_OUTPUT" -C "$SCRIPT_DIR/.build_mac" vigyan-pro
 echo "✓ macOS Lightweight Built: $MAC_OUTPUT"

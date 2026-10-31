@@ -27,7 +27,6 @@ from typing import Dict, Any, List, Optional
 # Sovereign session security token (ephemeral, single-session only)
 _SESSION_TOKEN = secrets.token_hex(32)
 
-# Auto-inject virtualenv site-packages and knowledge_graph paths so SymPy, KùzuDB are always available
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BASE_DIR not in sys.path:
     sys.path.insert(0, _BASE_DIR)
@@ -35,20 +34,25 @@ for _cand in [
     os.path.join(_BASE_DIR, "knowledge_graph"),
     _BASE_DIR,
     os.path.expanduser("~/.vigyan/knowledge_graph"),
-    "/home/hello/vigyan_masterpiece",
 ]:
     if os.path.isdir(_cand) and _cand not in sys.path:
         sys.path.insert(0, _cand)
 
-for _p in glob.glob(os.path.expanduser("~/.venv-rag/lib/python*/site-packages")):
-    if _p not in sys.path:
+_py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+for _p in (
+    glob.glob(os.path.join(_BASE_DIR, "..", ".venv", "lib", _py_ver, "site-packages"))
+    + glob.glob(os.path.join(_BASE_DIR, ".venv", "lib", _py_ver, "site-packages"))
+    + glob.glob(os.path.expanduser(f"~/.vigyan/venv/lib/{_py_ver}/site-packages"))
+    + glob.glob(os.path.expanduser(f"~/.venv-rag/lib/{_py_ver}/site-packages"))
+):
+    if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)
 
 # Auto-inject system site-packages and dist-packages so gi (Gtk, WebKit2) is always available even in a venv
 for _sys_p in (
-    glob.glob("/usr/lib*/python3*/site-packages")
+    glob.glob(f"/usr/lib*/{_py_ver}/site-packages")
     + glob.glob("/usr/lib*/python3/dist-packages")
-    + glob.glob("/usr/local/lib*/python3*/site-packages")
+    + glob.glob(f"/usr/local/lib*/{_py_ver}/site-packages")
     + glob.glob("/usr/local/lib*/python3/dist-packages")
 ):
     if os.path.isdir(_sys_p) and _sys_p not in sys.path:
@@ -525,23 +529,25 @@ def get_system_telemetry(override_mode: Optional[str] = None) -> Dict[str, Any]:
 # ==============================================================================
 # 2. EMBEDDED NEURO-SYMBOLIC ENGINE (SYMPY AST + KÙZUDB GRAPHRAG BRIDGE)
 # ==============================================================================
-MASTERPIECE_DIR = "/home/hello/vigyan_masterpiece"
-if os.path.exists(MASTERPIECE_DIR) and MASTERPIECE_DIR not in sys.path:
-    sys.path.append(MASTERPIECE_DIR)
-
 _SYMPY_ENGINE = None
 _STEM_GRAPH = None
 
 try:
     import sympy as sp
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
     class _FallbackSymPyEngine:
         def __init__(self):
+            # Standard scientific symbols across physics, math, and engineering
             self.safe_dict = {
                 "x": sp.Symbol("x"), "y": sp.Symbol("y"), "z": sp.Symbol("z"),
                 "t": sp.Symbol("t"), "s": sp.Symbol("s"), "n": sp.Symbol("n", integer=True),
                 "k": sp.Symbol("k"), "R": sp.Symbol("R", positive=True),
                 "C": sp.Symbol("C", positive=True), "L": sp.Symbol("L", positive=True),
+                "v": sp.Symbol("v"), "u": sp.Symbol("u"), "a": sp.Symbol("a"),
+                "m": sp.Symbol("m", positive=True), "F": sp.Symbol("F"), "r": sp.Symbol("r", positive=True),
+                "p": sp.Symbol("p"), "T": sp.Symbol("T", positive=True), "w": sp.Symbol("w"),
+                "I": sp.Symbol("I"), "q": sp.Symbol("q"), "V": sp.Symbol("V"),
                 "pi": sp.pi, "e": sp.E, "E": sp.E, "oo": sp.oo, "inf": sp.oo,
                 "sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "asin": sp.asin, "acos": sp.acos, "atan": sp.atan,
                 "sinh": sp.sinh, "cosh": sp.cosh, "tanh": sp.tanh, "exp": sp.exp,
@@ -553,6 +559,8 @@ try:
                 "Integer": sp.Integer, "Float": sp.Float, "Rational": sp.Rational, "Number": sp.Number
             }
             self._cache: Dict[str, Dict[str, Any]] = {}
+            self._cache_lock = threading.Lock()
+            self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="vigyan_sympy")
             try:
                 from sympy.parsing.sympy_parser import (
                     parse_expr,
@@ -568,11 +576,21 @@ try:
 
         def _clean_math_str(self, s: str) -> str:
             s = s.strip()
-            s = s.replace("²", "**2").replace("³", "**3").replace("⁴", "**4")
-            s = s.replace("−", "-").replace("×", "*").replace("÷", "/").replace("π", "pi")
-            for bad in ("__", "import", "eval", "exec", "open", "os", "sys", "subprocess", "lambda", "globals", "locals", "getattr", "setattr", "delattr", "system", "pty", "shutil"):
+            s = s.replace("²", "**2").replace("³", "**3").replace("⁴", "**4").replace("⁻¹", "**(-1)")
+            s = s.replace("−", "-").replace("×", "*").replace("÷", "/").replace("π", "pi").replace("√", "sqrt")
+            # Disallow dangerous builtins and code execution primitives
+            disallowed = (
+                "__", "import", "eval", "exec", "open", "os", "sys", "subprocess",
+                "lambda", "globals", "locals", "getattr", "setattr", "delattr",
+                "system", "pty", "shutil", "compile", "breakpoint"
+            )
+            for bad in disallowed:
                 if bad in s.lower():
                     return ""
+            # Syntax normalization: 2x -> 2*x (avoid scientific notation like 1e-4)
+            s = re.sub(r'(\d)(?![eE][+-]?\d)([a-zA-Z])', r'\1*\2', s)
+            s = re.sub(r'(\d)\(', r'\1*(', s)
+            s = re.sub(r'\)([\w\(])', r')*\1', s)
             return s
 
         def _is_safe_ast(self, expr_str: str) -> bool:
@@ -582,32 +600,67 @@ try:
                     ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
                     ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow,
                     ast.FloorDiv, ast.Mod, ast.UAdd, ast.USub, ast.Name,
-                    ast.Call, ast.Load, ast.Tuple, ast.List
+                    ast.Call, ast.Load, ast.Tuple, ast.List,
+                    ast.BitXor, ast.BitAnd, ast.Invert, ast.keyword
                 )
+                disallowed_names = {
+                    "import", "eval", "exec", "open", "os", "sys", "subprocess",
+                    "lambda", "globals", "locals", "getattr", "setattr", "delattr",
+                    "system", "pty", "shutil", "compile", "breakpoint", "quit", "exit"
+                }
                 for node in ast.walk(tree):
                     if not isinstance(node, allowed_nodes):
                         return False
                     if isinstance(node, ast.Attribute):
                         return False
                     if isinstance(node, ast.Name):
-                        if node.id.startswith("__") or node.id not in self.safe_dict:
+                        if node.id.startswith("__") or node.id.lower() in disallowed_names:
                             return False
+                        # Dynamically register valid variable symbols if safe
+                        if node.id not in self.safe_dict:
+                            if re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', node.id):
+                                self.safe_dict[node.id] = sp.Symbol(node.id)
+                            else:
+                                return False
                 return True
             except Exception:
                 return False
 
-        def evaluate_expression(self, expr_str: str) -> Dict[str, Any]:
+        def _eval_core(self, s: str) -> Dict[str, Any]:
+            if self._parse_expr:
+                res = self._parse_expr(
+                    s,
+                    local_dict=self.safe_dict,
+                    global_dict={"__builtins__": {}},
+                    transformations=self._transformations
+                )
+            else:
+                res = eval(s, {"__builtins__": {}}, dict(self.safe_dict))
+
+            latex_res = sp.latex(res) if isinstance(res, (sp.Basic, sp.Matrix, list, tuple)) else str(res)
+            num = None
+            if hasattr(res, "evalf") and not getattr(res, "free_symbols", None):
+                try:
+                    num = float(res.evalf(6))
+                except Exception:
+                    num = None
+            elif isinstance(res, (int, float)):
+                num = float(res)
+            return {"success": True, "result": str(res), "latex": latex_res, "numeric_approx": num, "cached": False}
+
+        def evaluate_expression(self, expr_str: str, timeout_sec: float = 2.5) -> Dict[str, Any]:
             s = self._clean_math_str(expr_str)
             if not s:
                 return {"success": False, "error": "Mathematical expression contains disallowed syntax or keywords"}
 
             import hashlib
             cache_key = hashlib.sha256(s.encode("utf-8")).hexdigest()
-            if cache_key in self._cache:
-                hit = dict(self._cache[cache_key])
-                hit["cached"] = True
-                hit["latency_ms"] = 0.0
-                return hit
+            with self._cache_lock:
+                if cache_key in self._cache:
+                    hit = dict(self._cache[cache_key])
+                    hit["cached"] = True
+                    hit["latency_ms"] = 0.0
+                    return hit
 
             if "=" in s and not ("==" in s or "Eq" in s or "<=" in s or ">=" in s):
                 parts = s.split("=", 1)
@@ -617,30 +670,15 @@ try:
                 return {"success": False, "error": "Mathematical expression contains disallowed syntax"}
 
             try:
-                if self._parse_expr:
-                    res = self._parse_expr(
-                        s,
-                        local_dict=self.safe_dict,
-                        global_dict={"__builtins__": {}},
-                        transformations=self._transformations
-                    )
-                else:
-                    res = eval(s, {"__builtins__": {}}, dict(self.safe_dict))
-
-                latex_res = sp.latex(res) if isinstance(res, (sp.Basic, sp.Matrix, list, tuple)) else str(res)
-                num = None
-                if hasattr(res, "evalf") and not getattr(res, "free_symbols", None):
-                    try:
-                        num = float(res.evalf(6))
-                    except Exception:
-                        num = None
-                elif isinstance(res, (int, float)):
-                    num = float(res)
-                out = {"success": True, "result": str(res), "latex": latex_res, "numeric_approx": num, "cached": False}
-                if len(self._cache) > 2048:
-                    self._cache.pop(next(iter(self._cache)))
-                self._cache[cache_key] = out
+                future = self._executor.submit(self._eval_core, s)
+                out = future.result(timeout=timeout_sec)
+                with self._cache_lock:
+                    if len(self._cache) > 2048:
+                        self._cache.pop(next(iter(self._cache)))
+                    self._cache[cache_key] = out
                 return out
+            except FuturesTimeoutError:
+                return {"success": False, "error": f"Evaluation timed out after {timeout_sec}s"}
             except Exception as exc:
                 return {"success": False, "error": f"Evaluation error: {str(exc)}"}
 
@@ -916,6 +954,30 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
 # ==============================================================================
 # 3. EMBEDDED LOCAL SOVEREIGN AGENT & NEURO-SYMBOLIC BRIDGE (PORT 8085)
 # ==============================================================================
+def get_current_ram_percent() -> float:
+    """Returns current system memory percentage with /proc/meminfo fallback."""
+    if psutil:
+        try:
+            return float(psutil.virtual_memory().percent)
+        except Exception:
+            pass
+    # Linux /proc/meminfo fallback
+    try:
+        meminfo = {}
+        with open("/proc/meminfo", "r") as f:
+            for line in f:
+                parts = line.split(":")
+                if len(parts) == 2:
+                    meminfo[parts[0].strip()] = int(parts[1].split()[0])
+        total = meminfo.get("MemTotal", 0)
+        avail = meminfo.get("MemAvailable", meminfo.get("MemFree", 0))
+        if total > 0:
+            return round((1.0 - (avail / total)) * 100.0, 1)
+    except Exception:
+        pass
+    return 0.0
+
+
 class RAMGovernor:
     """Monitors system memory during model streaming inference.
     If RAM usage reaches or exceeds threshold_pct (default 88.0%),
@@ -935,13 +997,13 @@ class RAMGovernor:
         self.tripped = False
         self.running = True
         self.peak_ram_pct = 0.0
-        self.prev_ram_pct = psutil.virtual_memory().percent if psutil else 0.0
+        self.prev_ram_pct = get_current_ram_percent()
 
         def _watchdog():
             consecutive_over = 0
             while self.running:
                 try:
-                    pct = psutil.virtual_memory().percent if psutil else 0.0
+                    pct = get_current_ram_percent()
                     self.rate_of_rise = pct - self.prev_ram_pct
                     self.prev_ram_pct = pct
 
@@ -1127,6 +1189,35 @@ def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
 # ==============================================================================
 # 3.1 VIGYAN AI SOVEREIGN MODEL REGISTRY & DOWNLOAD MANAGER
 # ==============================================================================
+def get_platform_model_dirs() -> List[str]:
+    """Returns platform-aware candidate directories for sovereign model weights."""
+    dirs = []
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    dirs.append(os.path.join(base_dir, "..", "models"))
+    dirs.append(os.path.join(base_dir, "models"))
+    if sys.platform == "win32":
+        local_app = os.environ.get("LOCALAPPDATA", os.path.expanduser("~/AppData/Local"))
+        dirs.append(os.path.join(local_app, "vigyan", "models"))
+    elif sys.platform == "darwin":
+        dirs.append(os.path.expanduser("~/Library/Application Support/vigyan/models"))
+    else:
+        xdg_data = os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))
+        dirs.append(os.path.join(xdg_data, "vigyan", "models"))
+    dirs.append(os.path.expanduser("~/.vigyan/models"))
+    dirs.append(os.path.expanduser("~/models"))
+    dirs.append(os.path.expanduser("~/Downloads"))
+    return [d for d in dirs if d]
+
+
+def _build_model_candidates(filename: str) -> List[str]:
+    cands = []
+    for d in get_platform_model_dirs():
+        p = os.path.join(d, filename)
+        if p not in cands:
+            cands.append(p)
+    return cands
+
+
 MODELS_CATALOG = {
     "vigyan:3b": {
         "name": "Vigyan 3B Quad-Master Sovereign Engine",
@@ -1137,14 +1228,7 @@ MODELS_CATALOG = {
         "description": "Certified flagship mathematical and STEM foundation model with SymPy CAS verification and zero cloud egress.",
         "dest_filename": "vigyan-3b-quad-master-iq3_m.gguf",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf",
-        "local_candidates": [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "vigyan-3b-quad-master-iq3_m.gguf"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "vigyan-3b-quad-master-iq3_m.gguf"),
-            os.path.expanduser("~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"),
-            os.path.expanduser("~/models/vigyan-3b-quad-master-iq3_m.gguf"),
-            os.path.expanduser("~/Downloads/vigyan-3b-quad-master-iq3_m.gguf"),
-            "/home/hello/Downloads/vigyan ai/models/vigyan-3b-quad-master-iq3_m.gguf"
-        ],
+        "local_candidates": _build_model_candidates("vigyan-3b-quad-master-iq3_m.gguf"),
         "template": """{{- if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
 {{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
@@ -1162,13 +1246,7 @@ MODELS_CATALOG = {
         "description": "Proprietary high-velocity STEM & math quad-master model with instant responses, ChatML formatting, and zero-hallucination calculus.",
         "dest_filename": "vigyan-1.5b-quad-master-q4_k_m.gguf",
         "hf_url": "https://github.com/shreyansh001boy-tech/vigyan-desktop-releases/releases/download/v2.9.0-beta/vigyan-1.5b-quad-master-q4_k_m.gguf",
-        "local_candidates": [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "vigyan-1.5b-quad-master-q4_k_m.gguf"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "vigyan-1.5b-quad-master-q4_k_m.gguf"),
-            os.path.expanduser("~/.vigyan/models/vigyan-1.5b-quad-master-q4_k_m.gguf"),
-            os.path.expanduser("~/models/vigyan-1.5b-quad-master-q4_k_m.gguf"),
-            os.path.expanduser("~/Downloads/vigyan-1.5b-quad-master-q4_k_m.gguf")
-        ],
+        "local_candidates": _build_model_candidates("vigyan-1.5b-quad-master-q4_k_m.gguf"),
         "template": """{{- if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
 {{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
@@ -1186,13 +1264,7 @@ MODELS_CATALOG = {
         "description": "Elite frontier model for closed-form mathematics, Denavit-Hartenberg kinematics, Verilog RTL, and analog circuit netlists.",
         "dest_filename": "vigyan-4th-gen-7b-IQ3_M.gguf",
         "hf_url": "https://github.com/shreyansh001boy-tech/vigyan-desktop-releases/releases/download/v2.9.0-beta/vigyan-4th-gen-7b-IQ3_M.gguf",
-        "local_candidates": [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "vigyan-4th-gen-7b-IQ3_M.gguf"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "vigyan-4th-gen-7b-IQ3_M.gguf"),
-            os.path.expanduser("~/.vigyan/models/vigyan-4th-gen-7b-IQ3_M.gguf"),
-            os.path.expanduser("~/models/vigyan-4th-gen-7b-IQ3_M.gguf"),
-            os.path.expanduser("~/Downloads/vigyan-4th-gen-7b-IQ3_M.gguf")
-        ],
+        "local_candidates": _build_model_candidates("vigyan-4th-gen-7b-IQ3_M.gguf"),
         "template": """{{- if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
 {{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
@@ -1202,6 +1274,94 @@ MODELS_CATALOG = {
         "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
     }
 }
+
+
+def ensure_vigyan_3b_registered() -> bool:
+    """Autonomous verifier and auto-repair for Flagship Vigyan 3B Quad-Master in Ollama."""
+    try:
+        check = subprocess.run(["ollama", "show", "vigyan:3b"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2.0)
+        if check.returncode == 0:
+            return True
+    except Exception:
+        pass
+
+    target_dir = os.path.expanduser("~/.vigyan/models")
+    os.makedirs(target_dir, exist_ok=True)
+    gguf_path = os.path.join(target_dir, "vigyan-3b-quad-master-iq3_m.gguf")
+
+    if not os.path.isfile(gguf_path) or os.path.getsize(gguf_path) < 1_000_000_000:
+        candidates = MODELS_CATALOG.get("vigyan:3b", {}).get("local_candidates", [])
+        found_local = None
+        for cand in candidates:
+            if cand and os.path.isfile(cand) and os.path.getsize(cand) >= 1_000_000_000:
+                found_local = cand
+                break
+
+        if found_local:
+            print(f"[INFO] Discovered bundled 3B sovereign model weights at: {found_local}", file=sys.stderr)
+            if os.path.abspath(found_local) != os.path.abspath(gguf_path):
+                try:
+                    import shutil
+                    print("[INFO] Importing 3B sovereign model into ~/.vigyan/models/...", file=sys.stderr)
+                    shutil.copy2(found_local, gguf_path)
+                except Exception:
+                    gguf_path = found_local
+            else:
+                gguf_path = found_local
+        else:
+            token_path = os.path.expanduser("~/.cache/huggingface/token")
+            hf_token = ""
+            if os.path.isfile(token_path):
+                try:
+                    with open(token_path, "r", encoding="utf-8") as f:
+                        hf_token = f.read().strip()
+                except Exception:
+                    pass
+            try:
+                from huggingface_hub import hf_hub_download
+                print("[INFO] Auto-repair: Downloading vigyan-3b-quad-master from Hugging Face...", file=sys.stderr)
+                hf_hub_download(
+                    repo_id="shreyansh12183/vigyan-3b-quad-master",
+                    filename="vigyan-3b-quad-master-iq3_m.gguf",
+                    token=hf_token or None,
+                    local_dir=target_dir
+                )
+            except Exception as e:
+                print(f"[WARN] 3B HF auto-repair download error: {e}", file=sys.stderr)
+                return False
+
+    modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-3b")
+    modelfile_content = (
+        f'FROM "{gguf_path}"\n'
+        'TEMPLATE """{{- if .System }}<|im_start|>system\n'
+        "{{ .System }}<|im_end|>\n"
+        '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
+        "{{ .Content }}<|im_end|>\n"
+        '{{ end }}<|im_start|>assistant\n'
+        '"""\n'
+        'SYSTEM """You are Vigyan 3B Quad-Master, the sovereign flagship STEM, mathematical proof, physics simulation, and engineering intelligence system architected by Shreyansh Singh. Deliver closed-form mathematical solutions, verified SymPy AST proofs, and exact engineering calculations with 100% offline edge privacy and zero corporate API dependency."""\n'
+        'PARAMETER stop "<|im_start|>"\n'
+        'PARAMETER stop "<|im_end|>"\n'
+        'PARAMETER stop "<|endoftext|>"\n'
+        'PARAMETER stop "User:"\n'
+        'PARAMETER stop "\\n\\nUser"\n'
+        'PARAMETER stop "Human:"\n'
+        "PARAMETER num_gpu 0\n"
+        "PARAMETER temperature 0.2\n"
+        "PARAMETER top_p 0.95\n"
+        "PARAMETER top_k 40\n"
+        "PARAMETER num_ctx 2048\n"
+    )
+    with open(modelfile_path, "w", encoding="utf-8") as mf:
+        mf.write(modelfile_content)
+
+    try:
+        print("[INFO] Auto-repair: Registering vigyan:3b into Ollama...", file=sys.stderr)
+        res = subprocess.run(["ollama", "create", "vigyan:3b", "-f", modelfile_path], capture_output=True, timeout=180)
+        return res.returncode == 0
+    except Exception as e:
+        print(f"[WARN] Ollama 3B registration error: {e}", file=sys.stderr)
+        return False
 
 
 def ensure_vigyan_1_5b_registered() -> bool:
@@ -1259,7 +1419,7 @@ def ensure_vigyan_1_5b_registered() -> bool:
 
     modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-1.5b")
     modelfile_content = (
-        f"FROM {gguf_path}\n"
+        f'FROM "{gguf_path}"\n'
         'TEMPLATE """{{- if .System }}<|im_start|>system\n'
         "{{ .System }}<|im_end|>\n"
         '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
@@ -1318,7 +1478,7 @@ def ensure_vigyan_7b_registered() -> bool:
 
     modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-7b")
     modelfile_content = (
-        f"FROM {gguf_path}\n"
+        f'FROM "{gguf_path}"\n'
         'TEMPLATE """{{- if .System }}<|im_start|>system\n'
         "{{ .System }}<|im_end|>\n"
         '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
@@ -2188,7 +2348,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
         elif self.path.startswith("/api/models/catalog"):
             tel = get_system_telemetry()
             ram_gb = tel.get("ram_total_gb", 8.0)
-            rec_tag = "vigyan:1.5b"
+            rec_tag = "vigyan:3b"
             payload = {
                 "catalog": MODELS_CATALOG,
                 "models": list(MODELS_CATALOG.values()),
@@ -2227,12 +2387,27 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 if os.path.isfile(target_file):
                     self._send_cors(200, content_type="text/html; charset=utf-8")
                     with open(target_file, "rb") as f:
-                        self.wfile.write(f.read())
+                        html_bytes = f.read()
+                    token_script = f"""<script>
+window.VIGYAN_TOKEN = '{_SESSION_TOKEN}';
+window.AGENT_HOST = 'http://127.0.0.1:{self.server.server_port}';
+try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.setItem('vigyan_agent_host', 'http://127.0.0.1:{self.server.server_port}'); }} catch(e) {{}}
+</script>""".encode("utf-8")
+                    if b"<head>" in html_bytes:
+                        html_bytes = html_bytes.replace(b"<head>", b"<head>\n" + token_script, 1)
+                    elif b"<html" in html_bytes:
+                        html_bytes = token_script + html_bytes
+                    self.wfile.write(html_bytes)
                     return
             elif clean_path.startswith(("/vendor/", "/assets/")):
                 rel = clean_path.lstrip("/")
                 target_dist = os.path.join(dist_dir, rel)
                 target_file = target_dist if os.path.isfile(target_dist) else os.path.join(base_dir, rel)
+                norm_target = os.path.realpath(target_file)
+                if not (norm_target.startswith(os.path.realpath(dist_dir)) or norm_target.startswith(os.path.realpath(base_dir))):
+                    self._send_cors(403)
+                    self.wfile.write(b'{"error":"Forbidden: Path traversal blocked"}')
+                    return
                 if os.path.isfile(target_file):
                     ctype = "application/octet-stream"
                     if clean_path.endswith(".js"):
@@ -2390,7 +2565,9 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Cache-Control", "no-cache, no-transform")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
             origin = self.headers.get("Origin", "")
             if origin.startswith("http://127.0.0.1:") or origin.startswith("http://localhost:") or origin == "null" or not origin:
                 self.send_header("Access-Control-Allow-Origin", origin if origin else "http://127.0.0.1")
@@ -2400,13 +2577,23 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Vigyan-Token")
             self.end_headers()
 
-            def _emit(event: str, data_obj: Any):
+            stream_lock = threading.Lock()
+            client_connected = [True]
+
+            def _emit(event: str, data_obj: Any) -> bool:
+                if not client_connected[0]:
+                    return False
                 chunk = f"event: {event}\ndata: {json.dumps(data_obj)}\n\n"
-                try:
-                    self.wfile.write(chunk.encode("utf-8"))
-                    self.wfile.flush()
-                except Exception:
-                    pass
+                with stream_lock:
+                    try:
+                        self.wfile.write(chunk.encode("utf-8"))
+                        self.wfile.flush()
+                        return True
+                    except (BrokenPipeError, ConnectionResetError, IOError):
+                        client_connected[0] = False
+                        return False
+                    except Exception:
+                        return False
 
             # Grounding and axioms
             if enrichment.get("sympy"):
@@ -2556,7 +2743,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                         hb_stop.set()
                         _emit("status", {"type": "ready", "message": "Inference stream active"})
                         for line in resp:
-                            if governor_tripped[0]:
+                            if governor_tripped[0] or not client_connected[0]:
                                 break
                             line_s = line.decode("utf-8").strip()
                             if not line_s:
@@ -2928,24 +3115,27 @@ def main():
     # Low-priority background pre-warming for zero-latency first prompt
     def _prewarm_moe():
         time.sleep(2.0)  # Wait for UI window to finish layout
+        ensure_vigyan_3b_registered()
         ensure_vigyan_1_5b_registered()
         ensure_vigyan_7b_registered()
-        try:
-            pw_req = urllib.request.Request(
-                "http://127.0.0.1:11434/api/generate",
-                data=json.dumps({
-                    "model": "vigyan:1.5b",
-                    "prompt": "",
-                    "keep_alive": "60m",
-                    "options": {"num_ctx": 2048, "num_batch": 128}
-                }).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(pw_req, timeout=35.0) as pw_resp:
-                if pw_resp.status == 200:
-                    print("[INFO] Pre-warmed vigyan:1.5b Quad Master into memory.", file=sys.stderr)
-        except Exception:
-            pass
+        for pm in ("vigyan:3b", "vigyan:1.5b"):
+            try:
+                pw_req = urllib.request.Request(
+                    "http://127.0.0.1:11434/api/generate",
+                    data=json.dumps({
+                        "model": pm,
+                        "prompt": "",
+                        "keep_alive": "60m",
+                        "options": {"num_ctx": 2048, "num_batch": 128}
+                    }).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(pw_req, timeout=35.0) as pw_resp:
+                    if pw_resp.status == 200:
+                        print(f"[INFO] Pre-warmed {pm} into memory.", file=sys.stderr)
+                        break
+            except Exception:
+                pass
 
     threading.Thread(target=_prewarm_moe, daemon=True).start()
 

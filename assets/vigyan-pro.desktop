@@ -1,7 +1,8 @@
 [Desktop Entry]
 Name=Vigyan Pro Sovereign Studio
-Comment=Sovereign AI Studio with Spec-Driven Agents and Local Inference
-Exec=/home/hello/.local/bin/vigyan-pro
+Comment=Sovereign Offline STEM Workstation with LanceDB RAG
+Exec=vigyan-pro %U
+TryExec=vigyan-pro
 Icon=vigyan-pro
 Terminal=false
 Type=Application

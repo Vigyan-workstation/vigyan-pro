@@ -19,8 +19,8 @@ if ! command -v ollama &>/dev/null && [ ! -x "/opt/homebrew/bin/ollama" ] && [ !
     echo ""
 fi
 
-# Locate Python 3
-for py_cmd in python3 /opt/homebrew/bin/python3 /usr/local/bin/python3 "$DIR/../.venv/bin/python3" "$DIR/.venv/bin/python3"; do
+# Locate Python 3 (prioritize project and user venvs over Xcode stub)
+for py_cmd in "$DIR/../.venv/bin/python3" "$DIR/.venv/bin/python3" "$HOME/.vigyan/venv/bin/python3" /opt/homebrew/bin/python3 /usr/local/bin/python3 python3; do
     if [ -x "$py_cmd" ] || command -v "$py_cmd" &>/dev/null; then
         exec "$py_cmd" "$DIR/launch_desktop_mac.py" "$@"
     fi

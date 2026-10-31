@@ -122,6 +122,12 @@
       targetDiv.id = uidPrefix + "0";
       waveEl.appendChild(targetDiv);
       (window as any).WaveDrom.RenderWaveForm(0, tool.wavedrom_spec, uidPrefix);
+      const svgs = waveEl.querySelectorAll("svg");
+      svgs.forEach((svg) => {
+        (svg as HTMLElement).style.filter = "invert(0.9) hue-rotate(180deg)";
+        (svg as HTMLElement).style.maxWidth = "100%";
+        (svg as HTMLElement).style.height = "auto";
+      });
     } catch (e) {
       console.warn("WaveDrom inline render error:", e);
     }

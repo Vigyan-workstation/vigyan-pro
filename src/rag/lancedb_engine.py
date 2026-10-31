@@ -1,6 +1,7 @@
 """
 Sovereign In-Process LanceDB Vector & Document RAG Engine.
 100% Offline, Zero-Daemon, Sub-Millisecond Vector Retrieval via PyArrow & FastEmbed.
+Cross-Platform: Linux, Windows, macOS.
 """
 
 import os
@@ -15,6 +16,30 @@ try:
     LANCEDB_AVAILABLE = True
 except ImportError:
     LANCEDB_AVAILABLE = False
+
+
+def get_platform_lancedb_path() -> str:
+    """Returns platform-standard directory for LanceDB vector storage."""
+    candidates = []
+    if sys.platform == "win32":
+        local_app = os.environ.get("LOCALAPPDATA")
+        if local_app:
+            candidates.append(os.path.join(local_app, "vigyan", "data", "lancedb"))
+    elif sys.platform == "darwin":
+        candidates.append(os.path.expanduser("~/Library/Application Support/vigyan/data/lancedb"))
+    else:
+        xdg_data = os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))
+        candidates.append(os.path.join(xdg_data, "vigyan", "data", "lancedb"))
+        candidates.append(os.path.expanduser("~/.local/vigyan/data/lancedb"))
+
+    candidates.append(os.path.expanduser("~/.vigyan/data/lancedb"))
+    candidates.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "lancedb"))
+
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    # Default to first platform path
+    return candidates[0]
 
 
 # Default Axiomatic STEM Corpus (Seeded when table is initialized)
@@ -83,17 +108,7 @@ class SovereignLanceDBEngine:
             return
 
         if not db_path:
-            candidates = [
-                os.path.expanduser("~/.vigyan/data/lancedb"),
-                "/home/hello/.local/vigyan/data/lancedb",
-                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "lancedb")
-            ]
-            for c in candidates:
-                if os.path.exists(c):
-                    db_path = c
-                    break
-            if not db_path:
-                db_path = os.path.expanduser("~/.vigyan/data/lancedb")
+            db_path = get_platform_lancedb_path()
 
         self.db_path = os.path.expanduser(db_path)
         os.makedirs(self.db_path, exist_ok=True)
@@ -111,7 +126,8 @@ class SovereignLanceDBEngine:
             self.embedder = None
 
     def _get_table_names(self) -> List[str]:
-        if not self.db:
+        # Explicit is None check prevents len(db)==0 truthiness bug
+        if self.db is None:
             return []
         try:
             res = self.db.list_tables()
@@ -126,7 +142,8 @@ class SovereignLanceDBEngine:
 
     def _ensure_stem_table(self):
         """Initializes and seeds the STEM axiomatic table if absent or empty."""
-        if not self.available or not self.db:
+        # Explicit is None check prevents truthiness failure on 0 tables
+        if not self.available or self.db is None or not self.embedder:
             return
         tables = self._get_table_names()
         if "stem_knowledge" not in tables:
@@ -149,11 +166,10 @@ class SovereignLanceDBEngine:
 
     def _ensure_user_docs_table(self):
         """Ensures user document ingest table exists."""
-        if not self.available or not self.db:
+        if not self.available or self.db is None or not self.embedder:
             return
         tables = self._get_table_names()
         if "user_docs" not in tables:
-            # Seed with schema structure
             dummy_text = "Vigyan Pro Sovereign In-Process Document Store initialized."
             vec = list(self.embedder.embed([dummy_text]))[0].tolist()
             initial_data = [{
@@ -171,11 +187,18 @@ class SovereignLanceDBEngine:
 
     def query_context(self, query: str, top_k: int = 3) -> str:
         """Returns verified scientific grounding context for prompt injection in <2ms."""
-        if not self.available or not self.db or not self.embedder:
+        if not self.available or self.db is None or not self.embedder:
+            return ""
+
+        q_clean = query.strip()
+        if not q_clean:
             return ""
 
         try:
-            q_vec = list(self.embedder.embed([query]))[0].tolist()
+            vecs = list(self.embedder.embed([q_clean]))
+            if not vecs:
+                return ""
+            q_vec = vecs[0].tolist()
             context_pieces: List[str] = []
 
             # 1. Search STEM axiomatic table
@@ -184,7 +207,8 @@ class SovereignLanceDBEngine:
                 stem_tbl = self.db.open_table("stem_knowledge")
                 res = stem_tbl.search(q_vec).limit(top_k).to_arrow()
                 for i in range(len(res)):
-                    score = res["_distance"][i].as_py() if "_distance" in res.column_names else 0.0
+                    raw_dist = res["_distance"][i].as_py() if "_distance" in res.column_names else 0.0
+                    score = float(raw_dist) if raw_dist is not None else 0.0
                     if score < 1.15:
                         t = res["title"][i].as_py()
                         content = res["text"][i].as_py()
@@ -202,7 +226,8 @@ class SovereignLanceDBEngine:
                     doc_id = doc_res["id"][i].as_py()
                     if doc_id == "init_anchor":
                         continue
-                    score = doc_res["_distance"][i].as_py() if "_distance" in doc_res.column_names else 0.0
+                    raw_dist = doc_res["_distance"][i].as_py() if "_distance" in doc_res.column_names else 0.0
+                    score = float(raw_dist) if raw_dist is not None else 0.0
                     if score < 1.15:
                         fn = doc_res["filename"][i].as_py()
                         txt = doc_res["text"][i].as_py()
@@ -216,33 +241,51 @@ class SovereignLanceDBEngine:
             sys.stderr.write(f"[LanceDB] Search query error: {e}\n")
             return ""
 
+    def _chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
+        """Safely chunks text into bounded, overlapping passages."""
+        text = text.strip()
+        if not text:
+            return []
+        # First split by paragraphs
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        chunks: List[str] = []
+        for p in paragraphs:
+            if len(p) <= chunk_size:
+                if len(p) >= 20:
+                    chunks.append(p)
+            else:
+                # Sub-chunk long paragraphs
+                start = 0
+                while start < len(p):
+                    sub = p[start:start + chunk_size].strip()
+                    if len(sub) >= 20:
+                        chunks.append(sub)
+                    start += chunk_size - overlap
+        return chunks
+
     def index_text_document(self, filename: str, text: str, chunk_size: int = 500) -> int:
-        """Indexes user documents into LanceDB with instant vectorization."""
-        if not self.available or not self.db or not self.embedder:
+        """Indexes user documents into LanceDB with bounded chunking and instant vectorization."""
+        if not self.available or self.db is None or not self.embedder:
             return 0
 
-        # Chunk text by paragraphs or length
-        raw_chunks = [c.strip() for c in text.split("\n\n") if len(c.strip()) > 30]
-        if not raw_chunks:
-            raw_chunks = [text[i:i+chunk_size].strip() for i in range(0, len(text), chunk_size) if len(text[i:i+chunk_size].strip()) > 30]
-
+        raw_chunks = self._chunk_text(text, chunk_size=chunk_size)
         if not raw_chunks:
             return 0
-
-        vectors = list(self.embedder.embed(raw_chunks))
-        now = time.time()
-        rows = []
-        for i, chunk in enumerate(raw_chunks):
-            rows.append({
-                "id": f"{filename}_{i}_{int(now)}",
-                "filename": filename,
-                "chunk_id": i,
-                "text": chunk,
-                "vector": vectors[i].tolist(),
-                "timestamp": now
-            })
 
         try:
+            vectors = list(self.embedder.embed(raw_chunks))
+            now = time.time()
+            rows = []
+            for i, chunk in enumerate(raw_chunks):
+                rows.append({
+                    "id": f"{filename}_{i}_{int(now)}",
+                    "filename": filename,
+                    "chunk_id": i,
+                    "text": chunk,
+                    "vector": vectors[i].tolist(),
+                    "timestamp": now
+                })
+
             docs_tbl = self.db.open_table("user_docs")
             docs_tbl.add(rows)
             return len(rows)

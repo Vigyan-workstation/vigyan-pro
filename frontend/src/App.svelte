@@ -28,6 +28,20 @@
       else contextTier = "4K EXT";
     } catch {}
 
+    const handleGlobalKeydown = (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
+      if (isMeta && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        chatStore.clear();
+      } else if (isMeta && e.key === ",") {
+        e.preventDefault();
+        settingsOpen = !settingsOpen;
+      } else if (e.key === "Escape" && settingsOpen) {
+        settingsOpen = false;
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeydown);
+
     const check = async () => {
       ollamaConnected = await checkOllamaStatus();
       const tel = await fetchTelemetry();
@@ -41,11 +55,14 @@
     };
     check();
     const interval = setInterval(check, 5_000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("keydown", handleGlobalKeydown);
+    };
   });
 </script>
 
-<div class="h-screen w-screen flex flex-col bg-[#000000] text-[#f3f4f6] select-none overflow-hidden font-sans">
+<div class="h-screen w-screen flex flex-col bg-[#000000] text-[#f3f4f6] overflow-hidden font-sans">
 
   <!-- Executive Minimalist Control Deck: 44px (h-11) whisper-quiet top-bar -->
   <header class="h-11 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--guide-color)] bg-[#020408]/90 backdrop-blur-md z-30 select-none">
@@ -65,10 +82,15 @@
       <!-- Divider -->
       <span class="text-white/10">/</span>
 
-      <!-- Core Engine Status Pill -->
-      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] font-mono">
-        <span class="w-1.5 h-1.5 rounded-full bg-[#10b981] shadow-[0_0_6px_#10b981]"></span>
-        <span class="text-white/90">Vigyan-3B Quad-Master</span>
+      <!-- Core Engine Status Pill (3-State Truth Indicator) -->
+      <div
+        class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[11px] font-mono select-none"
+        title={ollamaConnected ? "Engine Connected & Grounded" : "Engine Reconnecting..."}
+      >
+        <span
+          class="w-1.5 h-1.5 rounded-full transition-all duration-300 {ollamaConnected ? 'bg-[#10b981] shadow-[0_0_6px_#10b981]' : 'bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse'}"
+        ></span>
+        <span class="text-white/90">{model.replace('vigyan:', 'Vigyan-').toUpperCase()}</span>
       </div>
     </div>
 

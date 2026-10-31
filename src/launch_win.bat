@@ -17,45 +17,45 @@ if %ERRORLEVEL% neq 0 (
     echo.
 )
 
-where python >nul 2>&1
-if %ERRORLEVEL% equ 0 (
-    python launch_desktop_win.py
+if exist "%~dp0..\.venv\Scripts\python.exe" (
+    "%~dp0..\.venv\Scripts\python.exe" launch_desktop_win.py %*
+    exit /b %ERRORLEVEL%
+)
+
+if exist "%~dp0.venv\Scripts\python.exe" (
+    "%~dp0.venv\Scripts\python.exe" launch_desktop_win.py %*
+    exit /b %ERRORLEVEL%
+)
+
+if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
+    "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" launch_desktop_win.py %*
+    exit /b %ERRORLEVEL%
+)
+
+if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+    "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" launch_desktop_win.py %*
+    exit /b %ERRORLEVEL%
+)
+
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" launch_desktop_win.py %*
+    exit /b %ERRORLEVEL%
+)
+
+if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" (
+    "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" launch_desktop_win.py %*
     exit /b %ERRORLEVEL%
 )
 
 where py >nul 2>&1
 if %ERRORLEVEL% equ 0 (
-    py launch_desktop_win.py
+    py launch_desktop_win.py %*
     exit /b %ERRORLEVEL%
 )
 
-if exist "%~dp0..\.venv\Scripts\python.exe" (
-    "%~dp0..\.venv\Scripts\python.exe" launch_desktop_win.py
-    exit /b %ERRORLEVEL%
-)
-
-if exist "%~dp0.venv\Scripts\python.exe" (
-    "%~dp0.venv\Scripts\python.exe" launch_desktop_win.py
-    exit /b %ERRORLEVEL%
-)
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
-    "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" launch_desktop_win.py
-    exit /b %ERRORLEVEL%
-)
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-    "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" launch_desktop_win.py
-    exit /b %ERRORLEVEL%
-)
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
-    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" launch_desktop_win.py
-    exit /b %ERRORLEVEL%
-)
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" (
-    "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" launch_desktop_win.py
+where python >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    python launch_desktop_win.py %*
     exit /b %ERRORLEVEL%
 )
 

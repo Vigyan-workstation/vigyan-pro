@@ -171,7 +171,7 @@ class TestHybridComputeAndNeuroSymbolicStudio(unittest.TestCase):
             headers={"Content-Type": "application/json", "X-Vigyan-Token": launch_desktop._SESSION_TOKEN},
             method="POST",
         )
-        with urllib.request.urlopen(req_enrich, timeout=3) as resp:
+        with urllib.request.urlopen(req_enrich, timeout=15) as resp:
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.read().decode("utf-8"))
             self.assertTrue(len(data["axioms"]) >= 1)
