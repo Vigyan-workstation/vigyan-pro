@@ -182,13 +182,12 @@ def launch_webview2():
     # Universal cross-platform URL: prefer local HTTP server to avoid Edge/Chromium file:// CORS restrictions
     target_url = f"http://127.0.0.1:{bridge_port}/" if bridge_started else f"file:///{index_path.replace(os.sep, '/')}"
 
-    # Ensure Vigyan 3B Quad-Master and 1.5B are registered into Ollama
+    # Ensure embedded llama-server is online
     try:
-        from launch_desktop import ensure_vigyan_3b_registered, ensure_vigyan_1_5b_registered
-        ensure_vigyan_3b_registered()
-        ensure_vigyan_1_5b_registered()
+        from launch_desktop import ensure_llama_server
+        ensure_llama_server()
     except Exception as exc:
-        print(f"[Vigyan Pro] Sovereign model registration notice: {exc}")
+        print(f"[Vigyan Pro] Sovereign engine notice: {exc}")
 
     # 1. Try pywebview with edgechromium (WebView2)
     try:
@@ -249,29 +248,16 @@ def launch_webview2():
         return True
 
 
-def _ollama_is_healthy() -> bool:
-    try:
-        import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
-
-
 def main():
     try:
-        from ollama_supervisor import OllamaSupervisor
-        supervisor = OllamaSupervisor(["ollama", "serve"], is_healthy=_ollama_is_healthy)
-        try:
-            supervisor.start()
-        except Exception as exc:
-            print(f"[WARN] could not start ollama on windows: {exc}", file=sys.stderr)
+        from launch_desktop import ensure_llama_server, LLAMA_SUPERVISOR
+        ensure_llama_server()
         try:
             launch_webview2()
         finally:
-            supervisor.stop()
-    except ImportError:
+            LLAMA_SUPERVISOR.stop()
+    except Exception as exc:
+        print(f"[Vigyan Pro] Launch error: {exc}", file=sys.stderr)
         launch_webview2()
 
 

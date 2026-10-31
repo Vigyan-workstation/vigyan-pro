@@ -10,15 +10,6 @@ echo "  Launching Vigyan Pro Sovereign Studio"
 echo "  100% Offline Edge Intelligence • Shreyansh Singh"
 echo "========================================================"
 
-# Check if Ollama is installed
-if ! command -v ollama &>/dev/null && [ ! -x "/opt/homebrew/bin/ollama" ] && [ ! -x "/usr/local/bin/ollama" ]; then
-    echo ""
-    echo "[!] Notice: Ollama is not detected."
-    echo "    Vigyan Pro runs 100% locally using Ollama."
-    echo "    To install: brew install ollama   OR   visit https://ollama.com"
-    echo ""
-fi
-
 # Locate Python 3 (prioritize project and user venvs over Xcode stub)
 for py_cmd in "$DIR/../.venv/bin/python3" "$DIR/.venv/bin/python3" "$HOME/.vigyan/venv/bin/python3" /opt/homebrew/bin/python3 /usr/local/bin/python3 python3; do
     if [ -x "$py_cmd" ] || command -v "$py_cmd" &>/dev/null; then
@@ -26,6 +17,6 @@ for py_cmd in "$DIR/../.venv/bin/python3" "$DIR/.venv/bin/python3" "$HOME/.vigya
     fi
 done
 
-INDEX_PATH="$DIR/index.html"
+INDEX_PATH="$DIR/dist/index.html"
 echo "[WARN] Python 3 not detected. Opening UI directly in default browser..."
 open "file://$INDEX_PATH"

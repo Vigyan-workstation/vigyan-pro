@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Vigyan Pro Desktop - Multi-OS Release Packaging Script
+# Enterprise Offline Edition (~1.45 GB)
 # Builds packages for Linux (.deb, .tar.gz), Windows (.zip), and macOS (.tar.gz)
-# Supports:
-#   - Lightweight archives (~3.8 MB)
-#   - Full Standalone Bundles with 1.1 GB Quad Master weights (--bundle-weights)
+# Pure Offline Bundles with 1.4 GB Quad Master weights and embedded llama-server
 # ==============================================================================
 
 set -e
 
-RAW_VERSION="3.2.0"
-BUNDLE_WEIGHTS=false
+RAW_VERSION="3.3.0"
+BUNDLE_WEIGHTS=true
 
 for arg in "$@"; do
     if [ "$arg" = "--bundle-weights" ] || [ "$arg" = "--bundled" ]; then
         BUNDLE_WEIGHTS=true
+    elif [ "$arg" = "--lightweight" ] || [ "$arg" = "--no-weights" ]; then
+        BUNDLE_WEIGHTS=false
     elif [[ "$arg" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
         RAW_VERSION="$arg"
     fi
@@ -23,9 +24,9 @@ done
 VERSION="${RAW_VERSION#v}"
 
 echo "========================================================"
-echo "  Building Vigyan Pro Multi-OS Desktop Release v${VERSION}"
+echo "  Building Vigyan Pro Enterprise Multi-OS Release v${VERSION}"
 if [ "$BUNDLE_WEIGHTS" = true ]; then
-    echo "  Mode: Full Standalone Bundles (with 1.1GB Sovereign Model)"
+    echo "  Mode: Enterprise Offline Edition (~1.45GB Bundled Weights + llama-server)"
 else
     echo "  Mode: Standard Lightweight Packages"
 fi
@@ -37,7 +38,23 @@ cd "$SCRIPT_DIR"
 DIST_DIR="$SCRIPT_DIR/dist"
 mkdir -p "$DIST_DIR"
 
-MODEL_SOURCE="$HOME/.vigyan/models/vigyan-1.5b-quad-master-q4_k_m.gguf"
+MODEL_SOURCE="$HOME/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"
+
+# Locate llama-server binary for Linux / host
+LLAMA_SERVER_SRC=""
+if [ -f "$SCRIPT_DIR/bin/llama-server" ]; then
+    LLAMA_SERVER_SRC="$SCRIPT_DIR/bin/llama-server"
+elif [ -f "$HOME/.local/bin/llama-server" ]; then
+    LLAMA_SERVER_SRC="$HOME/.local/bin/llama-server"
+elif which llama-server >/dev/null 2>&1; then
+    LLAMA_SERVER_SRC="$(which llama-server)"
+fi
+
+# Ensure bin/ in the repository itself has llama-server
+if [ -n "$LLAMA_SERVER_SRC" ] && [ ! -f "$SCRIPT_DIR/bin/llama-server" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$SCRIPT_DIR/bin/llama-server"
+    chmod +x "$SCRIPT_DIR/bin/llama-server"
+fi
 
 # ------------------------------------------------------------------------------
 # 1. BUILD DEBIAN (.deb) PACKAGE FOR LINUX
@@ -62,6 +79,19 @@ cp -r "$SCRIPT_DIR/src/"* "$DEB_STAGE/opt/vigyan-pro/src/"
 cp -r "$SCRIPT_DIR/assets/"* "$DEB_STAGE/opt/vigyan-pro/assets/"
 cp "$SCRIPT_DIR/bin/vigyan-pro" "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
 chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
+
+# Copy llama-server into staged bin
+if [ -n "$LLAMA_SERVER_SRC" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$DEB_STAGE/opt/vigyan-pro/bin/llama-server"
+    chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/llama-server"
+fi
+
+# Bundle sovereign weights if enabled
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model weights into Debian package..."
+    mkdir -p "$DEB_STAGE/opt/vigyan-pro/models"
+    cp "$MODEL_SOURCE" "$DEB_STAGE/opt/vigyan-pro/models/"
+fi
 
 # Symlink to /usr/bin/vigyan-pro
 ln -s "/opt/vigyan-pro/bin/vigyan-pro" "$DEB_STAGE/usr/bin/vigyan-pro"
@@ -91,10 +121,10 @@ Architecture: amd64
 Maintainer: Shreyansh Lab <contact@experimentlab.in>
 Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, curl
 Homepage: https://experimentlab.in
-Description: Sovereign Offline STEM Workstation with In-Situ SymPy CAS
+Description: Sovereign Offline STEM Workstation with Embedded llama-server & SymPy CAS
  Vigyan Pro is an enterprise obsidian-grade sovereign desktop workstation
  featuring native KaTeX proofs, in-memory axiomatic physics/math grounding,
- SymPy CAS, and air-gapped local LLM inference.
+ SymPy CAS, and embedded 100% offline llama-server AI inference.
 EOF
 
 # DEBIAN postinst script
@@ -125,15 +155,15 @@ chmod 755 "$DEB_STAGE/DEBIAN/postrm"
 DEB_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_amd64.deb"
 
 if which dpkg-deb >/dev/null 2>&1; then
-    dpkg-deb --build --root-owner-group "$DEB_STAGE" "$DEB_OUTPUT"
+    dpkg-deb -Zgzip -z1 --build --root-owner-group "$DEB_STAGE" "$DEB_OUTPUT"
 else
     echo "==> dpkg-deb not found. Creating Debian package via universal ar/tar..."
     TMP_PKG="$SCRIPT_DIR/.deb_tmp"
     rm -rf "$TMP_PKG"
     mkdir -p "$TMP_PKG"
     echo "2.0" > "$TMP_PKG/debian-binary"
-    tar -czf "$TMP_PKG/control.tar.gz" -C "$DEB_STAGE/DEBIAN" .
-    tar -czf "$TMP_PKG/data.tar.gz" --exclude='./DEBIAN' -C "$DEB_STAGE" .
+    tar --use-compress-program="gzip -1" -cf "$TMP_PKG/control.tar.gz" -C "$DEB_STAGE/DEBIAN" .
+    tar --use-compress-program="gzip -1" -cf "$TMP_PKG/data.tar.gz" --exclude='./DEBIAN' -C "$DEB_STAGE" .
     (cd "$TMP_PKG" && ar rcs "$DEB_OUTPUT" debian-binary control.tar.gz data.tar.gz)
     rm -rf "$TMP_PKG"
 fi
@@ -154,6 +184,17 @@ cp -r "$SCRIPT_DIR/assets" "$TAR_STAGE/"
 cp -r "$SCRIPT_DIR/bin" "$TAR_STAGE/"
 chmod +x "$TAR_STAGE/bin/vigyan-pro"
 
+if [ -n "$LLAMA_SERVER_SRC" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$TAR_STAGE/bin/llama-server"
+    chmod +x "$TAR_STAGE/bin/llama-server"
+fi
+
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model into Linux package..."
+    mkdir -p "$TAR_STAGE/models"
+    cp "$MODEL_SOURCE" "$TAR_STAGE/models/"
+fi
+
 cat <<'EOF' > "$TAR_STAGE/launch.sh"
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -162,17 +203,11 @@ EOF
 chmod +x "$TAR_STAGE/launch.sh"
 
 TAR_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64.tar.gz"
-tar -czf "$TAR_OUTPUT" -C "$SCRIPT_DIR/.build_tar" vigyan-pro
-echo "✓ Linux Lightweight Built: $TAR_OUTPUT"
+tar --use-compress-program="gzip -1" -cf "$TAR_OUTPUT" -C "$SCRIPT_DIR/.build_tar" vigyan-pro
+echo "✓ Linux Archive Built: $TAR_OUTPUT"
 
-if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
-    echo "==> Bundling sovereign model into Linux Standalone package..."
-    mkdir -p "$TAR_STAGE/models"
-    cp "$MODEL_SOURCE" "$TAR_STAGE/models/"
-    TAR_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64_bundled.tar.gz"
-    tar -czf "$TAR_BUNDLED_OUTPUT" -C "$SCRIPT_DIR/.build_tar" vigyan-pro
-    echo "✓ Linux Standalone (with model) Built: $TAR_BUNDLED_OUTPUT"
-fi
+TAR_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64_bundled.tar.gz"
+ln -f "$TAR_OUTPUT" "$TAR_BUNDLED_OUTPUT" 2>/dev/null || cp "$TAR_OUTPUT" "$TAR_BUNDLED_OUTPUT"
 rm -rf "$SCRIPT_DIR/.build_tar"
 
 # ------------------------------------------------------------------------------
@@ -185,8 +220,23 @@ mkdir -p "$WIN_STAGE"
 
 cp -r "$SCRIPT_DIR/src" "$WIN_STAGE/"
 cp -r "$SCRIPT_DIR/assets" "$WIN_STAGE/"
+mkdir -p "$WIN_STAGE/bin"
 
-# Root launcher batch script
+if [ -f "$SCRIPT_DIR/bin/llama-server.exe" ]; then
+    cp "$SCRIPT_DIR/bin/llama-server.exe" "$WIN_STAGE/bin/"
+elif [ -f "$HOME/.local/bin/llama-server.exe" ]; then
+    cp "$HOME/.local/bin/llama-server.exe" "$WIN_STAGE/bin/"
+elif [ -n "$LLAMA_SERVER_SRC" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$WIN_STAGE/bin/llama-server"
+    cp -L "$LLAMA_SERVER_SRC" "$WIN_STAGE/bin/llama-server.exe" 2>/dev/null || true
+fi
+
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model into Windows package..."
+    mkdir -p "$WIN_STAGE/models"
+    cp "$MODEL_SOURCE" "$WIN_STAGE/models/"
+fi
+
 cat <<'EOF' > "$WIN_STAGE/Vigyan-Pro.bat"
 @echo off
 title Vigyan Pro
@@ -196,24 +246,14 @@ EOF
 
 WIN_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64.zip"
 if which zip >/dev/null 2>&1; then
-    (cd "$SCRIPT_DIR/.build_win" && zip -r -q "$WIN_OUTPUT" vigyan-pro)
+    (cd "$SCRIPT_DIR/.build_win" && zip -1 -r -q "$WIN_OUTPUT" vigyan-pro)
 else
     python3 -c "import shutil; shutil.make_archive('$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64', 'zip', '$SCRIPT_DIR/.build_win', 'vigyan-pro')"
 fi
-echo "✓ Windows Lightweight Built: $WIN_OUTPUT"
+echo "✓ Windows Archive Built: $WIN_OUTPUT"
 
-if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
-    echo "==> Bundling sovereign model into Windows Standalone package..."
-    mkdir -p "$WIN_STAGE/models"
-    cp "$MODEL_SOURCE" "$WIN_STAGE/models/"
-    WIN_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64_bundled.zip"
-    if which zip >/dev/null 2>&1; then
-        (cd "$SCRIPT_DIR/.build_win" && zip -r -q "$WIN_BUNDLED_OUTPUT" vigyan-pro)
-    else
-        python3 -c "import shutil; shutil.make_archive('$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64_bundled', 'zip', '$SCRIPT_DIR/.build_win', 'vigyan-pro')"
-    fi
-    echo "✓ Windows Standalone (with model) Built: $WIN_BUNDLED_OUTPUT"
-fi
+WIN_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64_bundled.zip"
+ln -f "$WIN_OUTPUT" "$WIN_BUNDLED_OUTPUT" 2>/dev/null || cp "$WIN_OUTPUT" "$WIN_BUNDLED_OUTPUT"
 rm -rf "$SCRIPT_DIR/.build_win"
 
 # ------------------------------------------------------------------------------
@@ -226,6 +266,19 @@ mkdir -p "$MAC_STAGE"
 
 cp -r "$SCRIPT_DIR/src" "$MAC_STAGE/"
 cp -r "$SCRIPT_DIR/assets" "$MAC_STAGE/"
+mkdir -p "$MAC_STAGE/bin"
+
+if [ -f "$SCRIPT_DIR/bin/llama-server-mac" ]; then
+    cp "$SCRIPT_DIR/bin/llama-server-mac" "$MAC_STAGE/bin/llama-server"
+elif [ -n "$LLAMA_SERVER_SRC" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$MAC_STAGE/bin/llama-server"
+fi
+
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model into macOS package..."
+    mkdir -p "$MAC_STAGE/models"
+    cp "$MODEL_SOURCE" "$MAC_STAGE/models/"
+fi
 
 cat <<'EOF' > "$MAC_STAGE/launch.sh"
 #!/usr/bin/env bash
@@ -277,17 +330,11 @@ EOF
 chmod +x "$APP_BUNDLE/Contents/MacOS/Vigyan-Pro"
 
 MAC_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal.tar.gz"
-tar -czf "$MAC_OUTPUT" -C "$SCRIPT_DIR/.build_mac" vigyan-pro
-echo "✓ macOS Lightweight Built: $MAC_OUTPUT"
+tar --use-compress-program="gzip -1" -cf "$MAC_OUTPUT" -C "$SCRIPT_DIR/.build_mac" vigyan-pro
+echo "✓ macOS Archive Built: $MAC_OUTPUT"
 
-if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
-    echo "==> Bundling sovereign model into macOS Standalone package..."
-    mkdir -p "$MAC_STAGE/models"
-    cp "$MODEL_SOURCE" "$MAC_STAGE/models/"
-    MAC_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal_bundled.tar.gz"
-    tar -czf "$MAC_BUNDLED_OUTPUT" -C "$SCRIPT_DIR/.build_mac" vigyan-pro
-    echo "✓ macOS Standalone (with model) Built: $MAC_BUNDLED_OUTPUT"
-fi
+MAC_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal_bundled.tar.gz"
+ln -f "$MAC_OUTPUT" "$MAC_BUNDLED_OUTPUT" 2>/dev/null || cp "$MAC_OUTPUT" "$MAC_BUNDLED_OUTPUT"
 rm -rf "$SCRIPT_DIR/.build_mac"
 
 # ------------------------------------------------------------------------------

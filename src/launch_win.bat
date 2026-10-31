@@ -7,16 +7,6 @@ echo   Launching Vigyan Pro Sovereign Studio (Windows)
 echo   100%% Offline Edge Intelligence • Shreyansh Singh
 echo ========================================================
 
-REM Check if Ollama is installed
-where ollama >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo.
-    echo [!] Notice: Ollama is not detected on your Windows system.
-    echo     Vigyan Pro runs 100%% locally using Ollama.
-    echo     To install, download from: https://ollama.com/download/windows
-    echo.
-)
-
 if exist "%~dp0..\.venv\Scripts\python.exe" (
     "%~dp0..\.venv\Scripts\python.exe" launch_desktop_win.py %*
     exit /b %ERRORLEVEL%
@@ -60,7 +50,7 @@ if %ERRORLEVEL% equ 0 (
 )
 
 REM Direct Edge App Mode fallback if Python is not in PATH
-set "INDEX_PATH=%~dp0index.html"
+set "INDEX_PATH=%~dp0dist\index.html"
 set "FILE_URL=file:///%INDEX_PATH:\=/%"
 
 echo [WARN] Python not in PATH. Launching Microsoft Edge App Mode directly...

@@ -264,12 +264,12 @@ export async function streamChat(
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") return;
-    onChunk({ type: "error", text: "Could not connect to local AI engine. Make sure Vigyan Pro backend or Ollama is running." });
+    onChunk({ type: "error", text: "Warming up sovereign engine... Please try again in a moment." });
     return;
   }
 
   if (!directResp.ok) {
-    onChunk({ type: "error", text: `AI engine returned status ${directResp.status}. Please try again.` });
+    onChunk({ type: "error", text: `Sovereign engine returned status ${directResp.status}. Please try again.` });
     return;
   }
 

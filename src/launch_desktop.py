@@ -66,6 +66,7 @@ os.environ.setdefault("OLLAMA_IGPU_ENABLE", "1")
 os.environ.setdefault("OLLAMA_ORIGINS", "*")
 
 from ollama_supervisor import OllamaSupervisor
+from llama_supervisor import LlamaServerSupervisor
 
 try:
     import tools
@@ -1223,94 +1224,6 @@ def ensure_vigyan_3b_registered() -> bool:
         return False
 
 
-def ensure_vigyan_1_5b_registered() -> bool:
-    """Autonomous verifier and auto-repair for Vigyan AI 1.5B Quad Master in Ollama."""
-    try:
-        check = subprocess.run(["ollama", "show", "vigyan:1.5b"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2.0)
-        if check.returncode == 0:
-            return True
-    except Exception:
-        pass
-
-    target_dir = os.path.expanduser("~/.vigyan/models")
-    os.makedirs(target_dir, exist_ok=True)
-    gguf_path = os.path.join(target_dir, "vigyan-1.5b-quad-master-q4_k_m.gguf")
-
-    if not os.path.isfile(gguf_path) or os.path.getsize(gguf_path) < 500_000_000:
-        # Check bundled / local candidate paths first
-        candidates = MODELS_CATALOG.get("vigyan:1.5b", {}).get("local_candidates", [])
-        found_local = None
-        for cand in candidates:
-            if cand and os.path.isfile(cand) and os.path.getsize(cand) >= 500_000_000:
-                found_local = cand
-                break
-
-        if found_local:
-            print(f"[INFO] Discovered bundled sovereign model weights at: {found_local}", file=sys.stderr)
-            if os.path.abspath(found_local) != os.path.abspath(gguf_path):
-                try:
-                    import shutil
-                    print("[INFO] Importing sovereign model into ~/.vigyan/models/...", file=sys.stderr)
-                    shutil.copy2(found_local, gguf_path)
-                except Exception:
-                    gguf_path = found_local
-        else:
-            token_path = os.path.expanduser("~/.cache/huggingface/token")
-            hf_token = ""
-            if os.path.isfile(token_path):
-                try:
-                    with open(token_path, "r", encoding="utf-8") as f:
-                        hf_token = f.read().strip()
-                except Exception:
-                    pass
-            try:
-                from huggingface_hub import hf_hub_download
-                print("[INFO] Auto-repair: Downloading vigyan-1.5b-quad-master from Hugging Face...", file=sys.stderr)
-                hf_hub_download(
-                    repo_id="shreyansh12183/vigyan-1.5b-quad-master",
-                    filename="vigyan-1.5b-quad-master-q4_k_m.gguf",
-                    token=hf_token or None,
-                    local_dir=target_dir
-                )
-            except Exception as e:
-                print(f"[WARN] HF auto-repair download error: {e}", file=sys.stderr)
-                return False
-
-    modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-1.5b")
-    modelfile_content = (
-        f'FROM "{gguf_path}"\n'
-        'TEMPLATE """{{- if .System }}<|im_start|>system\n'
-        "{{ .System }}<|im_end|>\n"
-        '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
-        "{{ .Content }}<|im_end|>\n"
-        '{{ end }}<|im_start|>assistant\n'
-        '"""\n'
-        'SYSTEM """You are Vigyan AI 1.5B Quad Master, a sovereign STEM, mathematical reasoning, physics simulation, and coding intelligence system architected and trained by Shreyansh Singh. Solve problems with rigorous mathematical proofs, clean LaTeX ($$...$$), and concise explanations. Be direct, authoritative, and professional. You operate with 100% offline edge privacy and zero corporate API dependency."""\n'
-        'PARAMETER stop "<|im_start|>"\n'
-        'PARAMETER stop "<|im_end|>"\n'
-        'PARAMETER stop "<|endoftext|>"\n'
-        'PARAMETER stop "User:"\n'
-        'PARAMETER stop "\\n\\nUser"\n'
-        'PARAMETER stop "Human:"\n'
-        "PARAMETER num_gpu 0\n"
-        "PARAMETER temperature 0.2\n"
-        "PARAMETER top_p 0.95\n"
-        "PARAMETER top_k 40\n"
-        "PARAMETER num_ctx 2048\n"
-    )
-    with open(modelfile_path, "w", encoding="utf-8") as mf:
-        mf.write(modelfile_content)
-
-    try:
-        print("[INFO] Auto-repair: Registering vigyan:1.5b into Ollama...", file=sys.stderr)
-        res = subprocess.run(["ollama", "create", "vigyan:1.5b", "-f", modelfile_path], capture_output=True, timeout=120)
-        return res.returncode == 0
-    except Exception as e:
-        print(f"[WARN] Ollama registration error: {e}", file=sys.stderr)
-        return False
-
-
-
 class ModelDownloadManager:
     """Resumable chunked model downloader with speed tracking and Ollama auto-registration."""
     def __init__(self):
@@ -1941,6 +1854,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             payload.update({
                 "status": "online",
                 "agent": "Vigyan-Sovereign-Neuro-Symbolic-Bridge",
+                "llama_server": LLAMA_SUPERVISOR.is_healthy(),
                 "sympy": _SYMPY_ENGINE is not None,
                 "kuzudb": True,
                 "ram_governor": {"active": True, "threshold_pct": 88.0},
@@ -2183,66 +2097,30 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 except Exception:
                     user_temp = 0.05
 
-                ollama_payload = {
-                    "model": active_model,
+                # Verified stop sequences and generation parameters
+                stop_sequences = [
+                    "<|im_start|>",
+                    "<|im_end|>",
+                    "<|endoftext|>",
+                    "</sstream>",
+                    "<solution>",
+                    "</solution>",
+                    "User:",
+                    "\n\nUser",
+                    "Human:"
+                ]
+
+                openai_payload = {
+                    "model": "vigyan-3b",
                     "messages": model_messages,
-                    "options": {
-                        "num_gpu": hybrid["num_gpu"],
-                        "num_thread": hybrid["num_thread"],
-                        "num_ctx": target_ctx,
-                        "num_batch": hybrid.get("num_batch", 256),
-                        "num_predict": min(target_ctx, 4096),
-                        "repeat_penalty": 1.15,
-                        "repeat_last_n": 64,
-                        "temperature": user_temp,
-                        "stop": [
-                            "<|im_start|>",
-                            "<|im_end|>",
-                            "<|endoftext|>",
-                            "</sstream>",
-                            "<solution>",
-                            "</solution>",
-                            "User:",
-                            "\n\nUser",
-                            "Human:"
-                        ]
-                    },
+                    "temperature": user_temp,
+                    "top_p": 0.95,
+                    "max_tokens": min(target_ctx, 4096),
                     "stream": True,
+                    "stop": stop_sequences,
+                    "repeat_penalty": 1.15,
+                    "repeat_last_n": 64,
                 }
-
-                gov_thresh = 96.0
-                try:
-                    if body.get("governor_threshold_pct"):
-                        gov_thresh = float(body.get("governor_threshold_pct"))
-                    elif body.get("options", {}).get("governor_threshold_pct"):
-                        gov_thresh = float(body.get("options", {}).get("governor_threshold_pct"))
-                except Exception:
-                    gov_thresh = 96.0
-
-                if active_model == "vigyan:1.5b":
-                    gov_thresh = max(94.0, min(97.5, gov_thresh))
-                else:
-                    gov_thresh = max(60.0, min(95.0, gov_thresh))
-
-                governor_tripped = [False]
-                def _on_ram_trip(pct):
-                    governor_tripped[0] = True
-                    _emit("ram_governor_trip", {
-                        "ram_percent": pct,
-                        "threshold": gov_thresh,
-                        "evicted_model": active_model,
-                        "fallback": "vigyan:1.5b"
-                    })
-                    _emit("token", f"\n\n**[RAM Governor Safety Alert]**: Memory reached {pct:.1f}% (≥ {gov_thresh:.0f}% threshold). Model `{active_model}` was unloaded to prevent system lockup.")
-
-                governor = RAMGovernor(threshold_pct=gov_thresh, interval_sec=0.1)
-                governor.start(_on_ram_trip, active_model)
-
-                req = urllib.request.Request(
-                    "http://127.0.0.1:11434/api/chat",
-                    headers={"Content-Type": "application/json"},
-                    data=json.dumps(ollama_payload).encode("utf-8"),
-                )
 
                 # Keep-alive silent heartbeat thread to prevent socket drop without user-facing noise
                 _emit("status", {"type": "thinking"})
@@ -2260,31 +2138,116 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 hb_t.start()
 
                 accumulated_text = ""
+                streamed_from_llama = False
+
+                # Primary routing: Embedded llama-server OpenAI endpoint (port 8086)
                 try:
-                    with urllib.request.urlopen(req, timeout=180) as resp:
+                    ls_req = urllib.request.Request(
+                        "http://127.0.0.1:8086/v1/chat/completions",
+                        headers={"Content-Type": "application/json"},
+                        data=json.dumps(openai_payload).encode("utf-8"),
+                    )
+                    with urllib.request.urlopen(ls_req, timeout=180) as resp:
                         hb_stop.set()
                         _emit("status", {"type": "ready", "message": "Inference stream active"})
-                        for line in resp:
-                            if governor_tripped[0] or not client_connected[0]:
+                        streamed_from_llama = True
+                        for raw_line in resp:
+                            if not client_connected[0]:
                                 break
-                            line_s = line.decode("utf-8").strip()
-                            if not line_s:
+                            line_s = raw_line.decode("utf-8", errors="replace").strip()
+                            if not line_s or line_s.startswith(":"):
                                 continue
-                            chunk = json.loads(line_s)
-                            tok = chunk.get("message", {}).get("content", "")
-                            if tok:
-                                if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
-                                    clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
-                                    if clean_tok.strip():
-                                        accumulated_text += clean_tok
-                                        _emit("token", clean_tok)
+                            if line_s.startswith("data: "):
+                                data_part = line_s[6:].strip()
+                                if data_part == "[DONE]":
                                     break
-                                accumulated_text += tok
-                                _emit("token", tok)
-                finally:
-                    hb_stop.set()
+                                try:
+                                    chunk = json.loads(data_part)
+                                    choices = chunk.get("choices", [])
+                                    if choices:
+                                        delta = choices[0].get("delta", {})
+                                        tok = delta.get("content", "")
+                                        if tok:
+                                            if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
+                                                clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
+                                                if clean_tok.strip():
+                                                    accumulated_text += clean_tok
+                                                    _emit("token", clean_tok)
+                                                break
+                                            accumulated_text += tok
+                                            _emit("token", tok)
+                                except Exception:
+                                    continue
+                except Exception as ls_exc:
+                    print(f"[WARN] llama-server stream unavailable: {ls_exc}; trying Ollama fallback", file=sys.stderr)
 
-                governor.stop()
+                if not streamed_from_llama:
+                    # Fallback to local Ollama daemon if available
+                    try:
+                        ollama_payload = {
+                            "model": active_model,
+                            "messages": model_messages,
+                            "options": {
+                                "num_gpu": hybrid["num_gpu"],
+                                "num_thread": hybrid["num_thread"],
+                                "num_ctx": target_ctx,
+                                "num_batch": hybrid.get("num_batch", 256),
+                                "num_predict": min(target_ctx, 4096),
+                                "repeat_penalty": 1.15,
+                                "repeat_last_n": 64,
+                                "temperature": user_temp,
+                                "stop": stop_sequences,
+                            },
+                            "stream": True,
+                        }
+                        req = urllib.request.Request(
+                            "http://127.0.0.1:11434/api/chat",
+                            headers={"Content-Type": "application/json"},
+                            data=json.dumps(ollama_payload).encode("utf-8"),
+                        )
+                        with urllib.request.urlopen(req, timeout=180) as resp:
+                            hb_stop.set()
+                            _emit("status", {"type": "ready", "message": "Inference stream active (fallback)"})
+                            for line in resp:
+                                if not client_connected[0]:
+                                    break
+                                line_s = line.decode("utf-8").strip()
+                                if not line_s:
+                                    continue
+                                chunk = json.loads(line_s)
+                                tok = chunk.get("message", {}).get("content", "")
+                                if tok:
+                                    if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
+                                        clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
+                                        if clean_tok.strip():
+                                            accumulated_text += clean_tok
+                                            _emit("token", clean_tok)
+                                        break
+                                    accumulated_text += tok
+                                    _emit("token", tok)
+                    except Exception as ollama_exc:
+                        hb_stop.set()
+                        if enrichment.get("sympy"):
+                            s = enrichment["sympy"]
+                            fallback = (
+                                f"### Exact Closed-Form Symbolic Solution\n\n"
+                                f"**Evaluated AST:** `{s.get('expression')}`\n\n"
+                                f"$$\\mathbf{{{s.get('latex')}}}$$\n\n"
+                                f"**Numerical Approximation:** `{s.get('numeric_approx')}`\n"
+                            )
+                            _emit("token", fallback)
+                        elif enrichment.get("graph_axioms"):
+                            ax = enrichment["graph_axioms"][0]
+                            fallback = (
+                                f"### {ax['law']} ({ax['domain']})\n\n"
+                                f"$$\\mathbf{{{ax['equation']}}}$$\n\n"
+                                f"{ax['axiom']}\n"
+                            )
+                            _emit("token", fallback)
+                        else:
+                            _emit("token", f"[Neuro-Symbolic Engine Initializing: {ls_exc}]")
+
+                hb_stop.set()
                 self._parse_and_execute_tools(accumulated_text, _emit)
 
             except Exception as exc:
@@ -2364,7 +2327,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
 
 def start_neuro_symbolic_bridge_server(port: int = 8085) -> Optional[int]:
     """Start embedded Neuro-Symbolic HTTP server on port 8085 (or 8086 if 8085 is in use)."""
-    for candidate_port in (port, 8086):
+    for candidate_port in (port, 8087, 8088):
         try:
             server = ThreadingHTTPServer(("127.0.0.1", candidate_port), _NeuroSymbolicHTTPHandler)
             t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -2378,32 +2341,28 @@ def start_neuro_symbolic_bridge_server(port: int = 8085) -> Optional[int]:
 # ==============================================================================
 # 4. OLLAMA DAEMON SUPERVISOR & WEBKITGTK WORKSTATION SHELL
 # ==============================================================================
-def _ollama_is_healthy() -> bool:
-    """Return True if a local Ollama answers on its loopback port."""
+LLAMA_SUPERVISOR = LlamaServerSupervisor(port=8086)
+
+
+def ensure_llama_server() -> None:
+    """Make sure the embedded llama-server micro-daemon is running."""
     try:
-        import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+        if not LLAMA_SUPERVISOR.is_healthy():
+            LLAMA_SUPERVISOR.start()
+    except Exception as exc:
+        print(f"[WARN] could not start llama-server: {exc}", file=sys.stderr)
 
 
-OLLAMA = OllamaSupervisor(["ollama", "serve"], is_healthy=_ollama_is_healthy)
-
-
-def ensure_ollama_daemon() -> None:
-    """Make sure a local Ollama is running; start one we own if it is not."""
-    try:
-        OLLAMA.start()
-    except OSError as exc:  # e.g. ollama is not installed
-        print(f"[WARN] could not start ollama: {exc}", file=sys.stderr)
-
-
-def _watch_ollama() -> bool:
-    """GLib timer callback: restart a crashed Ollama child. True keeps the timer."""
-    OLLAMA.check()
+def _watch_llama_server() -> bool:
+    """GLib timer callback: restart a crashed llama-server child. True keeps the timer."""
+    LLAMA_SUPERVISOR.check()
     return True
+
+
+# Backward compatibility shims
+OLLAMA = LLAMA_SUPERVISOR
+ensure_ollama_daemon = ensure_llama_server
+_watch_ollama = _watch_llama_server
 
 
 def main():
@@ -2433,7 +2392,7 @@ def main():
 
     # Initialize hardware topology cache, Ollama daemon, and Neuro-Symbolic bridge
     _discover_static_hardware()
-    ensure_ollama_daemon()
+    ensure_llama_server()
     bridge_port = start_neuro_symbolic_bridge_server(8085) or 8085
 
     win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
@@ -2630,38 +2589,28 @@ def main():
 
     win.show_all()
     win.present()
-    GLib.timeout_add_seconds(5, _watch_ollama)
+    GLib.timeout_add_seconds(5, _watch_llama_server)
 
     # Low-priority background pre-warming for zero-latency first prompt
     def _prewarm_moe():
         time.sleep(2.0)  # Wait for UI window to finish layout
-        ensure_vigyan_3b_registered()
-        ensure_vigyan_1_5b_registered()
-        for pm in ("vigyan:3b", "vigyan:1.5b"):
-            try:
-                pw_req = urllib.request.Request(
-                    "http://127.0.0.1:11434/api/generate",
-                    data=json.dumps({
-                        "model": pm,
-                        "prompt": "",
-                        "keep_alive": "60m",
-                        "options": {"num_ctx": 2048, "num_batch": 128}
-                    }).encode("utf-8"),
-                    headers={"Content-Type": "application/json"}
-                )
-                with urllib.request.urlopen(pw_req, timeout=35.0) as pw_resp:
-                    if pw_resp.status == 200:
-                        print(f"[INFO] Pre-warmed {pm} into memory.", file=sys.stderr)
-                        break
-            except Exception:
-                pass
+        try:
+            pw_req = urllib.request.Request(
+                "http://127.0.0.1:8086/health",
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(pw_req, timeout=5.0) as pw_resp:
+                if pw_resp.status == 200:
+                    print("[INFO] Embedded llama-server is online and warmed.", file=sys.stderr)
+        except Exception:
+            pass
 
     threading.Thread(target=_prewarm_moe, daemon=True).start()
 
     try:
         Gtk.main()
     finally:
-        OLLAMA.stop()
+        LLAMA_SUPERVISOR.stop()
 
 
 if __name__ == "__main__":

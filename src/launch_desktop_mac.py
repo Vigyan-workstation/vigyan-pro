@@ -18,17 +18,6 @@ os.environ.setdefault("OLLAMA_KV_CACHE_TYPE", "q8_0")
 os.environ.setdefault("OLLAMA_NUM_PARALLEL", "1")
 
 
-def _ollama_is_healthy() -> bool:
-    """Return True if local Ollama answers on loopback port."""
-    try:
-        import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:11434/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=1.0) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
-
-
 def launch_mac():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     index_dist = os.path.join(base_dir, "dist", "index.html")
@@ -47,25 +36,22 @@ def launch_mac():
     except Exception as exc:
         print(f"[Vigyan Pro] Warning: Neuro-Symbolic bridge init notice: {exc}", file=sys.stderr)
 
-    # 2. Start Ollama Supervisor Daemon
-    supervisor = None
+    # 2. Start Embedded Llama Server Supervisor Daemon
     try:
-        from ollama_supervisor import OllamaSupervisor
-        supervisor = OllamaSupervisor(["ollama", "serve"], is_healthy=_ollama_is_healthy)
-        supervisor.start()
-        print("[Vigyan Pro] Ollama Sovereign Supervisor initialized")
+        from launch_desktop import ensure_llama_server, LLAMA_SUPERVISOR
+        ensure_llama_server()
+        print("[Vigyan Pro] Embedded Llama Server Supervisor initialized")
     except Exception as exc:
-        print(f"[Vigyan Pro] Notice: Ollama supervisor started or running externally: {exc}", file=sys.stderr)
-
-    # 2.5 Ensure Vigyan 3B Quad-Master and 1.5B are registered into Ollama
-    try:
-        from launch_desktop import ensure_vigyan_3b_registered, ensure_vigyan_1_5b_registered
-        ensure_vigyan_3b_registered()
-        ensure_vigyan_1_5b_registered()
-    except Exception as exc:
-        print(f"[Vigyan Pro] Sovereign model registration notice: {exc}", file=sys.stderr)
+        print(f"[Vigyan Pro] Sovereign engine notice: {exc}", file=sys.stderr)
 
     target_url = f"http://127.0.0.1:{port}/" if bridge_started else f"file://{os.path.abspath(index_path)}"
+
+    def _cleanup():
+        try:
+            from launch_desktop import LLAMA_SUPERVISOR
+            LLAMA_SUPERVISOR.stop()
+        except Exception:
+            pass
 
     # 3. Launch Native Cocoa WKWebView via pywebview
     try:
@@ -83,8 +69,7 @@ def launch_mac():
             webview.start(gui='cocoa', debug=False)
             return True
         finally:
-            if supervisor:
-                supervisor.stop()
+            _cleanup()
     except ImportError:
         pass
     except Exception as e:
@@ -110,8 +95,7 @@ def launch_mac():
             proc.wait()
             return True
         finally:
-            if supervisor:
-                supervisor.stop()
+            _cleanup()
 
     # 5. Native Safari open fallback
     try:
@@ -123,8 +107,7 @@ def launch_mac():
     except KeyboardInterrupt:
         return True
     finally:
-        if supervisor:
-            supervisor.stop()
+        _cleanup()
 
 
 if __name__ == "__main__":
