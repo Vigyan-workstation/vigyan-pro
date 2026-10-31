@@ -885,6 +885,18 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
             parts.append(f"• [{ax['domain']}] {ax['law']}: $${ax['equation']}$$ — {ax['axiom']}")
         prompt_injection = "\n".join(parts)
 
+    # In-Process LanceDB Vector RAG Grounding (<2ms)
+    lancedb_ctx = ""
+    try:
+        from rag.lancedb_engine import SovereignLanceDBEngine
+        l_engine = SovereignLanceDBEngine.get_instance()
+        if l_engine.available:
+            lancedb_ctx = l_engine.query_context(q, top_k=2)
+            if lancedb_ctx:
+                prompt_injection = (prompt_injection + "\n" + lancedb_ctx).strip()
+    except Exception:
+        pass
+
     telemetry = get_system_telemetry()
     sympy_str = f"{sympy_res.get('expression')} = {sympy_res.get('result')}" if sympy_res else ""
     return {
@@ -894,6 +906,7 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
         "sympy_result": sympy_str,
         "graph_axioms": matched_axioms[:4],
         "axioms": matched_axioms[:4],
+        "lancedb_context": lancedb_ctx,
         "prompt_injection": prompt_injection,
         "enriched_system_suffix": ("\n" + prompt_injection) if prompt_injection else "",
         "hybrid": telemetry["hybrid"],
@@ -1067,39 +1080,47 @@ def execute_shell_command(command: str, confirmed: bool = False, cwd: Optional[s
 
 def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
     """Sovereign Vigyan AI execution router with dynamic RAM guard cascade.
-    Selects between Fast 1.5B/3B edge model and Frontier 7B model.
-    Checks available host RAM before loading 7B to prevent OOM freezes.
+    Selects between Flagship Vigyan-3B Quad-Master, Fast 1.5B, and Frontier 7B.
     """
     req = (requested_model or "").strip().lower()
     telemetry = get_system_telemetry()
     avail_gb = telemetry.get("ram_avail_gb", 0.0)
 
-    # Check if user explicitly requested 7B frontier model
+    # 1. Explicit 7B request
     if req in ("vigyan:7b", "7b", "frontier", "frontier-7b"):
         has_gpu_headroom = telemetry.get("gpu_vram_free_gb", 0.0) >= 3.6
         has_ram_headroom = avail_gb >= 3.6
 
         if has_gpu_headroom or has_ram_headroom:
             return {
-                "tier": 2,
+                "tier": 3,
                 "model": "vigyan:7b",
                 "downgraded": False,
-                "reason": "Vigyan 7B Frontier Sovereign Engine (Advanced physical engineering & deep math)"
+                "reason": "Vigyan 7B Frontier Sovereign Engine (Multi-page scientific research)"
             }
         else:
             return {
                 "tier": 1,
-                "model": "vigyan:1.5b",
+                "model": "vigyan:3b",
                 "downgraded": True,
-                "reason": f"RAM Guard: System memory headroom ({avail_gb:.1f} GB free) is below the 3.6 GB required for 7B Frontier inference. Gracefully routed to Fast 1.5B Quad Master to protect system stability."
+                "reason": f"RAM Guard: Memory headroom ({avail_gb:.1f} GB free) is below 3.6 GB. Routed to Vigyan-3B Quad-Master."
             }
 
-    # Default to Fast 1.5B Quad Master
+    # 2. Explicit 1.5B request
+    if req in ("vigyan:1.5b", "1.5b"):
+        return {
+            "tier": 1,
+            "model": "vigyan:1.5b",
+            "downgraded": False,
+            "reason": "Vigyan AI 1.5B Quad Master (Ultra-fast edge inference)"
+        }
+
+    # 3. Default to Flagship Vigyan-3B Quad-Master (57.50% GSM8K certified)
     return {
-        "tier": 1,
-        "model": "vigyan:1.5b",
+        "tier": 2,
+        "model": "vigyan:3b",
         "downgraded": False,
-        "reason": "Vigyan AI 1.5B Quad Master (Ultra-fast low-latency sovereign edge model)"
+        "reason": "Vigyan 3B Quad-Master Sovereign Engine (57.50% GSM8K Certified, 22-28 tok/s CPU inference)"
     }
 
 
@@ -1107,6 +1128,31 @@ def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
 # 3.1 VIGYAN AI SOVEREIGN MODEL REGISTRY & DOWNLOAD MANAGER
 # ==============================================================================
 MODELS_CATALOG = {
+    "vigyan:3b": {
+        "name": "Vigyan 3B Quad-Master Sovereign Engine",
+        "tag": "vigyan:3b",
+        "size_bytes": 1698693120,
+        "size_formatted": "1.58 GB",
+        "recommended_ram": "2.5 GB+ RAM (57.50% GSM8K Certified, 22-28 tok/s CPU inference)",
+        "description": "Certified flagship mathematical and STEM foundation model with SymPy CAS verification and zero cloud egress.",
+        "dest_filename": "vigyan-3b-quad-master-iq3_m.gguf",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf",
+        "local_candidates": [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models", "vigyan-3b-quad-master-iq3_m.gguf"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "vigyan-3b-quad-master-iq3_m.gguf"),
+            os.path.expanduser("~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"),
+            os.path.expanduser("~/models/vigyan-3b-quad-master-iq3_m.gguf"),
+            os.path.expanduser("~/Downloads/vigyan-3b-quad-master-iq3_m.gguf"),
+            "/home/hello/Downloads/vigyan ai/models/vigyan-3b-quad-master-iq3_m.gguf"
+        ],
+        "template": """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+""",
+        "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+    },
     "vigyan:1.5b": {
         "name": "Vigyan AI 1.5B Quad Master",
         "tag": "vigyan:1.5b",
@@ -2278,27 +2324,13 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"success": True, "evicted": evicted, "telemetry": stats}).encode("utf-8"))
             return
 
-        if self.path.startswith("/api/tools/cad/recompute"):
+        if self.path.startswith("/api/tools/rag/query"):
             import tools
-            shape = body.get("shape", "enclosure")
-            params = body.get("params", {})
-            title = body.get("title", f"Parametric {shape.title()}")
-            res = tools.dispatch_tool("cad_model_generate", {
-                "shape": shape,
-                "title": title,
-                "params": params
-            })
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/tools/robotics/recompute"):
-            import tools
-            arm_type = body.get("arm_type", "6dof_industrial")
-            joint_angles_deg = body.get("joint_angles_deg", [0, 0, 0, 0, 0, 0])
-            res = tools.dispatch_tool("robotics_kinematics", {
-                "arm_type": arm_type,
-                "joint_angles_deg": joint_angles_deg
+            query_str = body.get("query", "")
+            top_k = body.get("top_k", 3)
+            res = tools.dispatch_tool("knowledge_rag_search", {
+                "query": query_str,
+                "top_k": top_k
             })
             self._send_cors(200)
             self.wfile.write(json.dumps(res).encode("utf-8"))
@@ -2336,6 +2368,14 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                     raw_text = ingest_engine.extract_text_from_pdf_bytes(pdf_bytes)
                 except Exception:
                     raw_text = ""
+
+            # Index document text into in-process LanceDB RAG store
+            if raw_text:
+                try:
+                    from rag.lancedb_engine import SovereignLanceDBEngine
+                    indexed_count = SovereignLanceDBEngine.get_instance().index_text_document(filename, raw_text)
+                except Exception as e:
+                    sys.stderr.write(f"[Ingest RAG] Warning: {e}\n")
 
             res = ingest_engine.analyze_ingested_content(filename, raw_text)
             self._send_cors(200)
@@ -2395,7 +2435,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             sys_prompt = (
                 "You are Vigyan AI, a sovereign STEM, math, and physics intelligence system architected by Shreyansh Singh. "
                 "Solve problems with mathematical precision, concise explanations, and clean LaTeX ($$...$$). Be direct, rigorous, and professional. "
-                "When requested to synthesize 3D CAD geometry, 6-DoF robotics kinematics, digital bus waveforms, or mathematical plots, emit structured <tool_call> JSON specifications."
+                "When requested to synthesize digital bus waveforms, PCB netlists, or verify mathematical plots and formulas, emit structured <tool_call> JSON specifications."
                 f"{tool_spec}"
             )
             if enrichment.get("sympy"):

@@ -4,7 +4,7 @@
 
 import { compressContext, isCompressionEnabled } from "./compression";
 
-export const DEFAULT_MODEL = "vigyan:1.5b";
+export const DEFAULT_MODEL = "vigyan:3b";
 
 export interface ToolResult {
   tool: string;

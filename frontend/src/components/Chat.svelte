@@ -4,7 +4,6 @@
   import { onMount } from "svelte";
   import { streamChat, DEFAULT_MODEL, getAgentHost, getVigyanToken } from "../lib/ollama";
   import { chatStore } from "../lib/chatStore.svelte";
-  import { studioStore } from "../lib/studioStore.svelte";
   import ThinkingBlock from "./ThinkingBlock.svelte";
   import MessageBubble from "./MessageBubble.svelte";
 
@@ -33,10 +32,10 @@
   }
 
   const STARTERS = [
-    { icon: "⬡", label: "3D CAD Enclosure", prompt: "Generate a 3D electronics enclosure 140x90x35mm with 2.5mm walls." },
-    { icon: "∫", label: "Solve Equation", prompt: "Solve x² + x − 12 = 0 with step-by-step derivation." },
+    { icon: "⚡", label: "RLC Transient Response", prompt: "Derive and plot the step response of an underdamped series RLC circuit with R=20, L=0.1H, C=100uF." },
+    { icon: "∫", label: "Exact Calculus", prompt: "Solve x² + x − 12 = 0 with step-by-step derivation." },
     { icon: "∿", label: "Digital Waveform", prompt: "Generate SPI master write timing diagram with 8 bits data." },
-    { icon: "∂", label: "Plot Oscillation", prompt: "Plot the damped oscillation exp(-0.15*x)*cos(2*x) from 0 to 25." },
+    { icon: "∂", label: "Damped Oscillation", prompt: "Plot the damped oscillation exp(-0.15*x)*cos(2*x) from 0 to 25." },
   ];
 
   function handleFileDrop(e: DragEvent) {
@@ -110,7 +109,7 @@
                 filename: file.name,
                 summary: data.summary || "Extracted engineering parameters from image.",
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Synthesize 3D CAD Enclosure", "Evaluate Mathematical Proof"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Evaluate Mathematical Proof"],
               },
             });
             chatStore.save();
@@ -333,31 +332,6 @@
           }
           if (chunk.toolData) {
             chatStore.messages[idx].toolResults.push(chunk.toolData);
-            // Auto-open Artifact Viewport for CAD, Robotics, Waveforms, or Plots
-            const td = chunk.toolData;
-            if (td.mesh || td.joint_chain || td.wavedrom_spec || td.x || td.data || td.shape) {
-              studioStore.open({
-                id: Math.random().toString(36).slice(2, 9),
-                tool: td.tool || "tool",
-                render_type: td.render_type || (td.mesh ? "threejs_cad" : td.joint_chain ? "robotics" : td.wavedrom_spec ? "wavedrom" : "plot"),
-                title: td.title || "STEM Artifact",
-                shape: td.shape,
-                parameters: td.parameters,
-                mesh: td.mesh,
-                stl_base64: td.stl_base64,
-                dimensions_mm: td.dimensions_mm,
-                arm_type: td.arm_type,
-                joint_angles_deg: td.joint_angles_deg,
-                end_effector: td.end_effector,
-                reach_mm: td.reach_mm,
-                joint_chain: td.joint_chain,
-                wavedrom_spec: td.wavedrom_spec,
-                protocol: td.protocol,
-                data: td.data,
-                x: td.x,
-                y: td.y,
-              });
-            }
           }
           scrollToBottom();
         } else if (chunk.type === "answer") {

@@ -9,7 +9,7 @@
 
 set -e
 
-RAW_VERSION="3.1.0"
+RAW_VERSION="3.2.0"
 BUNDLE_WEIGHTS=false
 
 for arg in "$@"; do
@@ -91,10 +91,10 @@ Architecture: amd64
 Maintainer: Shreyansh Lab <contact@experimentlab.in>
 Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, curl
 Homepage: https://experimentlab.in
-Description: Sovereign AI Studio with Spec-Driven Agents and Local Inference
+Description: Sovereign Offline STEM Workstation with LanceDB RAG
  Vigyan Pro is an enterprise obsidian-grade sovereign desktop workstation
- featuring native KaTeX proofs, Plotly WebGL visualizations, and
- air-gapped local LLM inference via Ollama.
+ featuring native KaTeX proofs, in-process LanceDB vector RAG, SymPy CAS,
+ and air-gapped local LLM inference.
 EOF
 
 # DEBIAN postinst script

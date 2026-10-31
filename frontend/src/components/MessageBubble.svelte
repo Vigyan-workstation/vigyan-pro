@@ -2,7 +2,6 @@
   import { renderMath, extractPlottableFormula } from "../lib/katex";
   import StemInlineCard from "./StemInlineCard.svelte";
   import AttachmentCard from "./AttachmentCard.svelte";
-  import { studioStore } from "../lib/studioStore.svelte";
   import type { ToolResult } from "../lib/ollama";
   import type { Attachment, Digest } from "../lib/chatStore.svelte";
 
@@ -36,6 +35,7 @@
   }: Props = $props();
 
   let copied = $state(false);
+  let activePlotExpr = $state<string | null>(null);
 
   function handleCopy() {
     if (!content) return;
@@ -61,13 +61,7 @@
   );
 
   function openFormulaPlot(expr: string) {
-    studioStore.open({
-      id: Math.random().toString(36).slice(2, 9),
-      tool: "plot",
-      render_type: "plot",
-      title: `Curve: y = ${expr}`,
-      expression: expr,
-    });
+    activePlotExpr = expr;
   }
 </script>
 
@@ -145,15 +139,19 @@
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       <div class="prose-vigyan text-[14px]">{@html rendered}{#if streaming}<span class="animate-blink text-[#10b981] ml-0.5">▋</span>{/if}</div>
 
-      <!-- 1-Click Interactive Plot Curve Button (opens in Artifact Viewport) -->
-      {#if plottableFormula}
+      <!-- 1-Click Interactive Plot Curve Button (renders in-situ) -->
+      {#if plottableFormula && !activePlotExpr}
         <button
           onclick={() => openFormulaPlot(plottableFormula)}
-          class="mt-3.5 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 text-xs font-medium transition-all cursor-pointer"
+          class="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 text-xs font-medium transition-all cursor-pointer"
         >
           <span>∫</span>
-          <span>Open Curve in Viewport ({plottableFormula})</span>
+          <span>Plot Curve Inline ({plottableFormula})</span>
         </button>
+      {/if}
+
+      {#if activePlotExpr}
+        <StemInlineCard tool={{ tool: "plot", render_type: "plot", expression: activePlotExpr, title: `Curve: y = ${activePlotExpr}` }} />
       {/if}
     {/if}
 
