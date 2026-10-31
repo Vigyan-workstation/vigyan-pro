@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Vigyan Pro Sovereign Studio
-Comment=Sovereign Offline STEM Workstation with LanceDB RAG
+Comment=Sovereign Offline STEM Workstation with In-Situ SymPy CAS
 Exec=vigyan-pro %U
 TryExec=vigyan-pro
 Icon=vigyan-pro

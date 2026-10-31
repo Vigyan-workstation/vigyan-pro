@@ -91,10 +91,10 @@ Architecture: amd64
 Maintainer: Shreyansh Lab <contact@experimentlab.in>
 Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, curl
 Homepage: https://experimentlab.in
-Description: Sovereign Offline STEM Workstation with LanceDB RAG
+Description: Sovereign Offline STEM Workstation with In-Situ SymPy CAS
  Vigyan Pro is an enterprise obsidian-grade sovereign desktop workstation
- featuring native KaTeX proofs, in-process LanceDB vector RAG, SymPy CAS,
- and air-gapped local LLM inference.
+ featuring native KaTeX proofs, in-memory axiomatic physics/math grounding,
+ SymPy CAS, and air-gapped local LLM inference.
 EOF
 
 # DEBIAN postinst script

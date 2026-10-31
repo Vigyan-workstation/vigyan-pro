@@ -923,18 +923,6 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
             parts.append(f"• [{ax['domain']}] {ax['law']}: $${ax['equation']}$$ — {ax['axiom']}")
         prompt_injection = "\n".join(parts)
 
-    # In-Process LanceDB Vector RAG Grounding (<2ms)
-    lancedb_ctx = ""
-    try:
-        from rag.lancedb_engine import SovereignLanceDBEngine
-        l_engine = SovereignLanceDBEngine.get_instance()
-        if l_engine.available:
-            lancedb_ctx = l_engine.query_context(q, top_k=2)
-            if lancedb_ctx:
-                prompt_injection = (prompt_injection + "\n" + lancedb_ctx).strip()
-    except Exception:
-        pass
-
     telemetry = get_system_telemetry()
     sympy_str = f"{sympy_res.get('expression')} = {sympy_res.get('result')}" if sympy_res else ""
     return {
@@ -944,7 +932,7 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
         "sympy_result": sympy_str,
         "graph_axioms": matched_axioms[:4],
         "axioms": matched_axioms[:4],
-        "lancedb_context": lancedb_ctx,
+        "lancedb_context": "",
         "prompt_injection": prompt_injection,
         "enriched_system_suffix": ("\n" + prompt_injection) if prompt_injection else "",
         "hybrid": telemetry["hybrid"],
@@ -1046,98 +1034,6 @@ class RAMGovernor:
         self.running = False
 
 
-SAFE_READ_COMMANDS = {
-    "ls", "dir", "cat", "head", "tail", "grep", "rg", "find", "pwd",
-    "df", "free", "uptime", "uname", "whoami", "id", "which", "whereis",
-    "ps", "top", "env", "echo", "date", "cal", "tree"
-}
-
-DANGEROUS_PATTERNS = [
-    r"\brm\b", r"\bmv\b", r"\bcp\b", r"\bchmod\b", r"\bchown\b",
-    r"\bdd\b", r"\bmkfs\b", r"\bkill\b", r"\bpkill\b", r"\bshutdown\b",
-    r"\breboot\b", r"\bformat\b", r"\bsudo\b", r"\bsu\b", r"\bapt\b",
-    r"\bdpkg\b", r"\bpip install\b", r"\bnpm install\b", r"\bsystemctl\b",
-    r"\bcurl\b.*\|\s*(?:bash|sh)", r"\bwget\b.*\|\s*(?:bash|sh)",
-    r">\s*/dev/", r">\s*/etc/", r">\s*/bin/", r">\s*/usr/"
-]
-
-
-def classify_command_safety(command: str) -> Dict[str, Any]:
-    cmd_strip = command.strip()
-    cmd_lower = cmd_strip.lower()
-    for pat in DANGEROUS_PATTERNS:
-        if re.search(pat, cmd_lower):
-            return {
-                "safe": False,
-                "requires_approval": True,
-                "reason": f"Modifies filesystem or system state ({pat})",
-                "risk": "high" if ("rm" in pat or "sudo" in pat or "kill" in pat) else "medium"
-            }
-    first_word = cmd_lower.split()[0] if cmd_lower.split() else ""
-    if first_word in SAFE_READ_COMMANDS:
-        if ">" not in cmd_strip and "|" not in cmd_strip:
-            return {"safe": True, "requires_approval": False, "reason": "Read-only inspection command", "risk": "low"}
-    if cmd_lower.startswith("git ") and any(cmd_lower.startswith(f"git {sub}") for sub in ["status", "log", "branch", "diff", "show", "tag"]):
-        return {"safe": True, "requires_approval": False, "reason": "Git read-only inspection", "risk": "low"}
-    return {
-        "safe": False,
-        "requires_approval": True,
-        "reason": "Arbitrary command execution",
-        "risk": "medium"
-    }
-
-
-def execute_shell_command(command: str, confirmed: bool = False, cwd: Optional[str] = None) -> Dict[str, Any]:
-    safety = classify_command_safety(command)
-    if safety["requires_approval"] and not confirmed:
-        return {
-            "success": False,
-            "status": "requires_approval",
-            "command": command,
-            "risk": safety["risk"],
-            "reason": safety["reason"],
-            "cwd": cwd or os.getcwd()
-        }
-    work_dir = cwd if (cwd and os.path.isdir(cwd)) else os.getcwd()
-    try:
-        proc = subprocess.run(
-            command,
-            shell=True,
-            cwd=work_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=15.0
-        )
-        return {
-            "success": proc.returncode == 0,
-            "status": "executed",
-            "command": command,
-            "returncode": proc.returncode,
-            "stdout": proc.stdout[:10000],
-            "stderr": proc.stderr[:5000],
-            "cwd": work_dir
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "status": "timeout",
-            "command": command,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": "Command execution timed out after 15 seconds.",
-            "cwd": work_dir
-        }
-    except Exception as exc:
-        return {
-            "success": False,
-            "status": "error",
-            "command": command,
-            "returncode": -1,
-            "stdout": "",
-            "stderr": str(exc),
-            "cwd": work_dir
-        }
 
 
 def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
@@ -1573,120 +1469,6 @@ class ModelDownloadManager:
 _DOWNLOAD_MGR = ModelDownloadManager()
 
 
-# ==============================================================================
-# 3.2 LOCAL WORKSPACE FILE AGENT TOOLS
-# ==============================================================================
-def list_workspace_dir(path: str = ".") -> Dict[str, Any]:
-    safe_path = os.path.abspath(path)
-    if not os.path.isdir(safe_path):
-        return {"success": False, "error": f"Directory not found: {path}"}
-    items = []
-    try:
-        for entry in os.scandir(safe_path):
-            try:
-                stat = entry.stat()
-                items.append({
-                    "name": entry.name,
-                    "is_dir": entry.is_dir(),
-                    "size": stat.st_size if not entry.is_dir() else 0,
-                    "mtime": stat.st_mtime
-                })
-            except Exception:
-                pass
-        items.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
-        return {"success": True, "path": safe_path, "items": items[:100]}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def read_workspace_file(path: str, start_line: int = 1, end_line: int = 200) -> Dict[str, Any]:
-    safe_path = os.path.abspath(path)
-    if not os.path.isfile(safe_path):
-        return {"success": False, "error": f"File not found: {path}"}
-    try:
-        with open(safe_path, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-        total_lines = len(lines)
-        s = max(1, start_line)
-        e = min(total_lines, max(s, end_line))
-        chunk = "".join(lines[s-1:e])
-        return {
-            "success": True,
-            "path": safe_path,
-            "total_lines": total_lines,
-            "start_line": s,
-            "end_line": e,
-            "content": chunk
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def write_workspace_file(path: str, content: str, overwrite: bool = False) -> Dict[str, Any]:
-    safe_path = os.path.abspath(path)
-    if os.path.exists(safe_path) and not overwrite:
-        return {
-            "success": False,
-            "status": "requires_approval",
-            "reason": f"File '{os.path.basename(path)}' already exists. Overwrite requires user confirmation.",
-            "path": safe_path,
-            "command": f"write_file({os.path.basename(path)})"
-        }
-    try:
-        os.makedirs(os.path.dirname(safe_path), exist_ok=True)
-        with open(safe_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        return {"success": True, "status": "written", "path": safe_path, "bytes": len(content.encode("utf-8"))}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def grep_workspace_files(query: str, path: str = ".") -> Dict[str, Any]:
-    safe_path = os.path.abspath(path)
-    matches = []
-    # Fast-path: use grep binary on Unix/Linux if available
-    if shutil.which("grep") and not sys.platform.startswith("win32"):
-        try:
-            proc = subprocess.run(
-                ["grep", "-rnI", "--exclude-dir=.git", "--exclude-dir=node_modules", "--exclude-dir=__pycache__", "-m", "50", query, safe_path],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=8.0
-            )
-            for line in proc.stdout.splitlines()[:50]:
-                parts = line.split(":", 2)
-                if len(parts) >= 3:
-                    rel = os.path.relpath(parts[0], safe_path)
-                    matches.append({"file": rel, "line": int(parts[1]) if parts[1].isdigit() else 0, "text": parts[2].strip()})
-            return {"success": True, "query": query, "matches": matches}
-        except Exception:
-            pass
-
-    # Universal cross-platform pure-Python search fallback (minimal environments)
-    try:
-        q_lower = query.lower()
-        count = 0
-        skip_dirs = {".git", "node_modules", "__pycache__", ".venv", "dist", "build"}
-        for root, dirs, files in os.walk(safe_path):
-            dirs[:] = [d for d in dirs if d not in skip_dirs]
-            for fname in files:
-                fpath = os.path.join(root, fname)
-                try:
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                        for line_no, line in enumerate(f, 1):
-                            if q_lower in line.lower():
-                                rel = os.path.relpath(fpath, safe_path)
-                                matches.append({"file": rel, "line": line_no, "text": line.strip()})
-                                count += 1
-                                if count >= 50:
-                                    break
-                except Exception:
-                    pass
-                if count >= 50:
-                    break
-            if count >= 50:
-                break
-        return {"success": True, "query": query, "matches": matches}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 
 # ==============================================================================
@@ -2114,68 +1896,6 @@ def compress_conversation_history(messages: List[Dict[str, str]], max_tokens_est
     return compressed
 
 
-def check_github_update() -> Dict[str, Any]:
-    """Check GitHub releases for the latest version tag."""
-    repo = "shreyansh001boy-tech/vigyan-pro-desktop"
-    url = f"https://api.github.com/repos/{repo}/releases/latest"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Vigyan-Pro-Desktop"})
-        with urllib.request.urlopen(req, timeout=2.5) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                tag = data.get("tag_name", "").lstrip("v")
-                body = data.get("body", "Performance enhancements and bug fixes.")
-                assets = data.get("assets", [])
-                hotpatch_url = next((a["browser_download_url"] for a in assets if "hotpatch" in a["name"].lower() or "src" in a["name"].lower()), "")
-                is_newer = False
-                if tag and tag != __version__:
-                    is_newer = tag > __version__
-                return {
-                    "current_version": __version__,
-                    "latest_version": tag or __version__,
-                    "update_available": is_newer,
-                    "release_notes": body[:200],
-                    "hotpatch_url": hotpatch_url
-                }
-    except Exception:
-        pass
-    return {
-        "current_version": __version__,
-        "latest_version": __version__,
-        "update_available": False,
-        "release_notes": "All systems up to date.",
-        "hotpatch_url": ""
-    }
-
-
-def apply_hotpatch_update(hotpatch_url: str) -> Dict[str, Any]:
-    """Download and unpack hotpatch archive into local runtime directory."""
-    if not hotpatch_url:
-        return {"success": False, "message": "No hotpatch archive specified"}
-    try:
-        import tarfile, zipfile, tempfile
-        req = urllib.request.Request(hotpatch_url, headers={"User-Agent": "Vigyan-Pro-Desktop"})
-        target_dir = os.path.expanduser("~/.vigyan/desktop/")
-        os.makedirs(target_dir, exist_ok=True)
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            with urllib.request.urlopen(req, timeout=15.0) as resp:
-                tmp.write(resp.read())
-            tmp_path = tmp.name
-
-        if hotpatch_url.endswith(".zip"):
-            with zipfile.ZipFile(tmp_path, "r") as zf:
-                zf.extractall(target_dir)
-        elif hotpatch_url.endswith((".tar.gz", ".tgz")):
-            with tarfile.open(tmp_path, "r:gz") as tf:
-                tf.extractall(target_dir)
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
-        return {"success": True, "message": "Hotpatch applied. Reloading UI...", "target_dir": target_dir}
-    except Exception as e:
-        return {"success": False, "message": f"Update failed: {str(e)}"}
-
 
 # ==============================================================================
 # 3.3 EMBEDDED LOCAL SOVEREIGN AGENT & NEURO-SYMBOLIC BRIDGE (PORT 8085)
@@ -2235,20 +1955,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"error":"Forbidden: Invalid or missing X-Vigyan-Token"}')
                 return
 
-        if self.path.startswith("/api/telemetry"):
-            tel = get_system_telemetry()
-            payload = dict(tel)
-            payload.update({
-                "status": "online",
-                "agent": "Vigyan-Sovereign-Neuro-Symbolic-Bridge",
-                "sympy": _SYMPY_ENGINE is not None,
-                "kuzudb": True,
-                "ram_governor": {"active": True, "threshold_pct": 88.0},
-                "telemetry": tel,
-            })
-            self._send_cors(200)
-            self.wfile.write(json.dumps(payload).encode("utf-8"))
-        elif self.path.startswith("/api/models/catalog"):
+        if self.path.startswith("/api/models/catalog"):
             tel = get_system_telemetry()
             ram_gb = tel.get("ram_total_gb", 8.0)
             rec_tag = "vigyan:3b"
@@ -2261,24 +1968,6 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             }
             self._send_cors(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
-        elif self.path.startswith("/api/models/download/status"):
-            query_tag = None
-            if "?" in self.path:
-                from urllib.parse import parse_qs, urlparse
-                qs = parse_qs(urlparse(self.path).query)
-                query_tag = qs.get("tag", [None])[0]
-            st = _DOWNLOAD_MGR.get_status(query_tag)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(st).encode("utf-8"))
-        elif self.path.startswith("/api/system/update/check"):
-            self._send_cors(200)
-            self.wfile.write(json.dumps({
-                "current_version": __version__,
-                "latest_version": __version__,
-                "update_available": False,
-                "release_notes": "100% Offline Air-Gapped Workstation.",
-                "air_gapped": True
-            }).encode("utf-8"))
         else:
             # Universal cross-platform static file serving (dist/ priority then src/)
             clean_path = self.path.split("?")[0]
@@ -2347,85 +2036,6 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
         except Exception:
             body = {}
 
-        if self.path.startswith("/api/system/update/apply"):
-            url = body.get("hotpatch_url", "")
-            res = apply_hotpatch_update(url)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/enrich"):
-            q = body.get("query") or body.get("message") or ""
-            res = enrich_stem_query(q)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/compute_mode"):
-            mode = body.get("mode", "auto")
-            stats = get_system_telemetry(override_mode=mode)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(stats).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/models/download"):
-            if self.path.endswith("/cancel"):
-                tag = body.get("tag", "")
-                cancelled = _DOWNLOAD_MGR.cancel_download(tag)
-                self._send_cors(200)
-                self.wfile.write(json.dumps({"success": cancelled, "tag": tag}).encode("utf-8"))
-                return
-            tag = body.get("model_id") or body.get("tag") or "vigyan:1.5b"
-            res = _DOWNLOAD_MGR.start_download(tag)
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/models/evict"):
-            tag = body.get("model") or body.get("tag") or ""
-            targets = [tag] if tag else ["vigyan:1.5b"]
-            evicted = []
-            for m in targets:
-                try:
-                    ev_req = urllib.request.Request(
-                        "http://127.0.0.1:11434/api/generate",
-                        data=json.dumps({"model": m, "prompt": "", "keep_alive": 0}).encode("utf-8"),
-                        headers={"Content-Type": "application/json"}
-                    )
-                    with urllib.request.urlopen(ev_req, timeout=2.5) as ev_resp:
-                        if ev_resp.status == 200:
-                            evicted.append(m)
-                except Exception:
-                    pass
-            stats = get_system_telemetry()
-            self._send_cors(200)
-            self.wfile.write(json.dumps({"success": True, "evicted": evicted, "telemetry": stats}).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/tools/rag/query"):
-            import tools
-            query_str = body.get("query", "")
-            top_k = body.get("top_k", 3)
-            res = tools.dispatch_tool("knowledge_rag_search", {
-                "query": query_str,
-                "top_k": top_k
-            })
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        if self.path.startswith("/api/tools/wavedrom/recompute"):
-            import tools
-            protocol = body.get("protocol", "spi_master")
-            title = body.get("title")
-            res = tools.dispatch_tool("wavedrom_generate", {
-                "protocol": protocol,
-                "title": title
-            })
-            self._send_cors(200)
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
         if self.path.startswith("/api/ingest/file"):
             import ingest_engine
             filename = body.get("filename", "document.txt")
@@ -2447,24 +2057,15 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 except Exception:
                     raw_text = ""
 
-            # Index document text into in-process LanceDB RAG store
-            if raw_text:
-                try:
-                    from rag.lancedb_engine import SovereignLanceDBEngine
-                    indexed_count = SovereignLanceDBEngine.get_instance().index_text_document(filename, raw_text)
-                except Exception as e:
-                    sys.stderr.write(f"[Ingest RAG] Warning: {e}\n")
-
             res = ingest_engine.analyze_ingested_content(filename, raw_text)
             self._send_cors(200)
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
         if self.path.startswith("/api/chat") or self.path.startswith("/api/agent/stream"):
+            telemetry = get_system_telemetry()
             user_query = (body.get("query") or body.get("message") or "").strip()
             requested_model = body.get("model") or "auto"
-            
-            enrichment = enrich_stem_query(user_query)
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -2479,6 +2080,8 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
             self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Vigyan-Token")
             self.end_headers()
+
+            enrichment = enrich_stem_query(user_query)
 
             stream_lock = threading.Lock()
             client_connected = [True]
@@ -2684,6 +2287,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     _emit("token", f"[Neuro-Symbolic Notice: {exc}]")
 
             _emit("done", {})
+            self.close_connection = True
             return
 
         self._send_cors(404)
@@ -2910,7 +2514,7 @@ def main():
             action = decision.get_navigation_action()
             req = action.get_request()
             uri = req.get_uri() if req else ""
-            if uri.startswith("file://") or uri.startswith("about:blank"):
+            if uri.startswith(f"http://127.0.0.1:{bridge_port}") or uri.startswith(f"http://localhost:{bridge_port}") or uri.startswith("file://") or uri.startswith("about:blank"):
                 return False
             decision.ignore()
             try:
@@ -2923,17 +2527,8 @@ def main():
 
     webview.connect("decide-policy", on_decide_policy)
 
-    # Dynamic index.html discovery (prioritize compiled production assets in dist/)
-    index_candidates = [
-        os.path.join(base_dir, "dist", "index.html"),
-        os.path.join(base_dir, "index.html"),
-        "/opt/vigyan-pro/src/dist/index.html",
-        "/opt/vigyan-pro/src/index.html",
-        os.path.expanduser("~/.vigyan/desktop/dist/index.html"),
-        os.path.expanduser("~/.vigyan/desktop/index.html")
-    ]
-    index_path = next((p for p in index_candidates if os.path.exists(p)), index_candidates[0])
-    webview.load_uri(f"file://{os.path.abspath(index_path)}")
+    # Load embedded local sovereign bridge directly (avoids file:// null-origin sandbox restrictions)
+    webview.load_uri(f"http://127.0.0.1:{bridge_port}/")
 
     # Push initial telemetry and sync bridge port + security token as soon as page finishes loading
     def on_load_finished(view, event):

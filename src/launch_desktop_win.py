@@ -161,7 +161,8 @@ def get_windows_telemetry(mode: str = "auto") -> dict:
 
 def launch_webview2():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    index_path = os.path.join(base_dir, "index.html")
+    index_dist = os.path.join(base_dir, "dist", "index.html")
+    index_path = index_dist if os.path.exists(index_dist) else os.path.join(base_dir, "index.html")
     icon_path = os.path.join(base_dir, "..", "assets", "micro_logo_v.ico")
     if not os.path.exists(icon_path):
         icon_path = os.path.join(base_dir, "assets", "micro_logo_v.png")

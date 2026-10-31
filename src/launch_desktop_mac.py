@@ -31,7 +31,8 @@ def _ollama_is_healthy() -> bool:
 
 def launch_mac():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    index_path = os.path.join(base_dir, "index.html")
+    index_dist = os.path.join(base_dir, "dist", "index.html")
+    index_path = index_dist if os.path.exists(index_dist) else os.path.join(base_dir, "index.html")
 
     # 1. Start embedded Neuro-Symbolic HTTP Bridge (:8085)
     port = 8085

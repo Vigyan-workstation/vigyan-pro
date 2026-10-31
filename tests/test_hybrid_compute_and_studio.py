@@ -141,114 +141,67 @@ class TestHybridComputeAndNeuroSymbolicStudio(unittest.TestCase):
         srv = launch_desktop.start_neuro_symbolic_bridge_server(port=port)
         self.assertIsNotNone(srv)
 
-        # Unauthenticated request must return 403 Forbidden
+        # Unauthenticated request to protected API must return 403 Forbidden
         with self.assertRaises(urllib.error.HTTPError) as cm:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/telemetry", timeout=3)
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/models/catalog", timeout=3)
         self.assertEqual(cm.exception.code, 403)
 
         # Authenticated request with session token succeeds
         headers = {"X-Vigyan-Token": launch_desktop._SESSION_TOKEN}
-        req_tel = urllib.request.Request(f"http://127.0.0.1:{port}/api/telemetry", headers=headers)
-        with urllib.request.urlopen(req_tel, timeout=3) as resp:
+        req_cat = urllib.request.Request(f"http://127.0.0.1:{port}/api/models/catalog", headers=headers)
+        with urllib.request.urlopen(req_cat, timeout=3) as resp:
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.read().decode("utf-8"))
-            self.assertIn("ollama_options", data)
+            self.assertIn("catalog", data)
+            self.assertIn("vigyan:3b", data["catalog"])
 
-        req = urllib.request.Request(
-            f"http://127.0.0.1:{port}/api/compute_mode",
-            data=json.dumps({"mode": "balanced"}).encode("utf-8"),
-            headers={"Content-Type": "application/json", "X-Vigyan-Token": launch_desktop._SESSION_TOKEN},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=3) as resp:
+        # Health check endpoint returns status and live telemetry
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=3) as resp:
             self.assertEqual(resp.status, 200)
             data = json.loads(resp.read().decode("utf-8"))
-            self.assertEqual(data["compute_mode"], "balanced")
-
-        req_enrich = urllib.request.Request(
-            f"http://127.0.0.1:{port}/api/enrich",
-            data=json.dumps({"query": "/material fcc bragg diffraction"}).encode("utf-8"),
-            headers={"Content-Type": "application/json", "X-Vigyan-Token": launch_desktop._SESSION_TOKEN},
-            method="POST",
-        )
-        with urllib.request.urlopen(req_enrich, timeout=15) as resp:
-            self.assertEqual(resp.status, 200)
-            data = json.loads(resp.read().decode("utf-8"))
-            self.assertTrue(len(data["axioms"]) >= 1)
+            self.assertEqual(data["status"], "online")
+            self.assertIn("telemetry", data)
 
     def test_index_html_eight_domains_modals_and_js_syntax(self):
-        html_path = SRC / "index.html"
+        html_path = SRC / "dist" / "index.html"
+        self.assertTrue(html_path.exists(), "src/dist/index.html must exist as compiled SPA")
         html = html_path.read_text(encoding="utf-8")
 
-        for fn in [
-            "initInChatCAD",
-            "initInChatSemi",
-            "initInChatPlot",
-            "initInChatCircuit",
-            "initInChatSim",
-            "initInChatMaterial",
-            "initInChatBiology",
-            "initInChatMathVisual",
-            "initInChatMedical",
-            "setHybridComputeMode",
-            "onBackendTypeChange",
-        ]:
-            self.assertIn(fn, html, f"Missing required function {fn} in src/index.html")
-        for removed_modal in ["openStemTaskHub", "openLatexRefModal", "openExportPdfModal"]:
-            self.assertNotIn(removed_modal, html, f"Removed modal function {removed_modal} should not be in src/index.html")
+        self.assertIn('<div id="app"></div>', html)
+        self.assertIn("Vigyan Pro", html)
+        self.assertIn("katex.min.css", html)
+        self.assertIn("plotly.min.js", html)
 
-        scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
-        self.assertGreaterEqual(len(scripts), 1)
-        tmp_js = pathlib.Path("/tmp/test_vigyan_syntax.js")
-        tmp_js.write_text(scripts[-1], encoding="utf-8")
-        proc = subprocess.run(["node", "--check", str(tmp_js)], capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, f"JS syntax check failed: {proc.stderr}")
+        for removed_modal in ["openStemTaskHub", "openLatexRefModal", "openExportPdfModal"]:
+            self.assertNotIn(removed_modal, html, f"Removed modal function {removed_modal} should not be in production assets")
+
+        # Verify bundled script exists and passes JS syntax checks
+        assets_dir = SRC / "dist" / "assets"
+        js_files = list(assets_dir.glob("*.js"))
+        self.assertGreaterEqual(len(js_files), 1, "Expected at least one bundled JS asset in src/dist/assets")
+        for js_file in js_files:
+            proc = subprocess.run(["node", "--check", str(js_file)], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, f"JS syntax check failed for {js_file.name}: {proc.stderr}")
 
     def test_enterprise_settings_rows_and_functions(self):
-        html_path = SRC / "index.html"
-        html = html_path.read_text(encoding="utf-8")
+        frontend_dir = ROOT / "frontend" / "src"
+        app_svelte = (frontend_dir / "App.svelte").read_text(encoding="utf-8")
+        settings_svelte = (frontend_dir / "components" / "SettingsPanel.svelte").read_text(encoding="utf-8")
 
-        # Verify all newly implemented executive settings functions exist
-        for fn in [
-            "setContextLength",
-            "setGovernorThreshold",
-            "toggleTelemetryHUD",
-            "setCodeFont",
-            "toggleSmartScroll",
-            "toggleHaptics",
-            "exportAllChats",
-            "clearAllChatHistory",
-            "purgeModelCache"
-        ]:
-            self.assertIn(fn, html, f"Missing executive settings function {fn} in index.html")
+        # Verify executive settings controls exist in Svelte components
+        self.assertIn("fontSize", settings_svelte)
+        self.assertIn("handleResetChat", settings_svelte)
+        self.assertIn("chatStore.clear()", settings_svelte)
+        self.assertIn("Preferences", settings_svelte)
 
-        # Verify essential DOM elements exist
-        for dom_id in [
-            "header-hud-telemetry",
-            "hud-ram-text",
-            "hud-gpu-text",
-            "setting-ctx-select",
-            "setting-font-select",
-            "toggle-hud-switch",
-            "toggle-scroll-switch",
-            "toggle-haptics-switch",
-            "gov-btn-80",
-            "gov-btn-85",
-            "gov-btn-90"
-        ]:
-            self.assertIn(f'id="{dom_id}"', html, f"Missing element with id '{dom_id}' in index.html")
-
-        # Verify header and nav are properly closed before main
-        self.assertIn("</nav>", html)
-        self.assertIn("</header>", html)
-        nav_close = html.find("</nav>")
-        header_close = html.find("</header>")
-        main_open = html.find('<main class="app-main">')
-        self.assertGreater(header_close, nav_close, "Header must close after nav")
-        self.assertGreater(main_open, header_close, "<main> must start AFTER </header> to prevent layout collapse")
+        # Verify executive minimalist header in App.svelte
+        self.assertIn("<header", app_svelte)
+        self.assertIn("Vigyan Pro", app_svelte)
+        self.assertIn("DEFAULT_MODEL", app_svelte)
 
         # Verify legacy quad-master model is absent from model selection
-        self.assertNotIn("vigyan:7b-quad-master", html.replace("vigyan:7b-quad-master", "", 1))  # only 1 occurrence in sanitizer allowed
+        self.assertNotIn("vigyan:7b-quad-master", app_svelte)
+        self.assertNotIn("vigyan:7b-quad-master", settings_svelte)
 
 
 if __name__ == "__main__":

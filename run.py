@@ -67,7 +67,7 @@ def main():
     except Exception as exc:
         print(f"[Error] Failed to launch desktop shell: {exc}", file=sys.stderr)
         import webbrowser
-        index_path = os.path.join(src_dir, "index.html")
+        index_path = os.path.join(src_dir, "dist", "index.html")
         print(f"[*] Falling back to default browser: file://{index_path}")
         webbrowser.open(f"file://{os.path.abspath(index_path)}")
         sys.exit(1)

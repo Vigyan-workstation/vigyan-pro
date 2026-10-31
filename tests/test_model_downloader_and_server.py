@@ -20,7 +20,6 @@ from launch_desktop import (
     MODELS_CATALOG,
     ModelDownloadManager,
     select_cascade_model,
-    grep_workspace_files,
     start_neuro_symbolic_bridge_server,
     _SESSION_TOKEN,
 )
@@ -74,22 +73,6 @@ def test_model_download_manager_lifecycle():
     assert cancelled is False
 
 
-def test_pure_python_grep_fallback(tmp_path):
-    """Verify cross-platform pure-Python grep search handles queries accurately."""
-    f1 = tmp_path / "circuit.py"
-    f1.write_text("def solve_rc_filter(r, c):\n    return 1.0 / (2 * 3.14159 * r * c)\n", encoding="utf-8")
-
-    f2 = tmp_path / "notes.txt"
-    f2.write_text("Euler identity: e^(i*pi) + 1 = 0\nsolve_rc_filter is useful\n", encoding="utf-8")
-
-    res = grep_workspace_files("solve_rc_filter", path=str(tmp_path))
-    assert res["success"] is True
-    assert len(res["matches"]) == 2
-    files = [m["file"] for m in res["matches"]]
-    assert any("circuit.py" in f for f in files)
-    assert any("notes.txt" in f for f in files)
-
-
 def test_http_bridge_static_serving_and_catalog():
     """Verify embedded HTTP server serves index.html, /api/models/catalog, and static assets."""
     port = start_neuro_symbolic_bridge_server(8089)
@@ -118,15 +101,12 @@ def test_http_bridge_static_serving_and_catalog():
         assert resp.status == 200
         data = json.loads(resp.read().decode("utf-8"))
         assert "catalog" in data
-        assert "vigyan:1.5b" in data["catalog"]
+        assert "vigyan:3b" in data["catalog"]
         assert "system_ram_gb" in data
 
-    # 4. Test authenticated /api/models/download/status endpoint
-    req_st = urllib.request.Request(
-        f"http://127.0.0.1:{port}/api/models/download/status?tag=vigyan:1.5b",
-        headers=auth_headers
-    )
-    with urllib.request.urlopen(req_st, timeout=3.0) as resp:
+    # 4. Test public /health endpoint
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=3.0) as resp:
         assert resp.status == 200
-        st = json.loads(resp.read().decode("utf-8"))
-        assert "status" in st
+        data = json.loads(resp.read().decode("utf-8"))
+        assert data["status"] == "online"
+        assert "telemetry" in data

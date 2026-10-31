@@ -4,19 +4,10 @@ Permissive Open-Source (Apache 2.0 / MIT / BSD-2 / ISC).
 100% offline, air-gapped, zero cloud telemetry.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from .base import BaseTool
-from .wave_engine import WaveEngineTool
-from .pcb_engine import PCBEngineTool
-from .silicon_eda import SiliconEDATool
-from .lancedb_tool import KnowledgeRAGTool
 
-_INSTANCES = [
-    WaveEngineTool(),
-    PCBEngineTool(),
-    SiliconEDATool(),
-    KnowledgeRAGTool()
-]
+_INSTANCES: List[BaseTool] = []
 
 TOOL_REGISTRY: Dict[str, BaseTool] = {tool.name: tool for tool in _INSTANCES}
 
@@ -28,12 +19,7 @@ def get_all_tools() -> Dict[str, BaseTool]:
 
 def get_tool_schemas_prompt() -> str:
     """Generate dynamic system prompt instructions for all registered STEM tools."""
-    lines = [
-        "- <tool_call>{\"name\": \"knowledge_rag_search\", \"arguments\": {\"query\": \"Maxwell displacement current capacitor dielectric\"}}</tool_call>",
-        "- <tool_call>{\"name\": \"wavedrom_generate\", \"arguments\": {\"protocol\": \"spi_master\", \"title\": \"SPI Read Cycle\"}}</tool_call>",
-        "- <tool_call>{\"name\": \"pcb_netlist_generate\", \"arguments\": {\"circuit_type\": \"555_timer\", \"title\": \"555 Astable Pulse Generator\", \"params\": {\"r1\": 10000, \"r2\": 47000, \"c1\": 1e-6}}}</tool_call>",
-        "- <tool_call>{\"name\": \"verilog_analyze\", \"arguments\": {\"code\": \"module counter(input clk, output reg [3:0] q); always @(posedge clk) q <= q + 1; endmodule\", \"target_clock_mhz\": 100}}</tool_call>"
-    ]
+    lines = [tool.to_system_prompt_spec() for tool in _INSTANCES]
     return "\n".join(lines)
 
 

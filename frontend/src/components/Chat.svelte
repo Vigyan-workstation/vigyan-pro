@@ -73,7 +73,7 @@
   const STARTERS = [
     { icon: "⚡", label: "Transient Analysis", prompt: "Derive and plot the step response of an underdamped series RLC circuit with R=20Ω, L=0.1H, and C=100µF." },
     { icon: "∫", label: "Symbolic Calculus", prompt: "Evaluate the integral of x^2 * exp(-x) dx from 0 to infinity with full step-by-step derivation." },
-    { icon: "∿", label: "Waveform Timing", prompt: "Generate an SPI bus timing diagram illustrating a master write cycle with 8 data bits." },
+    { icon: "⚛", label: "Quantum Tunneling", prompt: "Derive the transmission coefficient for quantum tunneling through a rectangular finite potential barrier." },
     { icon: "∂", label: "Damped Oscillation", prompt: "Plot the damped oscillation curve exp(-0.15*x)*cos(2*x) from x = 0 to 25." },
   ];
 
@@ -137,6 +137,12 @@
 
           if (res.ok) {
             const data = await res.json();
+            const extracted = data.text || data.summary || "";
+            if (extracted) {
+              const snippet = extracted.slice(0, 2000);
+              input = input ? `[Context: ${file.name}]\n${snippet}\n\n${input}` : `Analyze specifications from '${file.name}':\n\n${snippet}\n\n`;
+              autoResize();
+            }
             chatStore.messages.push({
               id: uid(),
               role: "assistant",
@@ -199,6 +205,12 @@
 
           if (res.ok) {
             const data = await res.json();
+            const extracted = data.text || data.summary || "";
+            if (extracted) {
+              const snippet = extracted.slice(0, 2000);
+              input = input ? `[Context: ${file.name}]\n${snippet}\n\n${input}` : `Analyze specifications from '${file.name}':\n\n${snippet}\n\n`;
+              autoResize();
+            }
             chatStore.messages.push({
               id: uid(),
               role: "assistant",
@@ -210,7 +222,7 @@
                 filename: file.name,
                 summary: data.summary || "Extracted document specifications.",
                 metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Generate Timing Waveform", "Plot Parameter Curve"],
+                actions: data.suggested_actions || ["Derive Analytical Proof", "Plot Parameter Curve"],
               },
             });
             chatStore.save();
@@ -258,6 +270,12 @@
           });
           if (res.ok) {
             const data = await res.json();
+            const extracted = data.text || data.summary || content;
+            if (extracted) {
+              const snippet = extracted.slice(0, 2000);
+              input = input ? `[Context: ${file.name}]\n${snippet}\n\n${input}` : `Analyze specifications from '${file.name}':\n\n${snippet}\n\n`;
+              autoResize();
+            }
             chatStore.messages.push({
               id: uid(),
               role: "assistant",
@@ -284,9 +302,7 @@
   }
 
   function handleActionClick(actionText: string) {
-    if (actionText.includes("Waveform") || actionText.includes("Timing")) {
-      send("Generate digital timing waveform based on extracted specifications.");
-    } else if (actionText.includes("Proof") || actionText.includes("Analytical")) {
+    if (actionText.includes("Proof") || actionText.includes("Analytical")) {
       send("Derive the step-by-step analytical proof and verified equations for these parameters.");
     } else if (actionText.includes("Plot") || actionText.includes("Curve")) {
       send("Plot the parameter response curve based on the extracted values.");

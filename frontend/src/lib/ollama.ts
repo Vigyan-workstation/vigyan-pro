@@ -136,16 +136,16 @@ export async function streamChat(
   const token = getVigyanToken();
   const agentHost = getAgentHost();
 
+  let userCtx = 2048;
+  try {
+    userCtx = parseInt(localStorage.getItem("vigyan_context_budget") || "2048", 10);
+  } catch {}
+
   // ATTEMPT 1: Sovereign Neuro-Symbolic Bridge
   let bridgeSuccess = false;
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["X-Vigyan-Token"] = token;
-
-    let userCtx = 2048;
-    try {
-      userCtx = parseInt(localStorage.getItem("vigyan_context_budget") || "2048", 10);
-    } catch {}
 
     const bridgeResp = await fetch(`${agentHost}/api/chat`, {
       method: "POST",
@@ -164,6 +164,7 @@ export async function streamChat(
       const reader = bridgeResp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let isStreamDone = false;
 
       try {
         while (true) {
@@ -204,17 +205,20 @@ export async function streamChat(
                 onChunk({ type: "tool_result", text: "", toolData: parsed as ToolResult });
               } else if (eventName === "done") {
                 onChunk({ type: "done", text: "" });
+                isStreamDone = true;
+                break;
               }
             } catch {
               // Raw string fallback
               if (eventName === "token") onChunk({ type: "answer", text: dataStr });
             }
           }
+          if (isStreamDone) break;
         }
       } finally {
         reader.releaseLock();
       }
-      onChunk({ type: "done", text: "" });
+      if (!isStreamDone) onChunk({ type: "done", text: "" });
       return;
     }
   } catch (err: unknown) {
