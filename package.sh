@@ -38,7 +38,10 @@ cd "$SCRIPT_DIR"
 DIST_DIR="$SCRIPT_DIR/dist"
 mkdir -p "$DIST_DIR"
 
-MODEL_SOURCE="$HOME/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"
+MODEL_SOURCE="${MODEL_SOURCE:-$HOME/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf}"
+if [ ! -f "$MODEL_SOURCE" ] && [ -f "$SCRIPT_DIR/models/vigyan-3b-quad-master-iq3_m.gguf" ]; then
+    MODEL_SOURCE="$SCRIPT_DIR/models/vigyan-3b-quad-master-iq3_m.gguf"
+fi
 
 # Locate llama-server binary for Linux / host
 LLAMA_SERVER_SRC=""
