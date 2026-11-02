@@ -136,6 +136,20 @@
     }
   });
 
+  let copiedLatex = $state(false);
+
+  function copyFormula() {
+    const textToCopy = (tool as any).latex || tool.expression || (tool as any).equation || "";
+    if (!textToCopy) return;
+    try {
+      navigator.clipboard.writeText(textToCopy);
+      copiedLatex = true;
+      setTimeout(() => {
+        copiedLatex = false;
+      }, 1500);
+    } catch {}
+  }
+
   const icon = $derived(isPlot ? "∫" : "⚙");
 
   const title = $derived(
@@ -177,6 +191,15 @@
     </div>
 
     <div class="flex items-center gap-2">
+      {#if (tool as any).latex || tool.expression || (tool as any).equation}
+        <button
+          onclick={copyFormula}
+          title="Copy formula to clipboard"
+          class="text-[11px] font-mono text-[#38bdf8] hover:text-white px-2 py-0.5 rounded hover:bg-white/[0.05] transition-all cursor-pointer"
+        >
+          {copiedLatex ? "Copied ✓" : "Copy LaTeX"}
+        </button>
+      {/if}
       <button
         onclick={() => (expanded = !expanded)}
         class="text-[11px] font-mono text-[#9ca3af] hover:text-white px-2 py-0.5 rounded hover:bg-white/[0.05] transition-all cursor-pointer"

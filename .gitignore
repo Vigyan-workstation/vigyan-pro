@@ -46,3 +46,7 @@ build/
 *.deb
 *.tar.gz
 *.zip
+
+# Compiled local binaries
+bin/llama-server*
+bin/*.so*

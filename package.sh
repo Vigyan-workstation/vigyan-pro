@@ -84,6 +84,7 @@ chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
 if [ -n "$LLAMA_SERVER_SRC" ]; then
     cp -L "$LLAMA_SERVER_SRC" "$DEB_STAGE/opt/vigyan-pro/bin/llama-server"
     chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/llama-server"
+    cp -P "$SCRIPT_DIR/bin/"lib*.so* "$DEB_STAGE/opt/vigyan-pro/bin/" 2>/dev/null || true
 fi
 
 # Bundle sovereign weights if enabled

@@ -46,6 +46,7 @@ def find_llama_server_binary() -> Optional[str]:
         os.path.join(project_root, "bin"),
         os.path.join(base_dir, "bin"),
         os.path.join(project_root, "dist_bin"),
+        os.path.expanduser("~/.local/llama.cpp"),
         os.path.expanduser("~/.local/bin"),
         os.path.expanduser("~/.vigyan/bin"),
         "/opt/vigyan-pro/bin",
@@ -339,6 +340,7 @@ class LlamaServerSupervisor:
             bin_dir = os.path.dirname(os.path.realpath(real_bin))
             cur_ld = child_env.get("LD_LIBRARY_PATH", "")
             child_env["LD_LIBRARY_PATH"] = f"{bin_dir}:{cur_ld}" if cur_ld else bin_dir
+            child_env["GGML_BACKEND_PATH"] = bin_dir
 
         preexec = _linux_preexec if (self._die_with_parent and sys.platform.startswith("linux")) else None
         creationflags = 0

@@ -2157,6 +2157,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
 
                 accumulated_text = ""
                 streamed_from_llama = False
+                last_llama_exc: Optional[str] = None
+
+                # Ensure embedded llama-server is ready before attempting stream
+                if not LLAMA_SUPERVISOR.is_healthy():
+                    LLAMA_SUPERVISOR.start()
+                    LLAMA_SUPERVISOR.wait_until_ready(timeout=8.0)
 
                 # Primary routing: Embedded llama-server OpenAI endpoint (port 8086)
                 try:
@@ -2197,6 +2203,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                                 except Exception:
                                     continue
                 except Exception as ls_exc:
+                    last_llama_exc = str(ls_exc)
                     print(f"[WARN] llama-server stream unavailable: {ls_exc}; trying Ollama fallback", file=sys.stderr)
 
                 if not streamed_from_llama and not governor_tripped[0]:
@@ -2263,7 +2270,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                             )
                             _emit("token", fallback)
                         else:
-                            _emit("token", f"[Neuro-Symbolic Engine Initializing: {ls_exc}]")
+                            _emit("token", f"[Neuro-Symbolic Engine Initializing: {last_llama_exc or 'Inference server starting...'}]")
 
                 governor.stop()
                 hb_stop.set()
