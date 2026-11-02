@@ -1,0 +1,137 @@
+name: Multi-OS Private Package & Release Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release Version (e.g. 3.3.1)'
+        required: true
+        default: '3.3.1'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-packages:
+    name: Build Multi-OS Sovereign Packages (Linux, Windows, macOS)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun (Frontend Runtime)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install System Packaging Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip gzip tar curl binutils
+
+      - name: Install Python Utilities
+        run: |
+          pip install huggingface_hub
+
+      - name: Build Svelte 5 Frontend Production Bundle
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Download Multi-OS Precompiled llama-server Binaries
+        run: |
+          mkdir -p bin
+
+          # 1. Windows x64 binary
+          echo "Fetching Windows x64 llama-server..."
+          curl -sL https://github.com/ggml-org/llama.cpp/releases/download/b12034/llama-b12034-bin-win-cpu-x64.zip -o win_llama.zip
+          unzip -q -o win_llama.zip -d win_llama_tmp
+          find win_llama_tmp -name "llama-server.exe" -exec cp {} bin/llama-server.exe \;
+          rm -rf win_llama.zip win_llama_tmp
+
+          # 2. macOS arm64 binary
+          echo "Fetching macOS arm64 llama-server..."
+          curl -sL https://github.com/ggml-org/llama.cpp/releases/download/b12034/llama-b12034-bin-macos-arm64.tar.gz -o mac_llama.tar.gz
+          mkdir -p mac_llama_tmp
+          tar -xzf mac_llama.tar.gz -C mac_llama_tmp
+          find mac_llama_tmp -name "llama-server" -exec cp {} bin/llama-server-mac \;
+          chmod +x bin/llama-server-mac 2>/dev/null || true
+          rm -rf mac_llama.tar.gz mac_llama_tmp
+
+          # 3. Linux x64 binary + companion libraries
+          echo "Fetching Linux x64 llama-server and dynamic backends..."
+          curl -sL https://github.com/ggml-org/llama.cpp/releases/download/b12034/llama-b12034-bin-ubuntu-x64.tar.gz -o linux_llama.tar.gz
+          mkdir -p linux_llama_tmp
+          tar -xzf linux_llama.tar.gz -C linux_llama_tmp
+          find linux_llama_tmp -name "llama-server" -exec cp {} bin/llama-server \;
+          find linux_llama_tmp -name "lib*.so*" -exec cp -d {} bin/ \;
+          chmod +x bin/llama-server
+          rm -rf linux_llama.tar.gz linux_llama_tmp
+
+          ls -lh bin/
+
+      - name: Download Sovereign Model Weights (1.4 GB)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          mkdir -p models
+          python3 -c "
+          import os
+          from huggingface_hub import hf_hub_download
+
+          token = os.environ.get('HF_TOKEN')
+          print('Downloading vigyan-3b-quad-master-iq3_m.gguf from Hugging Face...')
+          path = hf_hub_download(
+              repo_id='shreyansh12183/vigyan-3b-quad-master',
+              filename='vigyan-3b-quad-master-iq3_m.gguf',
+              local_dir='models',
+              token=token
+          )
+          print('Successfully downloaded to:', path)
+          "
+          ls -lh models/
+
+      - name: Package Multi-OS Bundles (.deb, .tar.gz, .zip)
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "Packaging version: $VERSION"
+          export MODEL_SOURCE="$PWD/models/vigyan-3b-quad-master-iq3_m.gguf"
+          chmod +x package.sh bin/vigyan-pro
+          ./package.sh "$VERSION" --bundle-weights
+
+      - name: Upload Multi-OS Build Artifacts to Private GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: vigyan-pro-enterprise-offline-${{ github.event.inputs.version || github.ref_name }}
+          path: dist/*
+          retention-days: 14
+
+      - name: Publish or Update Private GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_NAME="v${{ github.event.inputs.version || github.ref_name }}"
+          TAG_NAME="${TAG_NAME#vv}"
+          echo "Publishing / Updating Private GitHub Release for $TAG_NAME..."
+
+          gh release view "$TAG_NAME" 2>/dev/null && RELEASE_EXISTS=true || RELEASE_EXISTS=false
+
+          if [ "$RELEASE_EXISTS" = true ]; then
+            echo "Release $TAG_NAME exists. Uploading updated assets..."
+            gh release upload "$TAG_NAME" dist/* --clobber
+          else
+            echo "Creating new private release $TAG_NAME..."
+            gh release create "$TAG_NAME" dist/* \
+              --title "Vigyan Pro Desktop $TAG_NAME (Enterprise Offline Edition)" \
+              --notes "Sovereign Air-Gapped Multi-OS Build (~1.45 GB Bundled Weights + Multi-Platform Companion Binaries). 100% Private."
+          fi
