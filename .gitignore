@@ -1,0 +1,68 @@
+# Packaging & distribution outputs
+/dist/
+frontend/dist/
+frontend/node_modules/
+!src/dist/
+bin/llama-server*
+bin/*.so*
+.build_deb/
+.build_tar/
+.deb_tmp/
+.build_mac/
+build/
+*.egg-info/
+*.deb
+*.tar.gz
+*.zip
+
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.coverage
+.ruff_cache/
+
+# Virtual environments
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+
+# Large Model Weights (Never commit heavy models to git)
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+models/
+src/models/
+
+# Vector & Graph Databases
+*.db
+*.sqlite
+*.sqlite3
+*.kuzu
+kuzu_db/
+*.lancedb/
+lancedb_data/
+
+# Temporary generated files
+*.stl
+*.scad.deps
+*.vvp
+*.vcd
+*.cir.out
+tmp/
+temp/
+*.log
+
+# System files
+.DS_Store
+*.swp
+*.swo
+*~

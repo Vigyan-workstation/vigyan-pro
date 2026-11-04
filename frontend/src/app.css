@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global Reset ─────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: #000000;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+/* ─── Hide all scrollbars visually (keep functionality) */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Text selection ───────────────────────────────── */
+::selection {
+  background: rgba(16, 185, 129, 0.25);
+  color: #ffffff;
+}
+
+/* ─── KaTeX Fonts (loaded from local vendor if bundled) */
+/* KaTeX is loaded via CDN in index.html for dev; bundled for production */
+
+/* ─── Textarea auto-resize via field-sizing ─────────── */
+textarea {
+  field-sizing: content;
+}
+
+/* ─── Smooth window drag region (Tauri) ─────────────── */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  cursor: default;
+}
+[data-tauri-drag-region] * {
+  -webkit-app-region: no-drag;
+}
+
+/* ─── Obsidian Titanium Design System Tokens ────────── */
+:root {
+  --guide-color: rgba(255, 255, 255, 0.08);
+  --guide-active: rgba(16, 185, 129, 0.40);
+  --emerald-accent: #10b981;
+  --emerald-glow: rgba(16, 185, 129, 0.20);
+  --obsidian-void: #000000;
+  --obsidian-surface: #04060a;
+  --obsidian-panel: #080b11;
+  --obsidian-card: #0c1017;
+}
+
+/* Hairline blueprint guides */
+.border-guide {
+  border-color: var(--guide-color);
+}
+
+.border-guide-active {
+  border-color: var(--guide-active);
+}
+
+/* Technical micro-badge */
+.tech-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* KaTeX mathematical typography enhancements */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.4rem 0.5rem;
+  margin: 0.75rem 0 !important;
+  mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
+}
+
+.katex {
+  font-size: 1.05em !important;
+  text-rendering: optimizeLegibility;
+}

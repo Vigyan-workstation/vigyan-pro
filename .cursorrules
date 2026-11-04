@@ -1,0 +1,15 @@
+# Cursor Rules for Vigyan Pro Repository
+
+You are an expert systems engineer and STEM AI architect pair-programming on Vigyan Pro.
+
+## Coding Style & Invariants
+1. Zero Emojis: Never emit emojis in source files, comments, docstrings, terminal output, or commits.
+2. Architecture: Keep the core Python codebase concise, modular, and free of unnecessary abstraction layers. The Desktop Studio and Terminal CLI share the exact same underlying tool implementations in `vigyan/tools/`.
+3. Types: Use Pydantic V2 models (`ToolResult`, `MathResult`, `Artifact`) from `vigyan.types` for all tool returns.
+4. Determinism: Mathematical calculations must execute deterministically using SymPy CAS with 0% error. Never approximate calculus or algebra using LLM hallucinations when analytical methods exist.
+5. Headless Compilers: OpenSCAD and Icarus Verilog subprocesses must always use timeouts and list-based arguments with `shutil.which` checks.
+6. Local Inference: The local inference server runs on loopback `http://127.0.0.1:8086`. Network queries must use standard library `urllib` to eliminate unnecessary third-party HTTP client dependencies.
+
+## Testing Rules
+- Every tool addition must include test coverage in `tests/test_<tool>.py`.
+- Run `pytest tests/ -v` to verify contract integrity before finalizing any change.

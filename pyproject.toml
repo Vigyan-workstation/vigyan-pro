@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vigyan"
+version = "3.4.0"
+description = "Vigyan Pro: Sovereign Offline Physical Engineering Intelligence Workstation."
+readme = "README.md"
+authors = [
+    { name = "Shreyansh Singh", email = "shreyansh001boy@gmail.com" },
+    { name = "Sabrith Kareem", email = "sabrith.experimentlab@gmail.com" }
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "sympy>=1.12",
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+]
+
+[project.scripts]
+vigyan = "vigyan.cli:app"
+
+[project.urls]
+Homepage = "https://experimentlab.in/workstation"
+Documentation = "https://github.com/Vigyan-workstation/vigyan-pro"
+Repository = "https://github.com/Vigyan-workstation/vigyan-pro"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vigyan*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
