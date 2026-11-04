@@ -1,6 +1,8 @@
 {
-  "name": "vigyan-lab-pro",
-  "version": "3.0.0",
+  "name": "vigyan-pro",
+  "version": "3.4.0",
+  "author": "ExperimentLab AI <support@experimentlab.in>",
+  "homepage": "https://experimentlab.in",
   "private": true,
   "type": "module",
   "scripts": {

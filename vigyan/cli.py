@@ -144,7 +144,8 @@ def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
         console.print(Panel(
             "[bold white]V I G Y A N   P R O   W O R K S T A T I O N[/bold white]\n"
-            "[dim]Sovereign Offline Engineering Intelligence | Zero Cloud Egress[/dim]\n\n"
+            "[dim]Sovereign Offline Engineering Intelligence | Zero Cloud Egress[/dim]\n"
+            "[dim cyan]ExperimentLab AI (https://experimentlab.in) | Support: support@experimentlab.in[/dim cyan]\n\n"
             "Commands:\n"
             "  [cyan]vigyan math '<query>'[/cyan]       Exact analytical SymPy CAS derivations\n"
             "  [cyan]vigyan cad '<spec>'[/cyan]          Parametric 3D solid modeling & STL export\n"

@@ -122,7 +122,7 @@ Version: ${VERSION}
 Section: science
 Priority: optional
 Architecture: amd64
-Maintainer: Shreyansh Lab <contact@experimentlab.in>
+Maintainer: ExperimentLab AI <support@experimentlab.in>
 Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, curl
 Homepage: https://experimentlab.in
 Description: Sovereign Offline STEM Workstation with Embedded llama-server & SymPy CAS

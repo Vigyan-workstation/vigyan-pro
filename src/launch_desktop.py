@@ -76,7 +76,7 @@ except Exception:
 try:
     from version import __version__
 except Exception:
-    __version__ = "2.7.0-beta.1"
+    __version__ = "3.4.0"
 
 try:
     import psutil

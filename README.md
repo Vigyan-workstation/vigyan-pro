@@ -1,5 +1,7 @@
 # Vigyan Pro: Sovereign Offline STEM Intelligence Workstation
 
+Developed by **[ExperimentLab AI](https://experimentlab.in)**.
+
 Vigyan Pro is an air-gapped, zero-cloud-egress physical engineering intelligence workstation designed for engineers, researchers, and students. It unites high-performance local language model inference with exact computer algebra systems, parametric 3D CAD solid modeling, and digital logic synthesis.
 
 ---
@@ -127,6 +129,17 @@ pytest tests/ -v
 This software is licensed under the **PolyForm Noncommercial License 1.0.0**.
 
 - **Non-Commercial Use**: 100% free for personal research, academic study, educational projects, and hobbyist development.
-- **Commercial Use**: Commercial deployment, enterprise use, or proprietary integration requires a commercial license from ExperimentLab Technologies.
+- **Commercial Use**: Commercial deployment, enterprise use, or proprietary integration requires a commercial license from ExperimentLab AI.
 
-For commercial licensing and enterprise support inquiries, contact: `licensing@experimentlab.in`.
+---
+
+## Contact & Official Channels
+
+- **Website**: [experimentlab.in](https://experimentlab.in)
+- **General Support**: `support@experimentlab.in`
+- **Commercial & Enterprise Inquiries**: `licensing@experimentlab.in`
+- **GitHub Organization**: [Vigyan-workstation](https://github.com/Vigyan-workstation)
+- **Model Checkpoints**: [Hugging Face Model Vault](https://huggingface.co/shreyansh12183)
+- **LinkedIn**: [ExperimentLab](https://www.linkedin.com/company/experimentlab-in/)
+- **Community Discord**: [Sovereign Guild](https://discord.com/invite/Jck3tD6mhf)
+- **Headquarters**: Varanasi & Delhi NCR, India

@@ -8,8 +8,12 @@ version = "3.4.0"
 description = "Vigyan Pro: Sovereign Offline Physical Engineering Intelligence Workstation."
 readme = "README.md"
 authors = [
-    { name = "Shreyansh Singh", email = "shreyansh001boy@gmail.com" },
-    { name = "Sabrith Kareem", email = "sabrith.experimentlab@gmail.com" }
+    { name = "ExperimentLab AI", email = "support@experimentlab.in" },
+    { name = "Shreyansh Singh", email = "support@experimentlab.in" },
+    { name = "Sabrith Kareem", email = "support@experimentlab.in" }
+]
+maintainers = [
+    { name = "ExperimentLab AI", email = "support@experimentlab.in" }
 ]
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -42,9 +46,10 @@ dev = [
 vigyan = "vigyan.cli:app"
 
 [project.urls]
-Homepage = "https://experimentlab.in/workstation"
+Homepage = "https://experimentlab.in"
 Documentation = "https://github.com/Vigyan-workstation/vigyan-pro"
 Repository = "https://github.com/Vigyan-workstation/vigyan-pro"
+"Bug Tracker" = "https://github.com/Vigyan-workstation/vigyan-pro/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

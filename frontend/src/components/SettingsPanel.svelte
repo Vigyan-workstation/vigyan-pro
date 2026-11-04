@@ -135,11 +135,25 @@
       <div class="bg-[#10121a] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 space-y-2 text-[11px]">
         <div class="flex items-center justify-between text-white">
           <span class="font-medium">Vigyan Pro Desktop</span>
-          <span class="font-mono text-[10px] text-[#9ca3af]">v3.2</span>
+          <span class="font-mono text-[10px] text-[#9ca3af]">v3.4.0</span>
         </div>
         <p class="text-[#6b7280] leading-relaxed">
-          Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS) and offline vector retrieval.
+          Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS), CAD modeling, and EDA simulation.
         </p>
+        <div class="pt-2 border-t border-[rgba(255,255,255,0.06)] space-y-1 text-[10px]">
+          <div class="flex justify-between">
+            <span class="text-[#6b7280]">Developer</span>
+            <span class="text-slate-300">ExperimentLab AI</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-[#6b7280]">Website</span>
+            <a href="https://experimentlab.in" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline">experimentlab.in</a>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-[#6b7280]">Support</span>
+            <span class="text-slate-300">support@experimentlab.in</span>
+          </div>
+        </div>
       </div>
     </section>
 
