@@ -176,12 +176,14 @@ class LlamaServerSupervisor:
         extra_env: Optional[dict[str, str]] = None,
         extra_args: Optional[Sequence[str]] = None,
     ) -> None:
-        # Dynamic RAM Guard: If available RAM is constrained (<2.5 GB), clamp ctx_size to 2048 to prevent OOM
-        if ctx_size > 2048:
-            avail_gb = get_available_memory_gb()
-            if avail_gb < 2.5:
-                ctx_size = 2048
-                logger.info("Host available RAM is low (%.2f GB < 2.5 GB). Clamped ctx_size to 2048.", avail_gb)
+        # Dynamic RAM Guard: Support scaling to 8192 when RAM >= 4.5 GB, clamp to 2048 if RAM < 2.5 GB
+        avail_gb = get_available_memory_gb()
+        if avail_gb < 2.5:
+            ctx_size = 2048
+            logger.info("Host available RAM is low (%.2f GB < 2.5 GB). Clamped ctx_size to 2048.", avail_gb)
+        elif avail_gb >= 4.5 and ctx_size <= 4096:
+            ctx_size = 8192
+            logger.info("Host available RAM is ample (%.2f GB >= 4.5 GB). Scaled ctx_size to 8192.", avail_gb)
 
         self._model_path = model_path
         self._server_bin = server_bin
@@ -219,6 +221,11 @@ class LlamaServerSupervisor:
     def owns_process(self) -> bool:
         """True while a child process we started is running."""
         return self._process is not None and self._process.poll() is None
+
+    @property
+    def is_alive(self) -> bool:
+        """Alias for owns_process."""
+        return self.owns_process
 
     @property
     def model_path(self) -> Optional[str]:
@@ -342,10 +349,11 @@ class LlamaServerSupervisor:
             child_env["LD_LIBRARY_PATH"] = f"{bin_dir}:{cur_ld}" if cur_ld else bin_dir
             child_env["GGML_BACKEND_PATH"] = bin_dir
 
-        preexec = _linux_preexec if (self._die_with_parent and sys.platform.startswith("linux")) else None
+        preexec = _linux_preexec if (self._die_with_parent and sys.platform.startswith("linux")) else (os.setpgrp if sys.platform.startswith("linux") else None)
         creationflags = 0
         if sys.platform == "win32":
             creationflags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000)
+            creationflags |= 0x08000000  # CREATE_NO_WINDOW to prevent black console flash
 
         self._process = subprocess.Popen(
             command,
@@ -364,6 +372,9 @@ class LlamaServerSupervisor:
     def _attach_to_job(self, process: subprocess.Popen[bytes]) -> None:
         """Windows Job Object integration to prevent orphaned processes."""
         try:
+            cur_dir = os.path.dirname(os.path.abspath(__file__))
+            if cur_dir not in sys.path:
+                sys.path.insert(0, cur_dir)
             import win_job
 
             if self._job is None:
@@ -380,8 +391,16 @@ class LlamaServerSupervisor:
             import win_job
 
             win_job.close_job(job)
-        except OSError as exc:
+        except Exception as exc:
             logger.warning("could not close Windows Job Object: %s", exc)
+
+    def _cleanup_port_listener(self) -> None:
+        """Gracefully release any unowned process listening on our port."""
+        if sys.platform != "win32":
+            try:
+                subprocess.run(["fuser", "-k", f"{self._port}/tcp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1.0)
+            except Exception:
+                pass
 
     def check(self) -> bool:
         """Check process status; if dead unexpectedly, restart up to max_restarts."""
@@ -405,6 +424,7 @@ class LlamaServerSupervisor:
         process = self._process
         if process is None:
             self._close_job()
+            self._cleanup_port_listener()
             return
 
         if process.poll() is None:

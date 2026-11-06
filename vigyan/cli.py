@@ -1,15 +1,19 @@
 import sys
 import shutil
+import json
+from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.syntax import Syntax
 
-from vigyan.tools.math import solve_math
-from vigyan.tools.cad import synthesize_cad
-from vigyan.tools.rtl import generate_rtl
 from vigyan.core import check_engine_health, DEFAULT_ENGINE_URL
+from vigyan.constants import lookup_constant, search_axioms, PHYSICAL_CONSTANTS
+from vigyan.ledger import add_rule, undo_rule, get_active_rules, get_budget_telemetry
+
+def _lazy_solve_math(spec: str, **kw):
+    from vigyan.tools.math import solve_math
+    return solve_math(spec, **kw)
 
 app = typer.Typer(
     name="vigyan",
@@ -21,26 +25,31 @@ console = Console()
 AVAILABLE_TOOLS = {
     "math": {
         "description": "Deterministic SymPy CAS analytical solver (0% error)",
-        "handler": lambda spec, **kw: solve_math(spec),
+        "handler": lambda spec, **kw: _lazy_solve_math(spec, **kw),
         "binary": None
-    },
-    "cad": {
-        "description": "Parametric 3D solid modeling & OpenSCAD STL compiler",
-        "handler": lambda spec, **kw: synthesize_cad(spec, **kw),
-        "binary": "openscad"
-    },
-    "rtl": {
-        "description": "Synthesizable Verilog HDL & Icarus Verilog simulation loop",
-        "handler": lambda spec, **kw: generate_rtl(spec, **kw),
-        "binary": "iverilog"
     }
 }
 
 @app.command(name="math", help="Solve algebraic, calculus, or differential equations using SymPy CAS.")
 def math_cmd(
     query: str = typer.Argument(..., help="Mathematical query or expression (e.g. 'diff(x**3 * sin(x), x)')"),
-    eval_num: bool = typer.Option(False, "--eval", "-e", help="Evaluate floating-point numerical value")
+    eval_num: bool = typer.Option(False, "--eval", "-e", help="Evaluate floating-point numerical value"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
 ):
+    from vigyan.tools.math import solve_math
+    if as_json:
+        res = solve_math(query, evaluate_numerical=eval_num)
+        data = {
+            "status": res.status,
+            "expression": getattr(res, "expression", query),
+            "solution": getattr(res, "solution", ""),
+            "latex": getattr(res, "latex", ""),
+            "evaluated_numerical": getattr(res, "evaluated_numerical", None),
+            "execution_time_ms": getattr(res, "execution_time_ms", 0),
+        }
+        print(json.dumps(data, indent=2))
+        return
+
     with console.status("[bold green]Calculating analytical solution via SymPy CAS...[/bold green]"):
         res = solve_math(query, evaluate_numerical=eval_num)
 
@@ -58,33 +67,49 @@ def math_cmd(
     else:
         console.print(Panel(f"[red]Failed to derive expression:[/red] {query}", title="Error", border_style="red"))
 
-@app.command(name="cad", help="Synthesize parametric OpenSCAD code and optionally render 3D STL mesh.")
-def cad_cmd(
-    spec: str = typer.Argument(..., help="Mechanical part specification (e.g. 'Planetary gear 24 teeth module 1.5')"),
-    output: str = typer.Option("part.scad", "--output", "-o", help="Output .scad file path"),
-    stl: bool = typer.Option(False, "--stl", "-s", help="Compile headless 3D STL mesh via OpenSCAD CLI")
+@app.command(name="const", help="Query sovereign CODATA 2022 physical constants.")
+def const_cmd(
+    symbol: str = typer.Argument(..., help="Constant symbol or name (e.g. 'c', 'h', 'G', 'kB', 'e')"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON")
 ):
-    with console.status("[bold green]Synthesizing parametric CAD model...[/bold green]"):
-        res = synthesize_cad(spec, output_path=output, render_stl=stl)
+    res = lookup_constant(symbol)
+    if not res:
+        if as_json:
+            print(json.dumps({"error": f"Constant '{symbol}' not found"}))
+        else:
+            console.print(f"[red]Error:[/red] Constant '{symbol}' not found. Available: {', '.join(PHYSICAL_CONSTANTS.keys())}")
+        raise typer.Exit(code=1)
+    if as_json:
+        print(json.dumps(res, indent=2))
+        return
+    table = Table(title=f"Physical Constant: {res['name']}", border_style="cyan")
+    table.add_column("Property", style="bold white")
+    table.add_column("Value", style="green")
+    table.add_row("Symbol", res["symbol"])
+    table.add_row("Value", str(res["value"]))
+    table.add_row("Unit", res["unit"])
+    table.add_row("LaTeX", res["latex"])
+    console.print(table)
 
-    console.print(Panel(res.stdout, title="Vigyan CAD Engine", border_style="blue"))
-    if res.code:
-        syntax = Syntax(res.code[:500] + ("\n..." if len(res.code) > 500 else ""), "openscad", theme="monokai", line_numbers=True)
-        console.print(syntax)
-
-@app.command(name="rtl", help="Synthesize Verilog HDL and execute self-healing simulation with Icarus Verilog.")
-def rtl_cmd(
-    spec: str = typer.Argument(..., help="Digital logic specification (e.g. '8-bit synchronous FIFO depth 16')"),
-    output: str = typer.Option("module.v", "--output", "-o", help="Output .v file path"),
-    verify: bool = typer.Option(True, "--verify/--no-verify", help="Execute Icarus Verilog simulation loop")
+@app.command(name="axiom", help="Search STEM governing equations & physical axioms.")
+def axiom_cmd(
+    keyword: str = typer.Argument(..., help="Search keyword (e.g. 'orbit', 'rc', 'diode', 'heat', 'planck')"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON")
 ):
-    with console.status("[bold green]Synthesizing Verilog RTL and running simulation...[/bold green]"):
-        res = generate_rtl(spec, output_path=output, verify=verify)
-
-    console.print(Panel(res.stdout, title="Vigyan Silicon EDA Engine", border_style="magenta"))
-    if res.code:
-        syntax = Syntax(res.code[:500] + ("\n..." if len(res.code) > 500 else ""), "verilog", theme="monokai", line_numbers=True)
-        console.print(syntax)
+    matches = search_axioms(keyword)
+    if as_json:
+        print(json.dumps(matches, indent=2))
+        return
+    if not matches:
+        console.print(f"[yellow]No axioms matched '{keyword}'.[/yellow]")
+        return
+    table = Table(title=f"Governing Equations matching '{keyword}'", border_style="cyan")
+    table.add_column("Domain", style="cyan")
+    table.add_column("Law", style="bold white")
+    table.add_column("Equation", style="green")
+    for m in matches:
+        table.add_row(m.get("domain", ""), m["law"], m["equation"])
+    console.print(table)
 
 @app.command(name="run", help="Directly invoke any registered engineering tool from the command line.")
 def run_cmd(
@@ -125,34 +150,285 @@ def list_cmd():
 
     console.print(table)
 
-@app.command(name="status", help="Check local inference daemon status and host compilers.")
-def status_cmd():
+@app.command(name="status", help="Check local inference daemon status and host runtime.")
+def status_cmd(
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    from vigyan import __version__
     active = check_engine_health()
+    if as_json:
+        data = {
+            "version": f"v{__version__}",
+            "engine_active": active,
+            "engine_port": 8086,
+            "sympy": True,
+        }
+        print(json.dumps(data, indent=2))
+        return
+
     status_text = "[green]ACTIVE (:8086 loopback responsive)[/green]" if active else "[yellow]OFFLINE (Daemon not running)[/yellow]"
 
     table = Table(title="Vigyan Sovereign Runtime Status", border_style="cyan")
     table.add_column("Component", style="bold white")
     table.add_column("Status")
+    table.add_row("Version", f"v{__version__} Sovereign Engineering Edition")
     table.add_row("Local Engine Daemon", status_text)
     table.add_row("SymPy CAS Engine", "[green]READY (In-Process Python)[/green]")
-    table.add_row("OpenSCAD Compiler", "[green]INSTALLED[/green]" if shutil.which("openscad") else "[yellow]NOT FOUND[/yellow]")
-    table.add_row("Icarus Verilog Simulator", "[green]INSTALLED[/green]" if shutil.which("iverilog") else "[yellow]NOT FOUND[/yellow]")
+    table.add_row("Physical Constants", "[green]CODATA 2022 (Zero-RAM)[/green]")
+    table.add_row("Learning Ledger", "[green]ACTIVE (.agents/ledger.jsonl)[/green]")
     console.print(table)
+
+@app.command(name="learn", help="Commit a reviewable, reversible operational rule to the Learning Ledger.")
+def learn_cmd(
+    rule: str = typer.Argument(..., help="Constraint, preference, or engineering rule to commit"),
+    category: str = typer.Option("auto", "--category", "-c", help="Category (cad, eda, math, physics, general)"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON")
+):
+    res = add_rule(rule, category=category)
+    if as_json:
+        print(json.dumps(res, indent=2))
+        return
+
+    if res.get("success"):
+        r = res["rule"]
+        tel = res["telemetry"]
+        console.print(Panel(
+            f"[bold green]Committed Rule {r['id']} ({r['category'].upper()}):[/bold green]\n"
+            f"{r['rule']}\n\n"
+            f"[dim]Context Budget: {tel['lines_used']}/{tel['max_budget_lines']} lines ({tel['budget_used_pct']}%) | Active Rules: {tel['active_rules_count']}[/dim]",
+            title="Sovereign Learning Ledger",
+            border_style="green"
+        ))
+    else:
+        console.print(f"[red]Error:[/red] {res.get('error', 'Failed to commit rule')}")
+
+@app.command(name="undo", help="Revert a previously learned rule from the Learning Ledger by ID.")
+def undo_cmd(
+    rule_id: str = typer.Argument(..., help="Rule ID to undo (e.g. 'L-101')"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON")
+):
+    res = undo_rule(rule_id)
+    if as_json:
+        print(json.dumps(res, indent=2))
+        return
+
+    if res.get("success"):
+        tel = res["telemetry"]
+        console.print(Panel(
+            f"[bold yellow]Reverted Rule {rule_id}[/bold yellow]\n"
+            f"[dim]Rule was cleanly removed from active context injection.[/dim]\n\n"
+            f"[dim]Context Budget: {tel['lines_used']}/{tel['max_budget_lines']} lines | Active Rules: {tel['active_rules_count']}[/dim]",
+            title="Learning Ledger Undo",
+            border_style="yellow"
+        ))
+    else:
+        console.print(f"[red]Error:[/red] {res.get('error', 'Failed to undo rule')}")
+
+@app.command(name="ledger", help="Inspect all active learning rules and context budget utilization.")
+def ledger_cmd(
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON")
+):
+    rules = get_active_rules()
+    tel = get_budget_telemetry()
+    if as_json:
+        print(json.dumps({"telemetry": tel, "rules": rules}, indent=2))
+        return
+
+    table = Table(title=f"Sovereign Learning Ledger ({tel['lines_used']}/{tel['max_budget_lines']} lines • {tel['active_rules_count']} rules)", border_style="cyan")
+    table.add_column("ID", style="bold white", width=8)
+    table.add_column("Category", style="cyan", width=10)
+    table.add_column("Rule", style="white")
+    table.add_column("Timestamp", style="dim", width=20)
+
+    if not rules:
+        console.print(Panel("[dim]Learning Ledger is empty. Use 'vigyan learn \"...\"' to commit rules.[/dim]", title="Learning Ledger", border_style="cyan"))
+        return
+
+    for r in rules:
+        ts = r.get("timestamp", "")[:19].replace("T", " ")
+        table.add_row(r.get("id", ""), r.get("category", "").upper(), r.get("rule", ""), ts)
+
+    console.print(table)
+
+@app.command(name="bench", help="Execute comprehensive forensic benchmark suite across CLI, Math CAS, and GUI Bridge.")
+def bench_cmd(
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON evaluation report")
+):
+    from vigyan.bench import execute_full_benchmark
+    execute_full_benchmark(as_json=as_json)
+
+@app.command(name="ask", help="Ask Vigyan a physical engineering, mathematical, or scientific question.")
+def ask_cmd(
+    prompt: str = typer.Argument(..., help="Question or prompt to send to Vigyan"),
+    stream: bool = typer.Option(True, "--stream/--no-stream", help="Stream response tokens in real-time"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON")
+):
+    from vigyan.core import check_engine_health, query_engine, stream_engine, ensure_engine_running
+
+    if not check_engine_health():
+        with console.status("[bold green]Starting local Vigyan-3B IQ3_M engine...[/bold green]"):
+            ok = ensure_engine_running()
+            if not ok:
+                console.print("[red]Error:[/red] Failed to start local inference engine on loopback.")
+                raise typer.Exit(code=1)
+
+    if as_json or not stream:
+        ans = query_engine(prompt)
+        if as_json:
+            print(json.dumps({"prompt": prompt, "response": ans}, indent=2))
+        else:
+            console.print(Panel(ans, title="Vigyan Response", border_style="cyan"))
+    else:
+        console.print("[bold cyan]Vigyan >[/bold cyan] ", end="")
+        for chunk in stream_engine(prompt):
+            console.print(chunk, end="")
+        console.print("\n")
+
+@app.command(name="chat", help="Start an interactive offline conversational session with Vigyan.")
+def chat_cmd():
+    from datetime import datetime
+    from vigyan.core import check_engine_health, stream_engine, ensure_engine_running
+
+    if not check_engine_health():
+        with console.status("[bold green]Starting local Vigyan-3B IQ3_M engine on private loopback...[/bold green]"):
+            ok = ensure_engine_running()
+            if not ok:
+                console.print("[red]Error:[/red] Failed to start local inference engine on loopback.")
+                raise typer.Exit(code=1)
+
+    # Initialize readline persistent history
+    history_file = None
+    try:
+        import readline
+        history_file = os.path.expanduser("~/.vigyan/history")
+        os.makedirs(os.path.dirname(history_file), exist_ok=True)
+        if os.path.exists(history_file):
+            readline.read_history_file(history_file)
+        readline.set_history_length(1000)
+    except Exception:
+        pass
+
+    tel = get_budget_telemetry()
+    console.print(Panel(
+        "[bold white]V I G Y A N   P R O   I N T E R A C T I V E   C H A T[/bold white]\n"
+        f"[dim]Sovereign Offline Intelligence • Context Budget: {tel['lines_used']}/{tel['max_budget_lines']} lines[/dim]\n"
+        "[dim]Type '/help' for in-chat commands, 'exit' or 'quit' to end session[/dim]",
+        border_style="cyan"
+    ))
+
+    history = []
+    try:
+        while True:
+            try:
+                user_input = console.input("\n[bold green]You >[/bold green] ").strip()
+            except (KeyboardInterrupt, EOFError):
+                break
+
+            if not user_input:
+                continue
+
+            if user_input.lower() in ("exit", "quit", "q"):
+                console.print("[dim]Ending session.[/dim]")
+                break
+
+            if user_input.lower() == "/help":
+                console.print(Panel(
+                    "In-Chat Commands:\n"
+                    "  /ledger         Review active learning ledger rules & context budget\n"
+                    "  /learn <rule>   Commit new operational rule to learning ledger\n"
+                    "  /undo <id>      Revert a learning ledger rule by ID (e.g. /undo L-101)\n"
+                    "  /clear          Clear current conversation history\n"
+                    "  exit, quit, q   Exit the chat session",
+                    title="Vigyan Chat Commands",
+                    border_style="cyan"
+                ))
+                continue
+
+            if user_input.lower() == "/ledger":
+                active = get_active_rules()
+                b_tel = get_budget_telemetry()
+                console.print(f"[dim]Active Rules ({b_tel['lines_used']}/{b_tel['max_budget_lines']} lines):[/dim]")
+                for r in active:
+                    console.print(f"  [{r['id']}] ({r['category'].upper()}) {r['rule']}")
+                continue
+
+            if user_input.lower().startswith("/learn "):
+                rule_text = user_input[7:].strip()
+                if rule_text:
+                    res = add_rule(rule_text)
+                    if res.get("success"):
+                        console.print(f"[bold green]Committed rule {res['rule']['id']}[/bold green]: {rule_text}")
+                    else:
+                        console.print(f"[red]Error:[/red] {res.get('error')}")
+                continue
+
+            if user_input.lower().startswith("/undo "):
+                rule_id = user_input[6:].strip()
+                if rule_id:
+                    res = undo_rule(rule_id)
+                    if res.get("success"):
+                        console.print(f"[bold yellow]Reverted rule {rule_id}[/bold yellow]")
+                    else:
+                        console.print(f"[red]Error:[/red] {res.get('error')}")
+                continue
+
+            if user_input.lower() == "/clear":
+                history.clear()
+                console.print("[dim]Conversation history cleared.[/dim]")
+                continue
+
+            console.print("[bold cyan]Vigyan >[/bold cyan] ", end="")
+            response_chunks = []
+            try:
+                for chunk in stream_engine(user_input, history=history):
+                    console.print(chunk, end="")
+                    response_chunks.append(chunk)
+                console.print("")
+                full_reply = "".join(response_chunks).strip()
+                history.append({"role": "user", "content": user_input})
+                history.append({"role": "assistant", "content": full_reply})
+                if len(history) > 10:
+                    history = history[-10:]
+            except Exception as err:
+                console.print(f"\n[red]Inference error:[/red] {err}")
+    finally:
+        if history_file:
+            try:
+                import readline
+                readline.write_history_file(history_file)
+            except Exception:
+                pass
+
+@app.command(name="stop", help="Stop local background inference engine and immediately reclaim host RAM.")
+def stop_cmd():
+    from vigyan.core import stop_engine
+    stopped = stop_engine()
+    if stopped:
+        console.print("[bold green]Local inference engine stopped. Host RAM reclaimed.[/bold green]")
+    else:
+        console.print("[dim]Local inference engine is not running.[/dim]")
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
         console.print(Panel(
             "[bold white]V I G Y A N   P R O   W O R K S T A T I O N[/bold white]\n"
-            "[dim]Sovereign Offline Engineering Intelligence | Zero Cloud Egress[/dim]\n"
+            "[dim]Sovereign Offline Engineering Intelligence | Zero Cloud Egress | v4.0.0[/dim]\n"
             "[dim cyan]ExperimentLab AI (https://experimentlab.in) | Support: support@experimentlab.in[/dim cyan]\n\n"
             "Commands:\n"
-            "  [cyan]vigyan math '<query>'[/cyan]       Exact analytical SymPy CAS derivations\n"
-            "  [cyan]vigyan cad '<spec>'[/cyan]          Parametric 3D solid modeling & STL export\n"
-            "  [cyan]vigyan rtl '<spec>'[/cyan]          Synthesizable Verilog & self-healing simulation\n"
-            "  [cyan]vigyan run <tool> '<spec>'[/cyan]   Directly run any registered tool\n"
-            "  [cyan]vigyan list[/cyan]                  List all registered tools\n"
-            "  [cyan]vigyan status[/cyan]                Inspect local daemon and compiler dependencies",
+            "  [cyan]vigyan chat[/cyan]                           Start interactive STEM chat session (with arrow-key history)\n"
+            "  [cyan]vigyan ask '<prompt>' [--stream][/cyan]       Ask Vigyan any physical science question\n"
+            "  [cyan]vigyan math '<query>' [--json][/cyan]          Exact analytical SymPy CAS derivations\n"
+            "  [cyan]vigyan const <symbol> [--json][/cyan]             Query physical constants (c, h, G, kB, e)\n"
+            "  [cyan]vigyan axiom <keyword> [--json][/cyan]            Search STEM governing equations\n"
+            "  [cyan]vigyan learn '<rule>' [--json][/cyan]            Commit reversible rule to learning ledger\n"
+            "  [cyan]vigyan undo <rule_id> [--json][/cyan]            Revert a previously learned rule\n"
+            "  [cyan]vigyan ledger [--json][/cyan]                    Review active rules and context budget\n"
+            "  [cyan]vigyan stop[/cyan]                           Immediately stop background engine & free RAM\n"
+            "  [cyan]vigyan bench [--json][/cyan]                     Run forensic benchmark suite & problem diagnostic\n"
+            "  [cyan]vigyan run <tool> '<spec>'[/cyan]                  Directly run any registered tool\n"
+            "  [cyan]vigyan list[/cyan]                                 List all registered tools\n"
+            "  [cyan]vigyan status [--json][/cyan]                       Inspect local daemon and runtime status",
             border_style="cyan"
         ))
 

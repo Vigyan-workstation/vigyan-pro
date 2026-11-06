@@ -1,9 +1,60 @@
 import time
 import re
+import ast
+from typing import Optional, Set
 import sympy as sp
-from typing import Optional
 from vigyan.types import MathResult
 from vigyan.core import query_engine, check_engine_health
+
+class SecurityViolationError(ValueError):
+    """Raised when an expression attempts unsafe attribute access, imports, or unwhitelisted calls."""
+    pass
+
+DISALLOWED_AST_NODES = (
+    ast.Import, ast.ImportFrom,
+    ast.Lambda, ast.Yield, ast.YieldFrom,
+    ast.AsyncFunctionDef, ast.FunctionDef, ast.ClassDef,
+    ast.Global, ast.Nonlocal,
+    ast.DictComp, ast.ListComp, ast.SetComp, ast.GeneratorExp,
+    ast.Delete, ast.Assign, ast.AnnAssign, ast.AugAssign,
+)
+
+PROHIBITED_IDENTIFIERS: Set[str] = {
+    "__builtins__", "__import__", "eval", "exec", "open", "compile",
+    "os", "sys", "subprocess", "posix", "shutil", "socket", "urllib", "requests"
+}
+
+def validate_sympy_ast(code_str: str) -> None:
+    """
+    Parse expression using Python AST in mode='eval' and verify that:
+    1. No statement or comprehension constructs exist.
+    2. No private or dunder attributes (starting with '_') are accessed.
+    3. No hazardous built-ins (os, sys, subprocess, open, eval, exec) are referenced.
+    """
+    clean_code = re.sub(r'(\w+)\^(\d+)', r'\1**\2', code_str.strip())
+    try:
+        tree = ast.parse(clean_code, mode="eval")
+    except SyntaxError as e:
+        for kw in PROHIBITED_IDENTIFIERS:
+            if re.search(r'\b' + re.escape(kw) + r'\b', code_str):
+                raise SecurityViolationError(f"Prohibited keyword '{kw}' detected in expression.")
+        raise SecurityViolationError(f"Malformed mathematical expression syntax: {e}")
+
+    for node in ast.walk(tree):
+        if isinstance(node, DISALLOWED_AST_NODES):
+            raise SecurityViolationError(
+                f"Disallowed AST syntax node '{type(node).__name__}'. Only pure mathematical expressions are permitted."
+            )
+        if isinstance(node, ast.Attribute):
+            if node.attr.startswith("_"):
+                raise SecurityViolationError(
+                    f"Access to private attribute '{node.attr}' is prohibited by sovereign security policy."
+                )
+        if isinstance(node, ast.Name):
+            if node.id.startswith("_") or node.id in PROHIBITED_IDENTIFIERS:
+                raise SecurityViolationError(
+                    f"Prohibited identifier '{node.id}' detected in mathematical expression."
+                )
 
 def solve_math(query: str, evaluate_numerical: bool = False) -> MathResult:
     """
@@ -14,11 +65,32 @@ def solve_math(query: str, evaluate_numerical: bool = False) -> MathResult:
     start_time = time.perf_counter()
     clean_query = query.strip()
 
+    # Pre-check for overt security violations in query string
+    for kw in PROHIBITED_IDENTIFIERS:
+        if re.search(r'\b' + re.escape(kw) + r'\b', clean_query):
+            return MathResult(
+                status="error",
+                expression=query,
+                solution=f"Security Violation: Prohibited identifier '{kw}' detected in expression.",
+                latex="",
+                is_exact=False,
+                execution_time_ms=round((time.perf_counter() - start_time) * 1000, 3)
+            )
+
     # Direct Evaluation Attempt
     try:
         res = _evaluate_sympy_direct(clean_query, evaluate_numerical)
         res.execution_time_ms = round((time.perf_counter() - start_time) * 1000, 3)
         return res
+    except SecurityViolationError as sec_err:
+        return MathResult(
+            status="error",
+            expression=query,
+            solution=f"Security Violation: {sec_err}",
+            latex="",
+            is_exact=False,
+            execution_time_ms=round((time.perf_counter() - start_time) * 1000, 3)
+        )
     except Exception:
         pass
 
@@ -31,11 +103,21 @@ def solve_math(query: str, evaluate_numerical: bool = False) -> MathResult:
                 res.expression = query
                 res.execution_time_ms = round((time.perf_counter() - start_time) * 1000, 3)
                 return res
+    except SecurityViolationError as sec_err:
+        return MathResult(
+            status="error",
+            expression=query,
+            solution=f"Security Violation: {sec_err}",
+            latex="",
+            is_exact=False,
+            execution_time_ms=round((time.perf_counter() - start_time) * 1000, 3)
+        )
     except Exception:
         pass
 
-    # Fallback: parse symbols directly and simplify
+    # Fallback: parse symbols directly and simplify (AST checked)
     try:
+        validate_sympy_ast(clean_query)
         expr = sp.sympify(clean_query)
         sol = sp.simplify(expr)
         num_val = str(sol.evalf()) if evaluate_numerical else None
@@ -46,6 +128,15 @@ def solve_math(query: str, evaluate_numerical: bool = False) -> MathResult:
             latex=sp.latex(sol),
             evaluated_numerical=num_val,
             is_exact=True,
+            execution_time_ms=round((time.perf_counter() - start_time) * 1000, 3)
+        )
+    except SecurityViolationError as sec_err:
+        return MathResult(
+            status="error",
+            expression=query,
+            solution=f"Security Violation: {sec_err}",
+            latex="",
+            is_exact=False,
             execution_time_ms=round((time.perf_counter() - start_time) * 1000, 3)
         )
     except Exception:
@@ -59,7 +150,9 @@ def solve_math(query: str, evaluate_numerical: bool = False) -> MathResult:
         )
 
 def _evaluate_sympy_direct(code_str: str, evaluate_numerical: bool = False) -> MathResult:
-    """Safely execute bounded SymPy analytical operations."""
+    """Safely execute bounded SymPy analytical operations after AST validation."""
+    validate_sympy_ast(code_str)
+
     x, y, z, t, a, b, c, n, k = sp.symbols('x y z t a b c n k')
     f, g = sp.symbols('f g', cls=sp.Function)
 

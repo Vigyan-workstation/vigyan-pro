@@ -12,11 +12,6 @@ import time
 import subprocess
 from typing import Optional
 
-# Set Ollama hybrid compute acceleration flags before spawning daemon
-os.environ.setdefault("OLLAMA_FLASH_ATTENTION", "1")
-os.environ.setdefault("OLLAMA_KV_CACHE_TYPE", "q8_0")
-os.environ.setdefault("OLLAMA_NUM_PARALLEL", "1")
-
 
 def launch_mac():
     base_dir = os.path.dirname(os.path.abspath(__file__))

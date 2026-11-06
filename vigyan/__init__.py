@@ -2,13 +2,16 @@
 Vigyan Pro: Sovereign Offline Physical Engineering Intelligence Workstation.
 """
 
-__version__ = "3.4.0"
+__version__ = "4.0.0"
 
 from vigyan.types import ToolResult, MathResult, Artifact
 from vigyan.core import check_engine_health, query_engine, EngineOfflineError
-from vigyan.tools.math import solve_math
-from vigyan.tools.cad import synthesize_cad
-from vigyan.tools.rtl import generate_rtl
+
+def __getattr__(name):
+    if name == "solve_math":
+        from vigyan.tools.math import solve_math
+        return solve_math
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 __all__ = [
     "__version__",
@@ -16,8 +19,6 @@ __all__ = [
     "MathResult",
     "Artifact",
     "solve_math",
-    "synthesize_cad",
-    "generate_rtl",
     "check_engine_health",
     "query_engine",
     "EngineOfflineError"

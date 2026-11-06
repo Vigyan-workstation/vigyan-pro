@@ -66,3 +66,7 @@ temp/
 *.swp
 *.swo
 *~
+
+# Sovereign Learning Ledger & Local Agent State
+.agents/
+*.jsonl
