@@ -408,6 +408,98 @@ def stop_cmd():
     else:
         console.print("[dim]Local inference engine is not running.[/dim]")
 
+model_app = typer.Typer(name="model", help="Manage sovereign local GGUF models and Hugging Face Hub weights.", add_completion=False)
+app.add_typer(model_app, name="model")
+
+@model_app.command(name="status", help="Inspect local sovereign GGUF model storage.")
+def model_status_cmd(
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    from vigyan.models import list_local_models, get_models_dir
+    from src.llama_supervisor import find_model_path
+    active_path = find_model_path()
+    local_models = list_local_models()
+    models_dir = get_models_dir()
+
+    if as_json:
+        data = {
+            "models_dir": models_dir,
+            "active_model": active_path,
+            "local_models": local_models,
+            "total_local_count": len(local_models),
+        }
+        print(json.dumps(data, indent=2))
+        return
+
+    table = Table(title="Sovereign GGUF Model Registry", border_style="cyan")
+    table.add_column("Model Artifact", style="bold white")
+    table.add_column("Size (GB)", justify="right")
+    table.add_column("Quant", style="cyan")
+    table.add_column("Status")
+
+    if not local_models:
+        table.add_row("No GGUF models found in ~/.vigyan/models", "-", "-", "[yellow]EMPTY[/yellow]")
+    else:
+        for m in local_models:
+            is_active = (m["path"] == active_path)
+            status_badge = "[bold green]ACTIVE (Default)[/bold green]" if is_active else "[dim]Available[/dim]"
+            table.add_row(m["name"], f"{m['size_gb']:.2f}", m["quantization"], status_badge)
+
+    console.print(table)
+    console.print(f"[dim]Model storage path: {models_dir}[/dim]")
+
+@model_app.command(name="list", help="List local models or remote Experimentlab Hugging Face artifacts.")
+def model_list_cmd(
+    remote: bool = typer.Option(False, "--remote", "-r", help="List remote models available on Hugging Face"),
+    repo: str = typer.Option("Experimentlab/Vigyan-Models-GGUF", "--repo", help="Hugging Face Hub repository"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    if remote:
+        from vigyan.models import list_remote_models
+        try:
+            remotes = list_remote_models(repo_id=repo)
+            if as_json:
+                print(json.dumps({"repo": repo, "models": remotes}, indent=2))
+                return
+            table = Table(title=f"Remote Hugging Face Models ({repo})", border_style="cyan")
+            table.add_column("Artifact Name", style="bold white")
+            table.add_column("Quantization", style="cyan")
+            for m in remotes:
+                table.add_row(m["name"], m["quantization"])
+            console.print(table)
+        except Exception as err:
+            if as_json:
+                print(json.dumps({"error": str(err)}, indent=2))
+            else:
+                console.print(f"[red]Failed to fetch remote models:[/red] {err}")
+    else:
+        from vigyan.models import list_local_models
+        locals_list = list_local_models()
+        if as_json:
+            print(json.dumps({"local_models": locals_list}, indent=2))
+            return
+        table = Table(title="Local GGUF Models", border_style="cyan")
+        table.add_column("Artifact Name", style="bold white")
+        table.add_column("Size (GB)", justify="right")
+        table.add_column("Quantization", style="cyan")
+        for m in locals_list:
+            table.add_row(m["name"], f"{m['size_gb']:.2f}", m["quantization"])
+        console.print(table)
+
+@model_app.command(name="pull", help="Download a GGUF model artifact from Hugging Face into ~/.vigyan/models/.")
+def model_pull_cmd(
+    filename: str = typer.Argument(..., help="Model filename (e.g. 'vigyan-2b-stem-q4_k_m.gguf')"),
+    repo: str = typer.Option("Experimentlab/Vigyan-Models-GGUF", "--repo", help="Hugging Face repository"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", help="Optional HF access token for gated models")
+):
+    from vigyan.models import pull_model
+    console.print(f"[dim]Pulling {filename} from {repo}...[/dim]")
+    try:
+        dest = pull_model(filename=filename, repo_id=repo, token=token)
+        console.print(f"[bold green]Successfully downloaded model to:[/bold green] {dest}")
+    except Exception as err:
+        console.print(f"[red]Download failed:[/red] {err}")
+
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
@@ -419,6 +511,7 @@ def main(ctx: typer.Context):
             "  [cyan]vigyan chat[/cyan]                           Start interactive STEM chat session (with arrow-key history)\n"
             "  [cyan]vigyan ask '<prompt>' [--stream][/cyan]       Ask Vigyan any physical science question\n"
             "  [cyan]vigyan math '<query>' [--json][/cyan]          Exact analytical SymPy CAS derivations\n"
+            "  [cyan]vigyan model [status|list|pull][/cyan]       Manage local GGUF models & HF weights\n"
             "  [cyan]vigyan const <symbol> [--json][/cyan]             Query physical constants (c, h, G, kB, e)\n"
             "  [cyan]vigyan axiom <keyword> [--json][/cyan]            Search STEM governing equations\n"
             "  [cyan]vigyan learn '<rule>' [--json][/cyan]            Commit reversible rule to learning ledger\n"

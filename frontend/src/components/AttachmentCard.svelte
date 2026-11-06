@@ -32,13 +32,13 @@
         class="w-full h-full object-cover group-hover:scale-105 transition-transform"
       />
       <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs">
-        ⛶
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
       </div>
     </button>
   {:else}
     <!-- Document Icon -->
     <div class="w-14 h-14 rounded-lg bg-white/[0.04] border border-white/10 flex flex-col items-center justify-center flex-shrink-0 text-[#10b981]">
-      <span class="text-xl">📄</span>
+      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     </div>
   {/if}
 
@@ -71,9 +71,10 @@
       <span class="text-xs font-semibold text-white">{attachment.name}</span>
       <button
         onclick={() => (previewModalOpen = false)}
-        class="text-gray-400 hover:text-white p-1 text-sm leading-none"
+        class="text-gray-400 hover:text-white p-1 text-sm leading-none cursor-pointer"
+        aria-label="Close"
       >
-        ✕
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div class="p-4 bg-black flex items-center justify-center overflow-auto max-h-[75vh]">

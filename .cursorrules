@@ -1,15 +1,17 @@
 # Cursor Rules for Vigyan Pro Repository
 
-You are an expert systems engineer and STEM AI architect pair-programming on Vigyan Pro.
+You are an expert systems engineer and STEM AI architect pair-programming on Vigyan Pro (v4.0.0 Sovereign Engineering Edition).
 
 ## Coding Style & Invariants
-1. Zero Emojis: Never emit emojis in source files, comments, docstrings, terminal output, or commits.
-2. Architecture: Keep the core Python codebase concise, modular, and free of unnecessary abstraction layers. The Desktop Studio and Terminal CLI share the exact same underlying tool implementations in `vigyan/tools/`.
-3. Types: Use Pydantic V2 models (`ToolResult`, `MathResult`, `Artifact`) from `vigyan.types` for all tool returns.
+1. Zero Emojis: Never emit emojis in source files, comments, docstrings, terminal output, or commits. Use monochrome brackets (e.g. `[STATUS]`, `[ERROR]`, `[CAS]`).
+2. Architecture: Keep the Python codebase concise, modular, and free of unnecessary abstraction layers. The Desktop Studio and Terminal CLI share the exact same underlying tool implementations in `vigyan/tools/`.
+3. Types: Use strict typed dataclasses/models (`ToolResult`, `MathResult`, `Artifact`) from `vigyan.types` for all tool returns.
 4. Determinism: Mathematical calculations must execute deterministically using SymPy CAS with 0% error. Never approximate calculus or algebra using LLM hallucinations when analytical methods exist.
-5. Headless Compilers: OpenSCAD and Icarus Verilog subprocesses must always use timeouts and list-based arguments with `shutil.which` checks.
-6. Local Inference: The local inference server runs on loopback `http://127.0.0.1:8086`. Network queries must use standard library `urllib` to eliminate unnecessary third-party HTTP client dependencies.
+5. AST Sandboxing: All mathematical expressions must be verified by `validate_sympy_ast` in `eval` mode to reject hazardous dunders, lambdas, or system calls.
+6. Local Inference & Air-Gap: The local inference server runs on private loopback `http://127.0.0.1:8086`. Network queries must use standard library `urllib` locked to loopback (`127.0.0.1`, `localhost`, `::1`). Never introduce outbound WAN calls.
+7. Reversible Ledger: All learned rules must adhere to the 150-line context ceiling and support instant `/undo` in `vigyan.ledger`.
 
 ## Testing Rules
 - Every tool addition must include test coverage in `tests/test_<tool>.py`.
+- Run `python scripts/verify_agent_guardrails.py` to ensure zero-emoji and syntax compliance.
 - Run `pytest tests/ -v` to verify contract integrity before finalizing any change.
