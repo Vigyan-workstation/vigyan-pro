@@ -60,7 +60,7 @@ def query_engine(
 
     # Dynamic RAM Governor Check
     try:
-        from src.llama_supervisor import get_available_memory_gb
+        from vigyan.models import get_available_memory_gb
         if get_available_memory_gb() < 2.0 and max_tokens > 2048:
             max_tokens = 2048
     except Exception:
@@ -126,7 +126,7 @@ def stream_engine(
 
     # Dynamic RAM Governor Check
     try:
-        from src.llama_supervisor import get_available_memory_gb
+        from vigyan.models import get_available_memory_gb
         if get_available_memory_gb() < 2.0 and max_tokens > 2048:
             max_tokens = 2048
     except Exception:
@@ -260,7 +260,14 @@ def run_daemon(port: int = 8086, idle_timeout: float = 600.0) -> None:
     Persistent hybrid daemon loop with idle timeout reaper.
     Terminates llama-server if no queries arrive within idle_timeout seconds.
     """
-    from src.llama_supervisor import LlamaServerSupervisor
+    try:
+        from src.llama_supervisor import LlamaServerSupervisor
+    except ModuleNotFoundError:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+        from src.llama_supervisor import LlamaServerSupervisor
+
     sup = LlamaServerSupervisor(port=port, die_with_parent=False)
     if not sup.server_bin or not sup.model_path:
         return

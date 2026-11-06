@@ -415,8 +415,7 @@ app.add_typer(model_app, name="model")
 def model_status_cmd(
     as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
 ):
-    from vigyan.models import list_local_models, get_models_dir
-    from src.llama_supervisor import find_model_path
+    from vigyan.models import list_local_models, get_models_dir, find_model_path
     active_path = find_model_path()
     local_models = list_local_models()
     models_dir = get_models_dir()
