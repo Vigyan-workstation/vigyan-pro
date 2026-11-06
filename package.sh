@@ -173,7 +173,7 @@ else
 fi
 
 rm -rf "$DEB_STAGE"
-echo "✓ Debian Package Built: $DEB_OUTPUT"
+echo "[OK] Debian Package Built: $DEB_OUTPUT"
 
 # ------------------------------------------------------------------------------
 # 2. BUILD LINUX PORTABLE ARCHIVE (.tar.gz)
@@ -208,7 +208,7 @@ chmod +x "$TAR_STAGE/launch.sh"
 
 TAR_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64.tar.gz"
 tar --use-compress-program="gzip -1" -cf "$TAR_OUTPUT" -C "$SCRIPT_DIR/.build_tar" vigyan-pro
-echo "✓ Linux Archive Built: $TAR_OUTPUT"
+echo "[OK] Linux Archive Built: $TAR_OUTPUT"
 
 TAR_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64_bundled.tar.gz"
 ln -f "$TAR_OUTPUT" "$TAR_BUNDLED_OUTPUT" 2>/dev/null || cp "$TAR_OUTPUT" "$TAR_BUNDLED_OUTPUT"
@@ -254,7 +254,7 @@ if which zip >/dev/null 2>&1; then
 else
     python3 -c "import shutil; shutil.make_archive('$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64', 'zip', '$SCRIPT_DIR/.build_win', 'vigyan-pro')"
 fi
-echo "✓ Windows Archive Built: $WIN_OUTPUT"
+echo "[OK] Windows Archive Built: $WIN_OUTPUT"
 
 WIN_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64_bundled.zip"
 ln -f "$WIN_OUTPUT" "$WIN_BUNDLED_OUTPUT" 2>/dev/null || cp "$WIN_OUTPUT" "$WIN_BUNDLED_OUTPUT"
@@ -335,7 +335,7 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/Vigyan-Pro"
 
 MAC_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal.tar.gz"
 tar --use-compress-program="gzip -1" -cf "$MAC_OUTPUT" -C "$SCRIPT_DIR/.build_mac" vigyan-pro
-echo "✓ macOS Archive Built: $MAC_OUTPUT"
+echo "[OK] macOS Archive Built: $MAC_OUTPUT"
 
 MAC_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal_bundled.tar.gz"
 ln -f "$MAC_OUTPUT" "$MAC_BUNDLED_OUTPUT" 2>/dev/null || cp "$MAC_OUTPUT" "$MAC_BUNDLED_OUTPUT"
@@ -346,7 +346,7 @@ rm -rf "$SCRIPT_DIR/.build_mac"
 # ------------------------------------------------------------------------------
 echo "==> Generating Cryptographic SHA-256 Checksums for Enterprise Security Audit..."
 (cd "$DIST_DIR" && sha256sum vigyan-pro_* > SHA256SUMS)
-echo "✓ Enterprise SHA256SUMS generated:"
+echo "[OK] Enterprise SHA256SUMS generated:"
 cat "$DIST_DIR/SHA256SUMS"
 
 echo "========================================================"

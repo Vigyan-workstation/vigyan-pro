@@ -2,6 +2,8 @@ PolyForm Noncommercial License 1.0.0
 
 <https://polyformproject.org/licenses/noncommercial/1.0.0>
 
+Copyright (c) 2026 ExperimentLab AI (https://experimentlab.in)
+
 Terms
 
 1.  **Grant** - The licensor grants you a copyright license to the software
@@ -25,11 +27,26 @@ Terms
     or this license.
 
 7.  **Commercial Licensing** - Any commercial deployment, proprietary
-    integration, or for-profit enterprise use requires a paid commercial license
+    integration, software-as-a-service (SaaS) hosting, or for-profit enterprise
+    use requires an executed commercial license agreement from ExperimentLab AI.
+
+8.  **AI Training & Distillation Restriction** - You may not use, scrape,
+    re-distribute, or permit any third party to use this software, its source
+    code, algorithms, mathematical datasets, system prompts, or model weights,
+    in whole or in part, to train, pre-train, fine-tune, distill, evaluate, or
+    enhance any commercial, proprietary, or closed-source artificial intelligence
+    foundation model or autonomous service without an express commercial license
     from ExperimentLab AI.
 
-    For commercial licensing and enterprise support inquiries, contact:
+9.  **Trademark & Brand Protection** - The names "Vigyan", "Vigyan Pro",
+    "ExperimentLab", "ExperimentLab AI", and associated logos and branding are
+    exclusive trademarks and trade names of ExperimentLab AI. No rights or
+    permissions to use these trademarks for commercial promotion, product
+    endorsement, or distribution are granted under this license.
+
+10. **Inquiries & Licensing Contact** -
+    For commercial licensing, enterprise deployment, or academic partnership:
     ExperimentLab AI
+    Web: https://experimentlab.in
     Support: support@experimentlab.in
     Licensing: licensing@experimentlab.in
-    Web: https://experimentlab.in

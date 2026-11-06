@@ -1,79 +1,132 @@
 # Contributing to Vigyan Pro
 
-Thank you for contributing to Vigyan Pro. This repository is built for human engineers, researchers, and students who want to build and expand offline, air-gapped engineering intelligence.
+Thank you for contributing to Vigyan Pro. This repository is dedicated to building sovereign, offline physical science and engineering intelligence for researchers, engineers, and students.
+
+We welcome contributions from both human developers and autonomous AI coding agents (Claude Code, Cursor, Windsurf, Aider, Devin, GitHub Copilot). To maintain sovereign reliability and security, all contributions must strictly adhere to the guidelines below.
 
 ---
 
-## 1. Development Principles
+## 1. Sovereign Invariants (Mandatory)
 
-1. **Deterministic Accuracy Over Hallucination**:
-   Whenever an engineering calculation, calculus derivation, or physical simulation can be verified deterministically (SymPy, OpenSCAD, Icarus Verilog, ngspice, KiCad), prioritize deterministic execution.
+All Pull Requests (human or agent-generated) are evaluated against six mandatory invariants:
 
-2. **Unified Tool Sharing**:
-   Both the Desktop Workstation GUI (`run.py`) and the Terminal CLI (`vigyan`) share the exact same underlying tool implementations in `vigyan/tools/`. Never build duplicate logic.
-
-3. **Strict Type Safety**:
-   Every tool accepts validated arguments and returns a structured `ToolResult` or `MathResult` model from `vigyan.types`.
-
-4. **Zero Emojis**:
-   Maintain clean, professional, enterprise-grade typography. Never add emojis to code, docstrings, commits, or CLI output.
+1. **Zero Emojis Invariant**:
+   Never include emojis in source code, docstrings, commit messages, console output, or documentation. Maintain clean, professional, enterprise-grade typography.
+2. **Zero Local Compute Invariant**:
+   Never run heavy model fine-tuning, large-scale quantization sweeps, or parameter mergers on local host hardware.
+3. **Air-Gap Loopback Egress Lock**:
+   All networking in `vigyan/core.py` and internal bridge servers must bind strictly to `127.0.0.1`, `localhost`, or `::1`. Never introduce outbound WAN calls to external APIs or CDNs.
+4. **AST Mathematical Sandboxing**:
+   All mathematical or symbolic operations must execute through deterministic CAS (`sympy`) and be validated by `validate_sympy_ast` to prevent arbitrary code execution or dunder attribute traversal (`__class__`, `__subclasses__`).
+5. **Reversible Learning Ledger Standard**:
+   The Learning Ledger (`vigyan/ledger.py`) enforces a hard 150-line context ceiling and full `/undo` reversibility.
+6. **Multi-OS Native Parity**:
+   Changes affecting the desktop workstation or CLI must maintain cross-platform compatibility across Linux (WebKitGTK), macOS (Cocoa WKWebView), and Windows (Microsoft Edge WebView2).
 
 ---
 
-## 2. Adding a New Tool
+## 2. Setting Up Development Environment
 
-To add a new engineering tool, simply add a Python module inside `vigyan/tools/`:
+Clone the repository and install the development dependencies:
+
+```bash
+git clone https://github.com/Vigyan-workstation/vigyan-pro.git
+cd vigyan-pro
+
+# Use a virtual environment with Python >= 3.10
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install in editable mode with test dependencies
+pip install -e .
+pip install pytest
+```
+
+---
+
+## 3. Adding a New Deterministic STEM Tool
+
+All deterministic tool implementations live under `vigyan/tools/` and are shared between the Terminal CLI and Desktop Workstation:
+
+1. Create a new module `vigyan/tools/<domain>.py`.
+2. Define your tool function with typed arguments returning `ToolResult` or `MathResult` from `vigyan.types`.
+3. Register the tool in `AVAILABLE_TOOLS` in `vigyan/cli.py` and export in `vigyan/tools/__init__.py`.
+4. Create comprehensive unit tests in `tests/test_<domain>.py`.
+
+Example:
 
 ```python
-# vigyan/tools/spice.py
+# vigyan/tools/fluid.py
 from vigyan.types import ToolResult
 
-def simulate_circuit(netlist: str) -> ToolResult:
-    # 1. Parse or validate SPICE netlist
-    # 2. Invoke local ngspice CLI or solver
-    # 3. Return ToolResult
+def calculate_reynolds_number(velocity: float, length: float, viscosity: float) -> ToolResult:
+    if viscosity <= 0:
+        return ToolResult(status="error", tool_name="reynolds", stdout="", stderr="Kinematic viscosity must be positive.")
+    re = (velocity * length) / viscosity
+    regime = "Laminar" if re < 2300 else ("Transitional" if re <= 4000 else "Turbulent")
     return ToolResult(
         status="success",
-        tool_name="spice_sim",
-        stdout="Transient analysis complete.",
-        code=netlist
+        tool_name="reynolds",
+        stdout=f"Reynolds Number: {re:.2f} ({regime})",
+        code=f"Re = ({velocity} * {length}) / {viscosity}"
     )
 ```
 
-Then register the tool in `AVAILABLE_TOOLS` in `vigyan/cli.py` and export in `vigyan/tools/__init__.py`.
-
 ---
 
-## 3. Testing Your Tool
+## 4. Verification & Quality Gates
 
-Verify your new tool from the command line:
+Before submitting a Pull Request, verify that all automated quality gates pass:
 
 ```bash
-# Direct CLI execution
-vigyan run spice ".include model.cir"
+# 1. Run agent guardrails (Zero Emojis, Syntax, Air-Gap)
+python scripts/verify_agent_guardrails.py
 
-# Run automated test suite
+# 2. Run automated test suite
 pytest tests/ -v
+
+# 3. Test CLI commands
+vigyan status --json
+vigyan bench --json
 ```
 
-All test cases must pass 100% green before submitting a pull request.
+---
+
+## 5. Coding Agent Protocol
+
+If you are using an AI coding agent:
+- Direct your agent to read [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md) prior to modifying files.
+- Ensure the agent does not invent mock return values, placeholder strings, or fake simulation stubs.
+- Verify that commit messages follow Conventional Commits (e.g. `feat: add fluid mechanics tool`) with zero emojis.
 
 ---
 
-## 4. Submitting Pull Requests
+## 6. Developer Certificate of Origin (DCO)
 
-1. Fork the repository and create your feature branch:
-   ```bash
-   git checkout -b feature/spice-simulation
-   ```
-2. Commit your changes:
-   ```bash
-   git commit -m "feat(tools): add SPICE analog simulation tool"
-   ```
-3. Push to your branch and open a Pull Request against `main`.
+To protect intellectual property and ensure sovereign open-source integrity, Vigyan Pro utilizes the Developer Certificate of Origin (DCO) version 1.1:
 
----
+```text
+By making a contribution to this project, I certify that:
 
-## 5. Licensing
+(a) The contribution was created in whole or in part by me and I
+    have the right to submit it under the PolyForm Noncommercial
+    License 1.0.0; or
 
-All contributions to this repository will be licensed under the PolyForm Noncommercial License 1.0.0.
+(b) The contribution is based upon previous work that, to the best
+    of my knowledge, is covered under an appropriate open-source or
+    noncommercial license and I have the right under that license to
+    submit that work with modifications, whether created in whole
+    or in part by me, under the same license; or
+
+(c) The contribution was provided directly to me by some other
+    person who certified (a), (b) or (c) and I have not modified
+    it.
+
+(d) I understand and agree that this project and the contribution
+    are public and that a record of the contribution (including all
+    personal information I submit with it, including my sign-off) is
+    maintained indefinitely and may be redistributed consistent with
+    this project and the PolyForm Noncommercial License 1.0.0.
+```
+
+All contributions are licensed under the PolyForm Noncommercial License 1.0.0. Commercial use or proprietary redistribution requires a separate commercial license from ExperimentLab AI.

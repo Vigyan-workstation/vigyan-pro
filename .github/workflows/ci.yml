@@ -31,6 +31,10 @@ jobs:
           pip install -e .
           pip install pytest
 
+      - name: Verify Agent Guardrails (Zero Emojis, Syntax, Air-Gap)
+        run: |
+          python scripts/verify_agent_guardrails.py
+
       - name: Run Test Suite
         run: |
           pytest tests/ -v

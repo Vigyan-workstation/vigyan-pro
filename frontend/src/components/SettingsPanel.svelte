@@ -52,9 +52,11 @@
     <span class="text-xs font-semibold text-white tracking-wider uppercase">Preferences</span>
     <button
       onclick={onClose}
-      class="text-[#9ca3af] hover:text-white transition-colors text-base leading-none p-1 cursor-pointer"
+      class="text-[#9ca3af] hover:text-white transition-colors p-1 cursor-pointer flex items-center justify-center"
       aria-label="Close"
-    >✕</button>
+    >
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
 
   <!-- Content -->
