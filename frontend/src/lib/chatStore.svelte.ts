@@ -46,10 +46,26 @@ function loadFromStorage(): Message[] {
 function saveToStorage(msgs: Message[]) {
   if (typeof window === "undefined") return;
   try {
-    const persistent = msgs.filter((m) => !m.streaming || m.content);
+    // Keep last 40 messages and strip large base64 dataUrls to prevent quota crashes
+    const persistent = msgs.slice(-40).filter((m) => !m.streaming || m.content).map((m) => {
+      if (m.attachment?.dataUrl) {
+        return {
+          ...m,
+          attachment: {
+            name: m.attachment.name,
+            size: m.attachment.size,
+            type: m.attachment.type,
+          }
+        };
+      }
+      return m;
+    });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(persistent));
   } catch {
-    // Ignore storage quota errors
+    try {
+      const emergency = msgs.slice(-10).map((m) => ({ ...m, attachment: undefined }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(emergency));
+    } catch {}
   }
 }
 

@@ -11,14 +11,10 @@
 
   let expanded = $state(true);
 
-  const hasSymPy = $derived(
-    Boolean(sympyGrounding) ||
-    text.toLowerCase().includes("sympy") ||
-    text.toLowerCase().includes("verified")
-  );
+  const hasSymPy = $derived(Boolean(sympyGrounding));
 
   const stepCount = $derived(
-    (text.match(/^(?:step\s*\d+|^\d+\.)/gim) ?? []).length || (text.split("\n").filter(l => l.trim().length > 10).length > 2 ? 4 : 2)
+    (text.match(/^(?:step\s*\d+|^\d+\.)/gim) ?? []).length
   );
 
   $effect(() => {
@@ -48,14 +44,18 @@
             <span class="text-xs font-semibold text-[#e2e8f0]">
               {streaming
                 ? "Reasoning through mathematical derivation…"
-                : (hasSymPy ? `Symbolically verified in ${stepCount} steps` : `Reasoning chain (${stepCount} steps)`)}
+                : (hasSymPy
+                    ? (stepCount > 0 ? `Symbolically verified in ${stepCount} steps` : "Symbolically verified")
+                    : (stepCount > 0 ? `Reasoning chain (${stepCount} steps)` : "Reasoning chain"))}
             </span>
           </div>
 
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/25 px-2 py-0.5 rounded-full">
-              {hasSymPy ? "Symbolically Verified" : "Verified"}
-            </span>
+            {#if hasSymPy}
+              <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 border border-[#10b981]/25 px-2 py-0.5 rounded-full">
+                Symbolically Verified
+              </span>
+            {/if}
             <span class="text-[11px] text-[#9ca3af] ml-1 flex items-center gap-0.5">
               <span>Hide</span>
               <span class="text-[9px]">▴</span>
@@ -76,11 +76,19 @@
       >
         <span class="text-[#10b981] font-mono">•</span>
         <span class="font-medium text-[#e2e8f0]">
-          {hasSymPy ? `Symbolically verified (${stepCount} steps)` : `Reasoning chain (${stepCount} steps)`}
+          {hasSymPy
+            ? (stepCount > 0 ? `Symbolically verified (${stepCount} steps)` : "Symbolically verified")
+            : (stepCount > 0 ? `Reasoning chain (${stepCount} steps)` : "Reasoning chain")}
         </span>
-        <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded-full border border-[#10b981]/20">
-          {hasSymPy ? "Symbolically Verified" : "Reasoning"}
-        </span>
+        {#if hasSymPy}
+          <span class="text-[10px] font-mono text-[#10b981] bg-[#10b981]/10 px-2 py-0.5 rounded-full border border-[#10b981]/20">
+            Symbolically Verified
+          </span>
+        {:else}
+          <span class="text-[10px] font-mono text-[#71717a] bg-white/[0.04] px-2 py-0.5 rounded-full border border-white/10">
+            Reasoning
+          </span>
+        {/if}
         <span class="text-[10px] text-[#71717a] ml-1">▾</span>
       </button>
     {/if}

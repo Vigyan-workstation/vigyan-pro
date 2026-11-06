@@ -5,28 +5,16 @@
 
   interface Props {
     open: boolean;
-    model?: string;
-    fontSize: "sm" | "md" | "lg";
     onClose: () => void;
-    onModelChange?: (m: string) => void;
-    onFontSizeChange: (s: "sm" | "md" | "lg") => void;
   }
 
   let {
     open,
-    fontSize,
     onClose,
-    onFontSizeChange,
   }: Props = $props();
 
   let confirmReset = $state(false);
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const fontLabels: Record<"sm" | "md" | "lg", string> = {
-    sm: "Compact",
-    md: "Standard",
-    lg: "Large",
-  };
 
   function handleResetChat() {
     if (!confirmReset) {
@@ -89,33 +77,12 @@
       </div>
     </section>
 
-    <!-- Typography Size -->
-    <section>
-      <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af] block mb-2">Reading Typography</span>
-      <div class="flex gap-2 bg-[#10121a] p-1 rounded-xl border border-[rgba(255,255,255,0.08)]">
-        {#each (["sm", "md", "lg"] as ("sm" | "md" | "lg")[]) as size}
-          <button
-            type="button"
-            onclick={() => onFontSizeChange(size)}
-            class="flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer {fontSize === size
-              ? 'bg-white text-black font-semibold shadow-sm'
-              : 'text-[#9ca3af] hover:text-white'}"
-          >
-            {fontLabels[size]}
-          </button>
-        {/each}
-      </div>
-      <p class="text-[11px] text-[#6b7280] mt-1.5 leading-relaxed">
-        Adjust typography scale for formula legibility and comfortable scientific reading.
-      </p>
-    </section>
-
     <!-- Storage & Privacy -->
     <section>
       <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af] block mb-2">Storage & Privacy</span>
       <div class="bg-[#10121a] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 space-y-3">
         <p class="text-[11px] text-[#9ca3af] leading-relaxed">
-          Your conversations, mathematical proofs, and indexed documents reside exclusively in local storage on this computer.
+          Your conversations and mathematical proofs reside exclusively in local storage on this computer.
         </p>
         <button
           type="button"
@@ -138,7 +105,7 @@
           <span class="font-mono text-[10px] text-[#9ca3af]">v3.4.0</span>
         </div>
         <p class="text-[#6b7280] leading-relaxed">
-          Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS), CAD modeling, and EDA simulation.
+          Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS).
         </p>
         <div class="pt-2 border-t border-[rgba(255,255,255,0.06)] space-y-1 text-[10px]">
           <div class="flex justify-between">

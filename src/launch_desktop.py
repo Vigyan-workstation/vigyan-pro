@@ -2,7 +2,7 @@
 """
 Vigyan Pro Sovereign Studio - Native Desktop WebKitGTK Application
 Pitch-Black Obsidian STEM Studio with Smart Hybrid GPU+CPU Compute Engine,
-Embedded Neuro-Symbolic Bridge (SymPy AST + KùzuDB GraphRAG), LaTeX, and WebGL.
+Embedded Neuro-Symbolic Bridge (SymPy CAS + In-Memory Deterministic STEM Axiom Registry), LaTeX, and WebGL.
 Zero Browser Chrome. 100% Native Desktop Window.
 """
 
@@ -21,6 +21,8 @@ import subprocess
 import urllib.request
 import urllib.parse
 import secrets
+import atexit
+import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Dict, Any, List, Optional
 
@@ -28,19 +30,14 @@ from typing import Dict, Any, List, Optional
 _SESSION_TOKEN = secrets.token_hex(32)
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if _BASE_DIR not in sys.path:
-    sys.path.insert(0, _BASE_DIR)
-for _cand in [
-    os.path.join(_BASE_DIR, "knowledge_graph"),
-    _BASE_DIR,
-    os.path.expanduser("~/.vigyan/knowledge_graph"),
-]:
-    if os.path.isdir(_cand) and _cand not in sys.path:
-        sys.path.insert(0, _cand)
+_PROJECT_ROOT = os.path.abspath(os.path.join(_BASE_DIR, ".."))
+for _p in (_BASE_DIR, _PROJECT_ROOT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 _py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
 for _p in (
-    glob.glob(os.path.join(_BASE_DIR, "..", ".venv", "lib", _py_ver, "site-packages"))
+    glob.glob(os.path.join(_PROJECT_ROOT, ".venv", "lib", _py_ver, "site-packages"))
     + glob.glob(os.path.join(_BASE_DIR, ".venv", "lib", _py_ver, "site-packages"))
     + glob.glob(os.path.expanduser(f"~/.vigyan/venv/lib/{_py_ver}/site-packages"))
     + glob.glob(os.path.expanduser(f"~/.venv-rag/lib/{_py_ver}/site-packages"))
@@ -58,20 +55,9 @@ for _sys_p in (
     if os.path.isdir(_sys_p) and _sys_p not in sys.path:
         sys.path.append(_sys_p)
 
-# Set Ollama hybrid compute acceleration flags before spawning daemon
-os.environ.setdefault("OLLAMA_FLASH_ATTENTION", "1")
-os.environ.setdefault("OLLAMA_KV_CACHE_TYPE", "q8_0")
-os.environ.setdefault("OLLAMA_NUM_PARALLEL", "1")
-os.environ.setdefault("OLLAMA_IGPU_ENABLE", "1")
-os.environ.setdefault("OLLAMA_ORIGINS", "*")
-
-from ollama_supervisor import OllamaSupervisor
 from llama_supervisor import LlamaServerSupervisor
-
-try:
-    import tools
-except Exception:
-    tools = None
+from vigyan.constants import PHYSICAL_CONSTANTS, STEM_AXIOMS, search_axioms, get_curated_axioms_summary, lookup_constant
+from vigyan.tools.math import solve_math
 
 try:
     from version import __version__
@@ -276,108 +262,7 @@ def _read_power_state() -> Dict[str, Any]:
     }
 
 
-def compute_hybrid_allocation(
-    mode: str,
-    hw: Dict[str, Any],
-    gpu_metrics: Dict[str, Any],
-    power: Dict[str, Any],
-    ram_avail_gb: float,
-) -> Dict[str, Any]:
-    """
-    Smart Hybrid GPU + CPU Compute Allocator.
-    Computes optimal Ollama runtime options (num_gpu, num_thread, num_ctx, num_batch)
-    based on hardware topology, VRAM + GTT headroom, physical CPU cores, and power state.
-    """
-    mode = (mode or "auto").lower()
-    if mode not in ("auto", "max_gpu", "balanced", "cpu_eco"):
-        mode = "auto"
 
-    phys_cores = int(hw.get("physical_cores", 4))
-    ram_total_gb = float(hw.get("ram_total_gb", 8.0))
-    has_gpu = bool(gpu_metrics.get("has_gpu", False))
-    is_apu = bool(gpu_metrics.get("is_apu", False))
-    vram_total_mb = float(gpu_metrics.get("vram_total_mb", 0.0))
-    gtt_total_mb = float(gpu_metrics.get("gtt_total_mb", 0.0))
-    effective_gpu_mem_mb = vram_total_mb + (gtt_total_mb * 0.65 if is_apu else 0.0)
-    on_battery = bool(power.get("on_battery", False))
-    battery_pct = int(power.get("battery_pct", 100))
-
-    # 1. Thread allocation: bind to physical cores for peak AVX2 FMA throughput without hyperthreading contention
-    if mode == "cpu_eco":
-        num_thread = max(2, phys_cores - 2)
-    else:
-        num_thread = phys_cores
-
-    # 2. Context window & batch scaling (Vigyan-3B IQ3_M uses only 1.4GB; 4096 ctx KV cache is ~200MB)
-    if ram_total_gb < 6.0:
-        num_ctx = 2048
-        num_batch = 128
-    elif ram_total_gb < 10.0:
-        # 7-8 GB laptops (e.g., AMD Ryzen 5 7520U with 6.95 GB usable RAM)
-        num_ctx = 4096 if ram_avail_gb >= 2.0 else 2048
-        num_batch = 256
-    elif ram_total_gb < 18.0:
-        num_ctx = 8192 if ram_avail_gb >= 4.0 else 4096
-        num_batch = 512
-    else:
-        num_ctx = 16384 if mode == "max_gpu" and ram_total_gb >= 24.0 else 8192
-        num_batch = 512
-
-    # 3. Hybrid GPU + CPU Layer Split (num_gpu)
-    if mode == "cpu_eco" or not has_gpu:
-        num_gpu = 0
-        strategy_label = "CPU Eco (AVX2 Physical Cores)" if mode == "cpu_eco" else "CPU Vector Engine"
-    elif mode == "max_gpu":
-        num_gpu = 99
-        strategy_label = "Max GPU Offload (All Layers)"
-    elif mode == "balanced":
-        num_gpu = 16 if (is_apu or vram_total_mb < 6000) else 28
-        strategy_label = f"Balanced Split ({num_gpu} GPU L + {num_thread}C CPU)"
-    else:
-        # Smart Auto-Hybrid Policy ("auto")
-        if on_battery and battery_pct < 20:
-            num_gpu = 0
-            strategy_label = "Battery Saver CPU Mode"
-        elif not is_apu and vram_total_mb >= 6000:
-            num_gpu = 99
-            strategy_label = f"Full dGPU Offload ({num_thread}C Assist)"
-        elif is_apu or effective_gpu_mem_mb >= 1500:
-            if ram_avail_gb >= 3.2:
-                num_gpu = 20 if not on_battery else 12
-            elif ram_avail_gb >= 2.0:
-                num_gpu = 12 if not on_battery else 8
-            else:
-                num_gpu = 0
-            strategy_label = (
-                f"Smart APU+CPU Hybrid ({num_gpu}L GPU / {num_thread}C CPU)"
-                if num_gpu > 0
-                else f"Smart Low-RAM CPU Guard ({num_thread}C CPU)"
-            )
-        elif vram_total_mb >= 2000:
-            num_gpu = 18
-            strategy_label = f"Smart Hybrid Split ({num_gpu}L GPU / {num_thread}C CPU)"
-        else:
-            num_gpu = 0
-            strategy_label = f"Physical Core AVX ({num_thread}C CPU)"
-
-    mode_titles = {
-        "auto": "Auto Hybrid",
-        "max_gpu": "Max GPU",
-        "balanced": "Balanced Hybrid",
-        "cpu_eco": "CPU Eco",
-    }
-
-    return {
-        "mode": mode,
-        "mode_label": mode_titles.get(mode, "Auto Hybrid"),
-        "strategy_label": strategy_label,
-        "num_gpu": num_gpu,
-        "num_thread": num_thread,
-        "num_ctx": num_ctx,
-        "num_batch": num_batch,
-        "flash_attention": True,
-        "kv_cache_type": "q8_0",
-    }
 
 
 def get_system_telemetry(override_mode: Optional[str] = None) -> Dict[str, Any]:
@@ -479,15 +364,6 @@ def get_system_telemetry(override_mode: Optional[str] = None) -> Dict[str, Any]:
         "gtt_used_mb": gtt_used_mb,
         "gtt_total_mb": gtt_total_mb,
     }
-
-    hybrid = compute_hybrid_allocation(_ACTIVE_COMPUTE_MODE, hw, gpu_metrics, power, ram_avail_gb)
-    ollama_options = {
-        "num_gpu": hybrid["num_gpu"],
-        "num_thread": hybrid["num_thread"],
-        "num_ctx": hybrid["num_ctx"],
-        "num_batch": hybrid["num_batch"],
-    }
-
     return {
         "cpu_pct": cpu_pct,
         "cpu_percent": cpu_pct,
@@ -513,276 +389,18 @@ def get_system_telemetry(override_mode: Optional[str] = None) -> Dict[str, Any]:
         "effective_vram_mb": round(vram_total_mb + gtt_total_mb, 1),
         "on_battery": power["on_battery"],
         "battery_percent": power["battery_pct"],
-        "compute_mode": hybrid["mode"],
-        "strategy_label": hybrid["strategy_label"],
-        "ollama_options": ollama_options,
+        "compute_mode": _ACTIVE_COMPUTE_MODE,
+        "strategy_label": "Sovereign In-Process Vector Engine",
         "gpu": gpu_metrics,
         "power": power,
-        "hybrid": hybrid,
     }
 
 
 # ==============================================================================
-# 2. EMBEDDED NEURO-SYMBOLIC ENGINE (SYMPY AST + KÙZUDB GRAPHRAG BRIDGE)
+# 2. EMBEDDED NEURO-SYMBOLIC ENGINE (SYMPY CAS + IN-MEMORY DETERMINISTIC STEM AXIOM REGISTRY)
 # ==============================================================================
-_SYMPY_ENGINE = None
-_STEM_GRAPH = None
 
-try:
-    import sympy as sp
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
-    class _FallbackSymPyEngine:
-        def __init__(self):
-            # Standard scientific symbols across physics, math, and engineering
-            self.safe_dict = {
-                "x": sp.Symbol("x"), "y": sp.Symbol("y"), "z": sp.Symbol("z"),
-                "t": sp.Symbol("t"), "s": sp.Symbol("s"), "n": sp.Symbol("n", integer=True),
-                "k": sp.Symbol("k"), "R": sp.Symbol("R", positive=True),
-                "C": sp.Symbol("C", positive=True), "L": sp.Symbol("L", positive=True),
-                "v": sp.Symbol("v"), "u": sp.Symbol("u"), "a": sp.Symbol("a"),
-                "m": sp.Symbol("m", positive=True), "F": sp.Symbol("F"), "r": sp.Symbol("r", positive=True),
-                "p": sp.Symbol("p"), "T": sp.Symbol("T", positive=True), "w": sp.Symbol("w"),
-                "I": sp.Symbol("I"), "q": sp.Symbol("q"), "V": sp.Symbol("V"),
-                "pi": sp.pi, "e": sp.E, "E": sp.E, "oo": sp.oo, "inf": sp.oo,
-                "sin": sp.sin, "cos": sp.cos, "tan": sp.tan, "asin": sp.asin, "acos": sp.acos, "atan": sp.atan,
-                "sinh": sp.sinh, "cosh": sp.cosh, "tanh": sp.tanh, "exp": sp.exp,
-                "log": sp.log, "ln": sp.log, "sqrt": sp.sqrt, "diff": sp.diff,
-                "integrate": sp.integrate, "solve": sp.solve, "simplify": sp.simplify,
-                "expand": sp.expand, "factor": sp.factor, "limit": sp.limit,
-                "series": sp.series, "dsolve": sp.dsolve, "Matrix": sp.Matrix,
-                "Eq": sp.Eq, "symbols": sp.symbols, "Symbol": sp.Symbol,
-                "Integer": sp.Integer, "Float": sp.Float, "Rational": sp.Rational, "Number": sp.Number
-            }
-            self._cache: Dict[str, Dict[str, Any]] = {}
-            self._cache_lock = threading.Lock()
-            self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="vigyan_sympy")
-            try:
-                from sympy.parsing.sympy_parser import (
-                    parse_expr,
-                    standard_transformations,
-                    implicit_multiplication_application,
-                    convert_xor
-                )
-                self._parse_expr = parse_expr
-                self._transformations = standard_transformations + (implicit_multiplication_application, convert_xor)
-            except Exception:
-                self._parse_expr = None
-                self._transformations = None
-
-        def _clean_math_str(self, s: str) -> str:
-            s = s.strip()
-            s = s.replace("²", "**2").replace("³", "**3").replace("⁴", "**4").replace("⁻¹", "**(-1)")
-            s = s.replace("−", "-").replace("×", "*").replace("÷", "/").replace("π", "pi").replace("√", "sqrt")
-            # Disallow dangerous builtins and code execution primitives
-            disallowed = (
-                "__", "import", "eval", "exec", "open", "os", "sys", "subprocess",
-                "lambda", "globals", "locals", "getattr", "setattr", "delattr",
-                "system", "pty", "shutil", "compile", "breakpoint"
-            )
-            for bad in disallowed:
-                if bad in s.lower():
-                    return ""
-            # Syntax normalization: 2x -> 2*x (avoid scientific notation like 1e-4)
-            s = re.sub(r'(\d)(?![eE][+-]?\d)([a-zA-Z])', r'\1*\2', s)
-            s = re.sub(r'(\d)\(', r'\1*(', s)
-            s = re.sub(r'\)([\w\(])', r')*\1', s)
-            return s
-
-        def _is_safe_ast(self, expr_str: str) -> bool:
-            try:
-                tree = ast.parse(expr_str, mode="eval")
-                allowed_nodes = (
-                    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
-                    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow,
-                    ast.FloorDiv, ast.Mod, ast.UAdd, ast.USub, ast.Name,
-                    ast.Call, ast.Load, ast.Tuple, ast.List,
-                    ast.BitXor, ast.BitAnd, ast.Invert, ast.keyword
-                )
-                disallowed_names = {
-                    "import", "eval", "exec", "open", "os", "sys", "subprocess",
-                    "lambda", "globals", "locals", "getattr", "setattr", "delattr",
-                    "system", "pty", "shutil", "compile", "breakpoint", "quit", "exit"
-                }
-                for node in ast.walk(tree):
-                    if not isinstance(node, allowed_nodes):
-                        return False
-                    if isinstance(node, ast.Attribute):
-                        return False
-                    if isinstance(node, ast.Name):
-                        if node.id.startswith("__") or node.id.lower() in disallowed_names:
-                            return False
-                        # Dynamically register valid variable symbols if safe
-                        if node.id not in self.safe_dict:
-                            if re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', node.id):
-                                self.safe_dict[node.id] = sp.Symbol(node.id)
-                            else:
-                                return False
-                return True
-            except Exception:
-                return False
-
-        def _eval_core(self, s: str) -> Dict[str, Any]:
-            if self._parse_expr:
-                res = self._parse_expr(
-                    s,
-                    local_dict=self.safe_dict,
-                    global_dict={"__builtins__": {}},
-                    transformations=self._transformations
-                )
-            else:
-                res = eval(s, {"__builtins__": {}}, dict(self.safe_dict))
-
-            latex_res = sp.latex(res) if isinstance(res, (sp.Basic, sp.Matrix, list, tuple)) else str(res)
-            num = None
-            if hasattr(res, "evalf") and not getattr(res, "free_symbols", None):
-                try:
-                    num = float(res.evalf(6))
-                except Exception:
-                    num = None
-            elif isinstance(res, (int, float)):
-                num = float(res)
-            return {"success": True, "result": str(res), "latex": latex_res, "numeric_approx": num, "cached": False}
-
-        def evaluate_expression(self, expr_str: str, timeout_sec: float = 2.5) -> Dict[str, Any]:
-            s = self._clean_math_str(expr_str)
-            if not s:
-                return {"success": False, "error": "Mathematical expression contains disallowed syntax or keywords"}
-
-            import hashlib
-            cache_key = hashlib.sha256(s.encode("utf-8")).hexdigest()
-            with self._cache_lock:
-                if cache_key in self._cache:
-                    hit = dict(self._cache[cache_key])
-                    hit["cached"] = True
-                    hit["latency_ms"] = 0.0
-                    return hit
-
-            if "=" in s and not ("==" in s or "Eq" in s or "<=" in s or ">=" in s):
-                parts = s.split("=", 1)
-                s = f"solve(Eq({parts[0].strip()}, {parts[1].strip()}))"
-
-            if not self._is_safe_ast(s):
-                return {"success": False, "error": "Mathematical expression contains disallowed syntax"}
-
-            try:
-                future = self._executor.submit(self._eval_core, s)
-                out = future.result(timeout=timeout_sec)
-                with self._cache_lock:
-                    if len(self._cache) > 2048:
-                        self._cache.pop(next(iter(self._cache)))
-                    self._cache[cache_key] = out
-                return out
-            except FuturesTimeoutError:
-                return {"success": False, "error": f"Evaluation timed out after {timeout_sec}s"}
-            except Exception as exc:
-                return {"success": False, "error": f"Evaluation error: {str(exc)}"}
-
-    _SYMPY_ENGINE = _FallbackSymPyEngine()
-except Exception:
-    _SYMPY_ENGINE = None
-
-# Curated deterministic GraphRAG knowledge base (always available even if KùzuDB is locked)
-CURATED_GRAPH_AXIOMS = [
-    {
-        "keywords": ["ohm", "resistor", "voltage", "current", "resistance"],
-        "law": "Ohm's Law & Joule Heating",
-        "domain": "Circuits",
-        "equation": "V = I \\cdot R, \\quad P = I^2 R = \\frac{V^2}{R}",
-        "axiom": "Potential difference across an ideal conductor is proportional to current; microscopic form J = sigma E.",
-    },
-    {
-        "keywords": ["rc", "cutoff", "filter", "sallen", "capacitor", "time constant"],
-        "law": "RC Filter & Cutoff Frequency",
-        "domain": "Signal Processing",
-        "equation": "\\tau = R C, \\quad f_c = \\frac{1}{2\\pi R C}, \\quad H(s) = \\frac{1}{1 + s R C}",
-        "axiom": "3dB corner frequency where output power drops by 50% (-3 dB) with -45 deg phase shift.",
-    },
-    {
-        "keywords": ["rlc", "resonance", "resonant", "tank", "inductor", "q factor"],
-        "law": "RLC Resonance & Quality Factor",
-        "domain": "RF & Circuits",
-        "equation": "f_0 = \\frac{1}{2\\pi\\sqrt{LC}}, \\quad Q = \\frac{1}{R}\\sqrt{\\frac{L}{C}}",
-        "axiom": "At resonance X_L = X_C, reactive impedance cancels and energy oscillates between magnetic (L) and electric (C) fields.",
-    },
-    {
-        "keywords": ["555", "astable", "timer", "oscillator", "pwm", "duty"],
-        "law": "NE555 Astable Multivibrator Timing",
-        "domain": "Analog ICs",
-        "equation": "f = \\frac{1.44}{(R_A + 2 R_B) C}, \\quad D = \\frac{R_A + R_B}{R_A + 2 R_B}",
-        "axiom": "Capacitor charges between 1/3 Vcc and 2/3 Vcc comparator thresholds via RA+RB and discharges through RB.",
-    },
-    {
-        "keywords": ["mosfet", "saturation", "finfet", "gaa", "transistor", "vgs", "vds", "dibl", "subthreshold"],
-        "law": "MOSFET Saturation & Subthreshold Conduction",
-        "domain": "Semiconductor VLSI",
-        "equation": "I_D = \\frac{1}{2}\\mu_n C_{ox}\\frac{W}{L}(V_{GS}-V_{th})^2(1+\\lambda V_{DS}), \\quad SS = \\ln(10)\\frac{k_B T}{q}\\left(1+\\frac{C_d}{C_{ox}}\\right)",
-        "axiom": "Pinch-off saturation occurs for Vds >= Vgs - Vth; room-temperature thermionic subthreshold limit is 60 mV/decade.",
-    },
-    {
-        "keywords": ["bandgap", "silicon", "gaas", "gan", "pn", "junction", "depletion", "diode", "shockley"],
-        "law": "PN Junction Depletion & Shockley Diode Law",
-        "domain": "Solid-State Physics",
-        "equation": "I = I_s\\left(e^{\\frac{qV}{n k_B T}} - 1\\right), \\quad V_{bi} = \\frac{k_B T}{q}\\ln\\left(\\frac{N_A N_D}{n_i^2}\\right)",
-        "axiom": "Si Eg = 1.12 eV (indirect), GaAs Eg = 1.42 eV (direct), GaN Eg = 3.40 eV (wide bandgap).",
-    },
-    {
-        "keywords": ["orbit", "kepler", "satellite", "vis-viva", "gravity", "escape"],
-        "law": "Vis-Viva & Kepler's Third Law",
-        "domain": "Astrodynamics",
-        "equation": "v^2 = GM\\left(\\frac{2}{r} - \\frac{1}{a}\\right), \\quad T^2 = \\frac{4\\pi^2}{GM}a^3",
-        "axiom": "Conservation of specific orbital energy E = -GM/(2a) and angular momentum h = r x v.",
-    },
-    {
-        "keywords": ["rocket", "tsiolkovsky", "propulsion", "impulse", "delta-v"],
-        "law": "Tsiolkovsky Rocket Equation",
-        "domain": "Aerospace",
-        "equation": "\\Delta v = I_{sp} g_0 \\ln\\left(\\frac{m_0}{m_f}\\right), \\quad g_0 = 9.80665\\text{ m/s}^2",
-        "axiom": "Momentum conservation for variable-mass reaction propulsion vehicles.",
-    },
-    {
-        "keywords": ["quantum", "schrodinger", "tunneling", "wavefunction", "harmonic", "planck"],
-        "law": "Time-Independent Schrödinger Equation & Tunneling",
-        "domain": "Quantum Mechanics",
-        "equation": "-\\frac{\\hbar^2}{2m}\\nabla^2\\psi + V(\\mathbf{r})\\psi = E\\psi, \\quad E_n = \\left(n + \\frac{1}{2}\\right)\\hbar\\omega",
-        "axiom": "Wavefunction transmission through a finite barrier decays exponentially with barrier width and root height.",
-    },
-    {
-        "keywords": ["fcc", "bcc", "hcp", "perovskite", "crystal", "miller", "bragg", "xrd", "eutectic", "lattice"],
-        "law": "Bragg's Law & Crystallographic Packing",
-        "domain": "Materials Science",
-        "equation": "n\\lambda = 2 d_{hkl}\\sin\\theta, \\quad d_{hkl} = \\frac{a}{\\sqrt{h^2+k^2+l^2}}, \\quad \\text{APF}_{\\text{FCC}} = 0.74",
-        "axiom": "FCC (Cu, Al, Au) has APF=0.74 and CN=12; BCC (Fe, W) has APF=0.68 and CN=8; Pb-Sn eutectic is at 183 C, 61.9 wt% Sn.",
-    },
-    {
-        "keywords": ["dna", "helix", "protein", "membrane", "atp", "enzyme", "michaelis", "ion channel", "nernst"],
-        "law": "Nernst Potential & Michaelis-Menten Kinetics",
-        "domain": "Molecular Biology",
-        "equation": "E_{\\text{ion}} = \\frac{RT}{zF}\\ln\\frac{[\\text{Ion}]_{\\text{out}}}{[\\text{Ion}]_{\\text{in}}}, \\quad v = \\frac{V_{\\max}[S]}{K_m + [S]}",
-        "axiom": "B-DNA has 10.5 bp/turn and 3.4 nm pitch; A=T forms 2 H-bonds and G=C forms 3 H-bonds.",
-    },
-    {
-        "keywords": ["saddle", "paraboloid", "gaussian", "curvature", "hessian", "curl", "divergence", "taylor", "stokes"],
-        "law": "Gaussian Curvature, Vector Curl & Taylor Expansion",
-        "domain": "Differential Geometry & Calculus",
-        "equation": "K = \\frac{f_{xx}f_{yy} - f_{xy}^2}{(1 + f_x^2 + f_y^2)^2}, \\quad \\oint_{\\partial\\Sigma}\\mathbf{F}\\cdot d\\mathbf{r} = \\iint_{\\Sigma}(\\nabla\\times\\mathbf{F})\\cdot d\\mathbf{S}",
-        "axiom": "Hyperbolic paraboloid z = x^2/a^2 - y^2/b^2 has negative Gaussian curvature K < 0 everywhere.",
-    },
-    {
-        "keywords": ["ecg", "stemi", "sepsis", "embolism", "troponin", "lactate", "medical", "vitals", "cardiac"],
-        "law": "Hemodynamic Oxygen Delivery & Mean Arterial Pressure",
-        "domain": "Clinical Medicine",
-        "equation": "\\text{MAP} = \\text{DBP} + \\frac{1}{3}(\\text{SBP} - \\text{DBP}), \\quad DO_2 = CO \\times (1.34 \\cdot \\text{Hb} \\cdot S_aO_2 + 0.003 P_aO_2)",
-        "axiom": "STEMI exhibits ST-segment elevation in contiguous leads with elevated hs-cTnI; Septic Shock requires MAP >= 65 mmHg.",
-    },
-    {
-        "keywords": ["gear", "propeller", "heatsink", "truss", "cad", "torsion", "beam"],
-        "law": "Epicyclic Gear Ratio & Fin Heat Transfer",
-        "domain": "Mechanical Engineering",
-        "equation": "i = 1 + \\frac{Z_{\\text{ring}}}{Z_{\\text{sun}}}, \\quad q_{\\text{fin}} = \\sqrt{hPkA_c}(T_b - T_\\infty)\\tanh(mL)",
-        "axiom": "Planetary gear train distributes torque across planet pinions; microchannel fins maximize convective surface area.",
-    },
-]
 
 
 def _extract_math_expression(query: str) -> Optional[str]:
@@ -845,71 +463,58 @@ def _extract_math_expression(query: str) -> Optional[str]:
 def enrich_stem_query(query: str) -> Dict[str, Any]:
     """
     Deterministic Neuro-Symbolic Enrichment:
-    1. Evaluates exact symbolic/numerical math via SymPy AST Engine.
-    2. Retrieves multi-hop physical laws, constants, and equations via KùzuDB + Curated STEM Graph.
+    1. Evaluates exact symbolic/numerical math via SymPy CAS.
+    2. Retrieves physical laws, constants, and equations via In-Memory Deterministic STEM Axiom Registry.
     3. Returns structured badges and grounding context for the LLM or UI.
     """
     q = (query or "").strip()
     q_lower = q.lower()
 
     sympy_res = None
-    if _SYMPY_ENGINE is not None:
-        expr = _extract_math_expression(q)
-        if expr:
-            eval_out = _SYMPY_ENGINE.evaluate_expression(expr)
-            if eval_out.get("success"):
-                eval_out["expression"] = expr
-                sympy_res = eval_out
+    expr = _extract_math_expression(q)
+    if expr:
+        res = solve_math(expr, evaluate_numerical=True)
+        if res.status == "success":
+            sympy_res = {
+                "success": True,
+                "expression": expr,
+                "result": res.solution,
+                "latex": res.latex,
+                "numeric_approx": res.evaluated_numerical,
+            }
 
     matched_axioms = []
     seen_laws = set()
 
-    # Check Curated GraphRAG Knowledge Base (0.1ms, lock-free)
-    for item in CURATED_GRAPH_AXIOMS:
-        if any(kw in q_lower for kw in item["keywords"]):
-            if item["law"] not in seen_laws:
-                seen_laws.add(item["law"])
+    # Search deterministic STEM axioms & constants (zero-RAM, zero-disk, 0.01ms)
+    words = [w for w in re.findall(r"\b[A-Za-z0-9_-]{2,}\b", q) if w.lower() not in {"what", "the", "and", "for", "with", "how", "derive", "explain", "plot", "simulate", "calculate", "find", "solve"}]
+    for w in words:
+        for ax in search_axioms(w):
+            if ax["law"] not in seen_laws:
+                seen_laws.add(ax["law"])
                 matched_axioms.append({
-                    "law": item["law"],
-                    "topic": item["law"],
-                    "domain": item["domain"],
-                    "equation": item["equation"],
-                    "axiom": item["axiom"],
+                    "law": ax["law"],
+                    "topic": ax["law"],
+                    "domain": ax.get("domain", "STEM Axiom"),
+                    "equation": ax["equation"],
+                    "axiom": f"Governing equation: {ax['equation']}",
                 })
-
-    # Also query KùzuDB if available and not locked
-    global _STEM_GRAPH
-    if len(matched_axioms) < 3 and q:
-        try:
-            if _STEM_GRAPH is None:
-                from knowledge_graph.kuzu_stem_graph import VigyanSTEMGraph
-                _STEM_GRAPH = VigyanSTEMGraph()
-            if _STEM_GRAPH is not None:
-                words = [w for w in re.findall(r"\b[A-Za-z0-9_-]{3,}\b", q) if w.lower() not in {"what", "the", "and", "for", "with", "how", "derive", "explain", "plot", "simulate"}]
-                ctx_str = _STEM_GRAPH.query_multihop_context(words[:6])
-                if ctx_str:
-                    for block in ctx_str.split("- [Graph "):
-                        if not block.strip() or block.startswith("###"):
-                            continue
-                        first_line = block.splitlines()[0].strip()
-                        law_title = first_line.split("]:", 1)[-1].strip()
-                        if law_title and law_title not in seen_laws:
-                            seen_laws.add(law_title)
-                            eq_match = re.search(r"Equation:\s*(.+)", block)
-                            ax_match = re.search(r"(?:Axiom|Definition|Properties):\s*(.+)", block)
-                            matched_axioms.append({
-                                "law": law_title,
-                                "topic": law_title,
-                                "domain": "KùzuDB GraphRAG",
-                                "equation": eq_match.group(1).strip() if eq_match else "",
-                                "axiom": ax_match.group(1).strip() if ax_match else block.replace("\n", " ")[:140],
-                            })
-        except Exception:
-            pass
+        c = lookup_constant(w)
+        if c and c["name"] not in seen_laws:
+            seen_laws.add(c["name"])
+            matched_axioms.append({
+                "law": c["name"],
+                "topic": c["name"],
+                "domain": "Physical Constant",
+                "equation": f"{c['symbol']} = {c['value']} {c['unit']}",
+                "axiom": f"{c['name']} ({c['symbol']}): {c['value']} {c['unit']}",
+            })
+        if len(matched_axioms) >= 4:
+            break
 
     prompt_injection = ""
     if sympy_res or matched_axioms:
-        parts = ["[NEURO-SYMBOLIC VERIFIED GROUNDING • KùzuDB GraphRAG + SymPy AST]"]
+        parts = ["[NEURO-SYMBOLIC VERIFIED GROUNDING • Deterministic Axioms + SymPy AST]"]
         if sympy_res:
             parts.append(
                 f"• SymPy AST Exact Evaluation: `{sympy_res.get('expression')}` = `{sympy_res.get('result')}` "
@@ -919,7 +524,6 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
             parts.append(f"• [{ax['domain']}] {ax['law']}: $${ax['equation']}$$ — {ax['axiom']}")
         prompt_injection = "\n".join(parts)
 
-    telemetry = get_system_telemetry()
     sympy_str = f"{sympy_res.get('expression')} = {sympy_res.get('result')}" if sympy_res else ""
     return {
         "query": q,
@@ -928,10 +532,8 @@ def enrich_stem_query(query: str) -> Dict[str, Any]:
         "sympy_result": sympy_str,
         "graph_axioms": matched_axioms[:4],
         "axioms": matched_axioms[:4],
-        "lancedb_context": "",
         "prompt_injection": prompt_injection,
         "enriched_system_suffix": ("\n" + prompt_injection) if prompt_injection else "",
-        "hybrid": telemetry["hybrid"],
     }
 
 
@@ -1008,15 +610,6 @@ class RAMGovernor:
                         try:
                             if LLAMA_SUPERVISOR:
                                 LLAMA_SUPERVISOR.release_slot(0)
-                        except Exception:
-                            pass
-                        try:
-                            evict_req = urllib.request.Request(
-                                "http://127.0.0.1:11434/api/generate",
-                                headers={"Content-Type": "application/json"},
-                                data=json.dumps({"model": active_model, "keep_alive": 0}).encode("utf-8"),
-                            )
-                            urllib.request.urlopen(evict_req, timeout=1.5)
                         except Exception:
                             pass
                         try:
@@ -1133,260 +726,6 @@ MODELS_CATALOG = {
     }
 }
 
-
-def ensure_vigyan_3b_registered() -> bool:
-    """Autonomous verifier and auto-repair for Flagship Vigyan 3B Quad-Master in Ollama."""
-    try:
-        check = subprocess.run(["ollama", "show", "vigyan:3b"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2.0, text=True)
-        if check.returncode == 0 and "</sstream>" in check.stdout and "4096" in check.stdout:
-            return True
-    except Exception:
-        pass
-
-    target_dir = os.path.expanduser("~/.vigyan/models")
-    os.makedirs(target_dir, exist_ok=True)
-    gguf_path = os.path.join(target_dir, "vigyan-3b-quad-master-iq3_m.gguf")
-
-    if not os.path.isfile(gguf_path) or os.path.getsize(gguf_path) < 1_000_000_000:
-        candidates = MODELS_CATALOG.get("vigyan:3b", {}).get("local_candidates", [])
-        found_local = None
-        for cand in candidates:
-            if cand and os.path.isfile(cand) and os.path.getsize(cand) >= 1_000_000_000:
-                found_local = cand
-                break
-
-        if found_local:
-            print(f"[INFO] Discovered bundled 3B sovereign model weights at: {found_local}", file=sys.stderr)
-            if os.path.abspath(found_local) != os.path.abspath(gguf_path):
-                try:
-                    import shutil
-                    print("[INFO] Importing 3B sovereign model into ~/.vigyan/models/...", file=sys.stderr)
-                    shutil.copy2(found_local, gguf_path)
-                except Exception:
-                    gguf_path = found_local
-            else:
-                gguf_path = found_local
-        else:
-            token_path = os.path.expanduser("~/.cache/huggingface/token")
-            hf_token = ""
-            if os.path.isfile(token_path):
-                try:
-                    with open(token_path, "r", encoding="utf-8") as f:
-                        hf_token = f.read().strip()
-                except Exception:
-                    pass
-            try:
-                from huggingface_hub import hf_hub_download
-                print("[INFO] Auto-repair: Downloading vigyan-3b-quad-master from Hugging Face...", file=sys.stderr)
-                hf_hub_download(
-                    repo_id="shreyansh12183/vigyan-3b-quad-master",
-                    filename="vigyan-3b-quad-master-iq3_m.gguf",
-                    token=hf_token or None,
-                    local_dir=target_dir
-                )
-            except Exception as e:
-                print(f"[WARN] 3B HF auto-repair download error: {e}", file=sys.stderr)
-                return False
-
-    modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-3b")
-    modelfile_content = (
-        f'FROM "{gguf_path}"\n'
-        'TEMPLATE """{{- if .System }}<|im_start|>system\n'
-        "{{ .System }}<|im_end|>\n"
-        '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
-        "{{ .Content }}<|im_end|>\n"
-        '{{ end }}<|im_start|>assistant\n'
-        '"""\n'
-        'SYSTEM """You are Vigyan 3B Quad-Master, the sovereign flagship STEM, mathematical proof, physics simulation, and engineering intelligence system architected by Shreyansh Singh. Deliver closed-form mathematical solutions, verified SymPy AST proofs, and exact engineering calculations with 100% offline edge privacy and zero corporate API dependency."""\n'
-        'PARAMETER stop "<|im_start|>"\n'
-        'PARAMETER stop "<|im_end|>"\n'
-        'PARAMETER stop "<|endoftext|>"\n'
-        'PARAMETER stop "</sstream>"\n'
-        'PARAMETER stop "<solution>"\n'
-        'PARAMETER stop "</solution>"\n'
-        'PARAMETER stop "User:"\n'
-        'PARAMETER stop "\\n\\nUser"\n'
-        'PARAMETER stop "Human:"\n'
-        "PARAMETER num_gpu 0\n"
-        "PARAMETER num_thread 4\n"
-        "PARAMETER num_batch 256\n"
-        "PARAMETER num_ctx 4096\n"
-        "PARAMETER repeat_penalty 1.15\n"
-        "PARAMETER repeat_last_n 64\n"
-        "PARAMETER temperature 0.2\n"
-        "PARAMETER top_p 0.95\n"
-        "PARAMETER top_k 40\n"
-    )
-    with open(modelfile_path, "w", encoding="utf-8") as mf:
-        mf.write(modelfile_content)
-
-    try:
-        print("[INFO] Auto-repair: Registering vigyan:3b into Ollama with STEM reasoning parameters...", file=sys.stderr)
-        res = subprocess.run(["ollama", "create", "vigyan:3b", "-f", modelfile_path], capture_output=True, timeout=180)
-        return res.returncode == 0
-    except Exception as e:
-        print(f"[WARN] Ollama 3B registration error: {e}", file=sys.stderr)
-        return False
-
-
-class ModelDownloadManager:
-    """Resumable chunked model downloader with speed tracking and Ollama auto-registration."""
-    def __init__(self):
-        self.active_downloads: Dict[str, Dict[str, Any]] = {}
-        self._lock = threading.Lock()
-
-    def get_status(self, tag: Optional[str] = None) -> Dict[str, Any]:
-        with self._lock:
-            if tag:
-                return self.active_downloads.get(tag, {"status": "idle"})
-            return dict(self.active_downloads)
-
-    def start_download(self, tag: str) -> Dict[str, Any]:
-        info = MODELS_CATALOG.get(tag)
-        if not info:
-            return {"success": False, "error": f"Unknown model: {tag}"}
-
-        with self._lock:
-            if tag in self.active_downloads and self.active_downloads[tag]["status"] in ("downloading", "registering"):
-                return {"success": True, "message": "Already downloading", "status": self.active_downloads[tag]}
-            self.active_downloads[tag] = {
-                "tag": tag,
-                "name": info["name"],
-                "status": "starting",
-                "progress_pct": 0.0,
-                "downloaded_bytes": 0,
-                "total_bytes": info["size_bytes"],
-                "speed_mbps": 0.0,
-                "error": None
-            }
-
-        # 0. Check if model already exists in Ollama
-        try:
-            check_proc = subprocess.run(["ollama", "show", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.8)
-            if check_proc.returncode == 0:
-                with self._lock:
-                    self.active_downloads[tag] = {
-                        "tag": tag,
-                        "name": info["name"],
-                        "status": "ready",
-                        "progress_pct": 100.0,
-                        "downloaded_bytes": info["size_bytes"],
-                        "total_bytes": info["size_bytes"],
-                        "speed_mbps": 0.0,
-                        "error": None
-                    }
-                return {"success": True, "message": f"{tag} is already installed in Ollama", "status": "ready"}
-        except Exception:
-            pass
-
-        # Check local candidate files first (instant local import)
-        for cand in info.get("local_candidates", []):
-            if os.path.isfile(cand) and os.path.getsize(cand) > 100_000_000:
-                def _instant_register():
-                    with self._lock:
-                        self.active_downloads[tag]["status"] = "registering"
-                        self.active_downloads[tag]["progress_pct"] = 100.0
-                    target_dir = os.path.expanduser("~/.vigyan/models")
-                    os.makedirs(target_dir, exist_ok=True)
-                    dest_file = cand
-                    # Register into Ollama directly
-                    modelfile_path = os.path.join(target_dir, f"Modelfile.{tag.replace(':', '_')}")
-                    with open(modelfile_path, "w", encoding="utf-8") as mf:
-                        mf.write(f"FROM {dest_file}\nTEMPLATE \"\"\"{info['template']}\"\"\"\n")
-                        for s in info.get("stop", []):
-                            mf.write(f"PARAMETER stop \"{s}\"\n")
-                    subprocess.run(["ollama", "create", tag, "-f", modelfile_path], check=False)
-                    with self._lock:
-                        self.active_downloads[tag]["status"] = "ready"
-                threading.Thread(target=_instant_register, daemon=True).start()
-                return {"success": True, "message": "Found local weights, registering into Ollama...", "status": "registering"}
-
-        # Background resumable download thread
-        def _download_thread():
-            target_dir = os.path.expanduser("~/.vigyan/models")
-            os.makedirs(target_dir, exist_ok=True)
-            dest_file = os.path.join(target_dir, info["dest_filename"])
-            part_file = dest_file + ".part"
-
-            existing_bytes = os.path.getsize(part_file) if os.path.exists(part_file) else 0
-            headers = {"User-Agent": "Vigyan-Desktop-Sovereign-Downloader/1.0"}
-            if existing_bytes > 0:
-                headers["Range"] = f"bytes={existing_bytes}-"
-
-            try:
-                with self._lock:
-                    self.active_downloads[tag]["status"] = "downloading"
-                    self.active_downloads[tag]["downloaded_bytes"] = existing_bytes
-
-                req = urllib.request.Request(info["hf_url"], headers=headers)
-                start_time = time.time()
-                bytes_this_session = 0
-
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    total = info["size_bytes"]
-                    cr = resp.headers.get("Content-Range")
-                    if cr and "/" in cr:
-                        try:
-                            total = int(cr.split("/")[-1])
-                        except Exception:
-                            pass
-                    elif resp.headers.get("Content-Length") and existing_bytes == 0:
-                        total = int(resp.headers.get("Content-Length"))
-
-                    mode = "ab" if existing_bytes > 0 else "wb"
-                    with open(part_file, mode) as f:
-                        while True:
-                            with self._lock:
-                                if self.active_downloads.get(tag, {}).get("status") == "cancelled":
-                                    return
-                            chunk = resp.read(1024 * 256)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                            bytes_this_session += len(chunk)
-                            current_total = existing_bytes + bytes_this_session
-                            elapsed = max(0.1, time.time() - start_time)
-                            speed_mbps = (bytes_this_session / (1024 * 1024)) / elapsed
-                            pct = min(99.0, round((current_total / max(1, total)) * 100, 1))
-
-                            with self._lock:
-                                self.active_downloads[tag]["downloaded_bytes"] = current_total
-                                self.active_downloads[tag]["total_bytes"] = total
-                                self.active_downloads[tag]["progress_pct"] = pct
-                                self.active_downloads[tag]["speed_mbps"] = round(speed_mbps, 1)
-
-                os.rename(part_file, dest_file)
-                with self._lock:
-                    self.active_downloads[tag]["status"] = "registering"
-                    self.active_downloads[tag]["progress_pct"] = 100.0
-
-                modelfile_path = os.path.join(target_dir, f"Modelfile.{tag.replace(':', '_')}")
-                with open(modelfile_path, "w", encoding="utf-8") as mf:
-                    mf.write(f"FROM {dest_file}\nTEMPLATE \"\"\"{info['template']}\"\"\"\n")
-                    for s in info.get("stop", []):
-                        mf.write(f"PARAMETER stop \"{s}\"\n")
-                subprocess.run(["ollama", "create", tag, "-f", modelfile_path], check=False)
-
-                with self._lock:
-                    self.active_downloads[tag]["status"] = "ready"
-
-            except Exception as exc:
-                with self._lock:
-                    self.active_downloads[tag]["status"] = "error"
-                    self.active_downloads[tag]["error"] = str(exc)
-
-        threading.Thread(target=_download_thread, daemon=True).start()
-        return {"success": True, "message": "Download started", "tag": tag}
-
-    def cancel_download(self, tag: str) -> bool:
-        with self._lock:
-            if tag in self.active_downloads:
-                self.active_downloads[tag]["status"] = "cancelled"
-                return True
-            return False
-
-
-_DOWNLOAD_MGR = ModelDownloadManager()
 
 
 
@@ -1856,13 +1195,16 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
         if self.path.startswith("/health"):
             tel = get_system_telemetry()
             payload = dict(tel)
+            ram_pct = tel.get("ram_used_pct", tel.get("ram_pct", get_current_ram_percent()))
             payload.update({
                 "status": "online",
+                "version": "v3.4.0",
                 "agent": "Vigyan-Sovereign-Neuro-Symbolic-Bridge",
                 "llama_server": LLAMA_SUPERVISOR.is_healthy(),
-                "sympy": _SYMPY_ENGINE is not None,
-                "kuzudb": True,
+                "sympy": True,
                 "ram_governor": {"active": True, "threshold_pct": 88.0},
+                "ram_used_pct": ram_pct,
+                "ram_pct": ram_pct,
                 "telemetry": tel,
             })
             self._send_cors(200)
@@ -1885,10 +1227,19 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 "models": list(MODELS_CATALOG.values()),
                 "recommended_tag": rec_tag,
                 "system_ram_gb": ram_gb,
-                "downloads": _DOWNLOAD_MGR.get_status()
+                "downloads": {}
             }
             self._send_cors(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/ledger/list"):
+            import vigyan.ledger
+            active_rules = vigyan.ledger.get_active_rules()
+            tel = vigyan.ledger.get_budget_telemetry()
+            self._send_cors(200)
+            self.wfile.write(json.dumps({"success": True, "rules": active_rules, "telemetry": tel}).encode("utf-8"))
+            return
         else:
             # Universal cross-platform static file serving (dist/ priority then src/)
             clean_path = self.path.split("?")[0]
@@ -1957,28 +1308,19 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
         except Exception:
             body = {}
 
-        if self.path.startswith("/api/ingest/file"):
-            import ingest_engine
-            filename = body.get("filename", "document.txt")
-            image_b64 = body.get("image_base64", "")
-            pdf_b64 = body.get("pdf_base64", "")
-            content = body.get("content", "")
+        if self.path.startswith("/api/ledger/learn"):
+            import vigyan.ledger
+            rule_text = body.get("rule", "")
+            cat = body.get("category", "auto")
+            res = vigyan.ledger.add_rule(rule_text, category=cat)
+            self._send_cors(200)
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
 
-            raw_text = content
-            if image_b64:
-                try:
-                    img_bytes = base64.b64decode(image_b64)
-                    raw_text = ingest_engine.extract_text_from_image_bytes(img_bytes)
-                except Exception:
-                    raw_text = ""
-            elif pdf_b64:
-                try:
-                    pdf_bytes = base64.b64decode(pdf_b64)
-                    raw_text = ingest_engine.extract_text_from_pdf_bytes(pdf_bytes)
-                except Exception:
-                    raw_text = ""
-
-            res = ingest_engine.analyze_ingested_content(filename, raw_text)
+        if self.path.startswith("/api/ledger/undo"):
+            import vigyan.ledger
+            rule_id = body.get("id") or body.get("rule_id", "")
+            res = vigyan.ledger.undo_rule(rule_id)
             self._send_cors(200)
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
@@ -2039,22 +1381,31 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 cites = [f"[{a['domain']}: {a['law']}] {a['equation']}" for a in enrichment["graph_axioms"]]
                 _emit("memory", "<br>• " + "<br>• ".join(cites))
 
-            tool_spec = ""
-            try:
-                import tools
-                tool_spec = "\n" + tools.get_tool_schemas_prompt()
-            except Exception:
-                pass
+            tool_spec = (
+                "\n\nYou have access to the following deterministic STEM AST tools when requested:\n"
+                "- plot_function: {\"name\": \"plot_function\", \"arguments\": {\"expression\": \"sin(x)\", \"x_min\": -5.0, \"x_max\": 5.0, \"points\": 100}}\n"
+                "- circuit_calc: {\"name\": \"circuit_calc\", \"arguments\": {\"circuit_type\": \"rc_filter|rlc_resonance|555_astable\", \"params\": {\"r\": 10000, \"c\": 1e-7}}}\n"
+                "- physics_sim: {\"name\": \"physics_sim\", \"arguments\": {\"sim_type\": \"kepler_orbit|projectile\", \"params\": {...}}}\n"
+                "To invoke a tool, emit: <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call>"
+            )
 
             sys_prompt = (
                 "You are Vigyan AI, a sovereign STEM, math, and physics intelligence system architected by Shreyansh Singh. "
                 "Solve problems with mathematical precision, concise explanations, and clean LaTeX ($$...$$). Be direct, rigorous, and professional. "
-                "When requested to synthesize digital bus waveforms, PCB netlists, or verify mathematical plots and formulas, emit structured <tool_call> JSON specifications."
+                "When requested to synthesize electrical circuits, physics simulations, or function plots, emit structured <tool_call> JSON specifications."
                 f"{tool_spec}"
             )
             if enrichment.get("sympy"):
                 s = enrichment["sympy"]
                 sys_prompt += f"\n[SymPy Verified Grounding]: {s.get('expression')} = {s.get('result')}"
+
+            try:
+                import vigyan.ledger
+                ledger_injection = vigyan.ledger.get_prompt_injection()
+                if ledger_injection:
+                    sys_prompt += f"\n\n{ledger_injection}"
+            except Exception:
+                pass
 
             # Sovereign Offline Ollama with RAM Governor
             cascade = select_cascade_model(requested_model, user_query)
@@ -2065,7 +1416,6 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 _emit("think", f"[RAM Guard]: System routed to {active_model} Sovereign Engine.\n")
 
             try:
-                hybrid = enrichment["hybrid"]
                 user_ctx = None
                 try:
                     if body.get("num_ctx"):
@@ -2076,7 +1426,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     user_ctx = None
 
                 # RAM-Safe Dynamic Context Budget Clamping (Default 4096, scalable to 8192)
-                target_ctx = user_ctx or hybrid.get("num_ctx", 4096)
+                target_ctx = user_ctx or 4096
                 avail_ram = telemetry.get("ram_avail_gb", 4.0)
                 if target_ctx > 8192 and avail_ram < 5.0:
                     target_ctx = 8192
@@ -2204,73 +1554,29 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                                     continue
                 except Exception as ls_exc:
                     last_llama_exc = str(ls_exc)
-                    print(f"[WARN] llama-server stream unavailable: {ls_exc}; trying Ollama fallback", file=sys.stderr)
+                    print(f"[WARN] llama-server stream unavailable: {ls_exc}", file=sys.stderr)
 
                 if not streamed_from_llama and not governor_tripped[0]:
-                    # Fallback to local Ollama daemon if available
-                    try:
-                        ollama_payload = {
-                            "model": active_model,
-                            "messages": model_messages,
-                            "options": {
-                                "num_gpu": hybrid["num_gpu"],
-                                "num_thread": hybrid["num_thread"],
-                                "num_ctx": target_ctx,
-                                "num_batch": hybrid.get("num_batch", 256),
-                                "num_predict": min(target_ctx, 4096),
-                                "repeat_penalty": 1.15,
-                                "repeat_last_n": 64,
-                                "temperature": user_temp,
-                                "stop": stop_sequences,
-                            },
-                            "stream": True,
-                        }
-                        req = urllib.request.Request(
-                            "http://127.0.0.1:11434/api/chat",
-                            headers={"Content-Type": "application/json"},
-                            data=json.dumps(ollama_payload).encode("utf-8"),
+                    hb_stop.set()
+                    if enrichment.get("sympy"):
+                        s = enrichment["sympy"]
+                        fallback = (
+                            f"### Exact Closed-Form Symbolic Solution\n\n"
+                            f"**Evaluated AST:** `{s.get('expression')}`\n\n"
+                            f"$$\\mathbf{{{s.get('latex')}}}$$\n\n"
+                            f"**Numerical Approximation:** `{s.get('numeric_approx')}`\n"
                         )
-                        with urllib.request.urlopen(req, timeout=180) as resp:
-                            hb_stop.set()
-                            _emit("status", {"type": "ready", "message": "Inference stream active (fallback)"})
-                            for line in resp:
-                                if governor_tripped[0] or not client_connected[0]:
-                                    break
-                                line_s = line.decode("utf-8").strip()
-                                if not line_s:
-                                    continue
-                                chunk = json.loads(line_s)
-                                tok = chunk.get("message", {}).get("content", "")
-                                if tok:
-                                    if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
-                                        clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
-                                        if clean_tok.strip():
-                                            accumulated_text += clean_tok
-                                            _emit("token", clean_tok)
-                                        break
-                                    accumulated_text += tok
-                                    _emit("token", tok)
-                    except Exception as ollama_exc:
-                        hb_stop.set()
-                        if enrichment.get("sympy"):
-                            s = enrichment["sympy"]
-                            fallback = (
-                                f"### Exact Closed-Form Symbolic Solution\n\n"
-                                f"**Evaluated AST:** `{s.get('expression')}`\n\n"
-                                f"$$\\mathbf{{{s.get('latex')}}}$$\n\n"
-                                f"**Numerical Approximation:** `{s.get('numeric_approx')}`\n"
-                            )
-                            _emit("token", fallback)
-                        elif enrichment.get("graph_axioms"):
-                            ax = enrichment["graph_axioms"][0]
-                            fallback = (
-                                f"### {ax['law']} ({ax['domain']})\n\n"
-                                f"$$\\mathbf{{{ax['equation']}}}$$\n\n"
-                                f"{ax['axiom']}\n"
-                            )
-                            _emit("token", fallback)
-                        else:
-                            _emit("token", f"[Neuro-Symbolic Engine Initializing: {last_llama_exc or 'Inference server starting...'}]")
+                        _emit("token", fallback)
+                    elif enrichment.get("graph_axioms"):
+                        ax = enrichment["graph_axioms"][0]
+                        fallback = (
+                            f"### {ax['law']} ({ax['domain']})\n\n"
+                            f"$$\\mathbf{{{ax['equation']}}}$$\n\n"
+                            f"{ax['axiom']}\n"
+                        )
+                        _emit("token", fallback)
+                    else:
+                        _emit("token", f"[Vigyan Offline Model: Initializing local weights on llama-server...]")
 
                 governor.stop()
                 hb_stop.set()
@@ -2313,16 +1619,22 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 t_args = t_data.get("arguments", {})
                 if t_name == "sympy_eval":
                     expr = t_args.get("expression", "")
-                    if _SYMPY_ENGINE:
-                        eval_res = _SYMPY_ENGINE.evaluate_expression(expr)
-                        emit_fn("sympy", f"$${eval_res.get('latex', eval_res.get('result'))}$$")
+                    math_res = solve_math(expr, evaluate_numerical=True)
+                    if math_res.status == "success":
+                        emit_fn("sympy", f"$${math_res.latex or math_res.solution}$$")
                         emit_fn("tool_result", {
                             "tool": "sympy_eval",
                             "success": True,
                             "expression": expr,
-                            "result": eval_res.get("result", ""),
-                            "latex": eval_res.get("latex", ""),
-                            "numeric": eval_res.get("numeric_approx", "")
+                            "result": math_res.solution,
+                            "latex": math_res.latex,
+                            "numeric": math_res.evaluated_numerical
+                        })
+                    else:
+                        emit_fn("tool_result", {
+                            "tool": "sympy_eval",
+                            "success": False,
+                            "error": f"Failed to derive expression: {expr}"
                         })
                 elif t_name == "plot_function":
                     expr = t_args.get("expression", "x**2")
@@ -2344,35 +1656,6 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     sparams = t_args.get("params") if isinstance(t_args.get("params"), dict) else t_args
                     phys_res = calc_physics(stype, sparams)
                     emit_fn("tool_result", phys_res)
-                elif t_name in ("cad_synthesize", "cad_openscad", "openscad"):
-                    try:
-                        from vigyan.tools.cad import synthesize_cad
-                        spec = t_args.get("spec", t_args.get("prompt", ""))
-                        cad_res = synthesize_cad(spec)
-                        emit_fn("tool_result", {
-                            "tool": "cad_synthesize",
-                            "success": cad_res.status == "success",
-                            "stdout": cad_res.stdout,
-                            "code": cad_res.code
-                        })
-                    except Exception as e:
-                        emit_fn("tool_result", {"tool": "cad_synthesize", "success": False, "error": str(e)})
-                elif t_name in ("rtl_synthesize", "verilog", "eda_verilog"):
-                    try:
-                        from vigyan.tools.rtl import generate_rtl
-                        spec = t_args.get("spec", t_args.get("prompt", ""))
-                        rtl_res = generate_rtl(spec)
-                        emit_fn("tool_result", {
-                            "tool": "rtl_synthesize",
-                            "success": rtl_res.status == "success",
-                            "stdout": rtl_res.stdout,
-                            "code": rtl_res.code
-                        })
-                    except Exception as e:
-                        emit_fn("tool_result", {"tool": "rtl_synthesize", "success": False, "error": str(e)})
-                elif tools and t_name in tools.get_all_tools():
-                    tool_res = tools.dispatch_tool(t_name, t_args)
-                    emit_fn("tool_result", tool_res)
             except Exception:
                 pass
 
@@ -2411,18 +1694,14 @@ def _watch_llama_server() -> bool:
     return True
 
 
-# Backward compatibility shims
-OLLAMA = LLAMA_SUPERVISOR
-ensure_ollama_daemon = ensure_llama_server
-_watch_ollama = _watch_llama_server
-
 
 def main():
-    # Lower process priority to nice 10 to yield CPU cycles to foreground user apps
-    try:
-        os.nice(10)
-    except Exception:
-        pass
+    if "--check-only" in sys.argv:
+        print("[*] Vigyan Pro desktop dependencies and environment verified.")
+        return
+
+    # Register supervisor cleanup on process exit
+    atexit.register(LLAMA_SUPERVISOR.stop)
 
     import gi
     gi.require_version('Gtk', '3.0')

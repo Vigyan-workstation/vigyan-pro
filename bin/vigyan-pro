@@ -25,10 +25,13 @@ done
 
 # 3. Dynamic discovery of desktop runtime
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/../src/launch_desktop.py" ]; then
-    exec "$PYTHON_BIN" "$SCRIPT_DIR/../src/launch_desktop.py" "$@"
-elif [ -f "/opt/vigyan-pro/src/launch_desktop.py" ]; then
-    exec "$PYTHON_BIN" "/opt/vigyan-pro/src/launch_desktop.py" "$@"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "$ROOT_DIR/run.py" ]; then
+    exec "$PYTHON_BIN" "$ROOT_DIR/run.py" "$@"
+elif [ -f "$ROOT_DIR/src/launch_desktop.py" ]; then
+    exec "$PYTHON_BIN" "$ROOT_DIR/src/launch_desktop.py" "$@"
+elif [ -f "/opt/vigyan-pro/run.py" ]; then
+    exec "$PYTHON_BIN" "/opt/vigyan-pro/run.py" "$@"
 else
     exec "$PYTHON_BIN" "$HOME/.vigyan/desktop/launch_desktop.py" "$@"
 fi

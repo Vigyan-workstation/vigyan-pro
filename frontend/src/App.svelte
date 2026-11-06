@@ -5,10 +5,12 @@
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
+  import LedgerDrawer from "./components/LedgerDrawer.svelte";
   import { checkOllamaStatus, fetchTelemetry, DEFAULT_MODEL } from "./lib/ollama";
   import { chatStore } from "./lib/chatStore.svelte";
 
   let settingsOpen = $state(false);
+  let ledgerOpen = $state(false);
   let ollamaConnected = $state(false);
   let model = $state(DEFAULT_MODEL);
   let fontSize = $state<"sm" | "md" | "lg">("md");
@@ -24,11 +26,15 @@
       if (isMeta && e.key.toLowerCase() === "k") {
         e.preventDefault();
         chatStore.clear();
+      } else if (isMeta && e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        ledgerOpen = !ledgerOpen;
       } else if (isMeta && e.key === ",") {
         e.preventDefault();
         settingsOpen = !settingsOpen;
-      } else if (e.key === "Escape" && settingsOpen) {
-        settingsOpen = false;
+      } else if (e.key === "Escape") {
+        if (settingsOpen) settingsOpen = false;
+        if (ledgerOpen) ledgerOpen = false;
       }
     };
     window.addEventListener("keydown", handleGlobalKeydown);
@@ -37,7 +43,8 @@
       ollamaConnected = await checkOllamaStatus();
       const tel = await fetchTelemetry();
       if (tel) {
-        if (tel.ram_used_pct) ramPercent = Math.round(tel.ram_used_pct);
+        const ramP = tel.ram_used_pct ?? tel.ram_pct;
+        if (ramP !== undefined) ramPercent = Math.round(ramP);
         if (tel.ram_total_gb) ramTotalGb = Math.round(tel.ram_total_gb * 10) / 10;
         if (tel.ram_avail_gb) {
           ramUsedGb = Math.round((ramTotalGb - tel.ram_avail_gb) * 10) / 10;
@@ -66,7 +73,7 @@
         </svg>
       </div>
       <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
-      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-[#9ca3af]">v3.3</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-[#9ca3af]">v4.0</span>
     </div>
 
     <!-- Center: Whisper-Quiet Status Capsule -->
@@ -99,6 +106,15 @@
       {/if}
 
       <button
+        onclick={() => (ledgerOpen = !ledgerOpen)}
+        class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.08]"
+        title="Learning Ledger (Cmd+L)"
+      >
+        <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8]"></span>
+        <span>Ledger</span>
+      </button>
+
+      <button
         onclick={() => (settingsOpen = !settingsOpen)}
         class="w-7 h-7 flex items-center justify-center rounded-lg text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer"
         aria-label="Preferences"
@@ -120,14 +136,16 @@
     <Chat {model} {fontSize} />
   </main>
 
+  <!-- Learning Ledger Slide-in Drawer -->
+  <LedgerDrawer
+    open={ledgerOpen}
+    onClose={() => (ledgerOpen = false)}
+  />
+
   <!-- Settings Slide-in Drawer -->
   <SettingsPanel
     open={settingsOpen}
-    {model}
-    {fontSize}
     onClose={() => (settingsOpen = false)}
-    onModelChange={(m) => (model = m)}
-    onFontSizeChange={(s) => (fontSize = s)}
   />
 
 </div>

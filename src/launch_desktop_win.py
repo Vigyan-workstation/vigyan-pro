@@ -9,11 +9,6 @@ import sys
 import os
 import subprocess
 
-# Set Ollama hybrid compute acceleration flags before spawning daemon
-os.environ.setdefault("OLLAMA_FLASH_ATTENTION", "1")
-os.environ.setdefault("OLLAMA_KV_CACHE_TYPE", "q8_0")
-os.environ.setdefault("OLLAMA_NUM_PARALLEL", "1")
-
 try:
     import psutil
 except ImportError:

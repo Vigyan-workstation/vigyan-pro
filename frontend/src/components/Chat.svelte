@@ -2,66 +2,25 @@
   // Chat.svelte — Sovereign Centered Reading Workspace with Floating Bottom Input
   // Obsidian Titanium monochrome styling for focused scientific derivation.
   import { onMount } from "svelte";
-  import { streamChat, DEFAULT_MODEL, getAgentHost, getVigyanToken } from "../lib/ollama";
+  import { streamChat, DEFAULT_MODEL } from "../lib/ollama";
   import { chatStore } from "../lib/chatStore.svelte";
   import ThinkingBlock from "./ThinkingBlock.svelte";
   import MessageBubble from "./MessageBubble.svelte";
 
   interface Props {
     model: string;
-    fontSize: "sm" | "md" | "lg";
+    fontSize?: "sm" | "md" | "lg";
   }
-  let { model, fontSize }: Props = $props();
+  let { model, fontSize = "md" }: Props = $props();
 
   let input = $state("");
   let isStreaming = $state(false);
   let abortController: AbortController | null = null;
   let scrollEl: HTMLElement | null = null;
   let textareaEl: HTMLTextAreaElement | null = $state(null);
-  let fileInputEl: HTMLInputElement | null = $state(null);
-  let isDragging = $state(false);
 
   onMount(() => {
     scrollToBottom();
-
-    let dragCounter = 0;
-    const onWindowDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounter++;
-      isDragging = true;
-    };
-    const onWindowDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounter--;
-      if (dragCounter <= 0) {
-        dragCounter = 0;
-        isDragging = false;
-      }
-    };
-    const onWindowDragOver = (e: DragEvent) => {
-      e.preventDefault();
-    };
-    const onWindowDrop = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounter = 0;
-      isDragging = false;
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        processIngestedFile(files[0]);
-      }
-    };
-
-    window.addEventListener("dragenter", onWindowDragEnter);
-    window.addEventListener("dragleave", onWindowDragLeave);
-    window.addEventListener("dragover", onWindowDragOver);
-    window.addEventListener("drop", onWindowDrop);
-
-    return () => {
-      window.removeEventListener("dragenter", onWindowDragEnter);
-      window.removeEventListener("dragleave", onWindowDragLeave);
-      window.removeEventListener("dragover", onWindowDragOver);
-      window.removeEventListener("drop", onWindowDrop);
-    };
   });
 
   function autoResize() {
@@ -71,245 +30,11 @@
   }
 
   const STARTERS = [
-    { icon: "⚡", label: "Transient Analysis", prompt: "Derive and plot the step response of an underdamped series RLC circuit with R=20Ω, L=0.1H, and C=100µF." },
-    { icon: "∫", label: "Symbolic Calculus", prompt: "Evaluate the integral of x^2 * exp(-x) dx from 0 to infinity with full step-by-step derivation." },
-    { icon: "⚛", label: "Quantum Tunneling", prompt: "Derive the transmission coefficient for quantum tunneling through a rectangular finite potential barrier." },
-    { icon: "∂", label: "Damped Oscillation", prompt: "Plot the damped oscillation curve exp(-0.15*x)*cos(2*x) from x = 0 to 25." },
+    { badge: "RLC", label: "Transient Analysis", prompt: "Derive the step response and damping ratio of an underdamped series RLC circuit with R=20 Ohm, L=0.1 H, and C=100 uF." },
+    { badge: "CAS", label: "Symbolic Calculus", prompt: "Evaluate the analytical integral of x^2 * exp(-x) dx from 0 to infinity using step-by-step SymPy derivation." },
+    { badge: "QM", label: "Quantum Tunneling", prompt: "Derive the transmission coefficient T for quantum tunneling through a rectangular finite potential barrier of width a and height V0." },
+    { badge: "ODE", label: "Harmonic Oscillation", prompt: "Solve the second-order differential equation m*x''(t) + c*x'(t) + k*x(t) = 0 for initial conditions x(0)=x0, x'(0)=0." },
   ];
-
-  function handleFileDrop(e: DragEvent) {
-    e.preventDefault();
-    isDragging = false;
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      processIngestedFile(files[0]);
-    }
-  }
-
-  function handleFileInputChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      processIngestedFile(input.files[0]);
-    }
-  }
-
-  async function processIngestedFile(file: File) {
-    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name);
-    const isPDF = file.type === "application/pdf" || file.name.endsWith(".pdf");
-
-    if (isImage) {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = String(reader.result || "");
-        const base64 = dataUrl.split(",")[1] || "";
-
-        chatStore.messages.push({
-          id: uid(),
-          role: "user",
-          content: `Attached image '${file.name}' for analysis.`,
-          thinking: "",
-          thinkingDone: true,
-          streaming: false,
-          attachment: {
-            name: file.name,
-            size: file.size,
-            type: "image",
-            dataUrl,
-          },
-        });
-        chatStore.save();
-        scrollToBottom();
-
-        try {
-          const host = getAgentHost();
-          const token = getVigyanToken();
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (token) headers["X-Vigyan-Token"] = token;
-
-          const res = await fetch(`${host}/api/ingest/file`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              filename: file.name,
-              image_base64: base64,
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            const extracted = data.text || data.summary || "";
-            if (extracted) {
-              const snippet = extracted.slice(0, 2000);
-              input = input ? `[Context: ${file.name}]\n${snippet}\n\n${input}` : `Analyze specifications from '${file.name}':\n\n${snippet}\n\n`;
-              autoResize();
-            }
-            chatStore.messages.push({
-              id: uid(),
-              role: "assistant",
-              content: data.text || "Image processed successfully on-device.",
-              thinking: "Extracted parameters locally with private on-device analysis.\n",
-              thinkingDone: true,
-              streaming: false,
-              digest: {
-                filename: file.name,
-                summary: data.summary || "Extracted parameters from attached image.",
-                metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Plot Parameter Curve"],
-              },
-            });
-            chatStore.save();
-            scrollToBottom();
-          }
-        } catch (err) {
-          console.error("Image Ingest error:", err);
-        }
-      };
-      reader.readAsDataURL(file);
-
-    } else if (isPDF) {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = String(reader.result || "");
-        const base64 = dataUrl.split(",")[1] || "";
-
-        chatStore.messages.push({
-          id: uid(),
-          role: "user",
-          content: `Attached document '${file.name}' for analysis.`,
-          thinking: "",
-          thinkingDone: true,
-          streaming: false,
-          attachment: {
-            name: file.name,
-            size: file.size,
-            type: "document",
-          },
-        });
-        chatStore.save();
-        scrollToBottom();
-
-        try {
-          const host = getAgentHost();
-          const token = getVigyanToken();
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (token) headers["X-Vigyan-Token"] = token;
-
-          const res = await fetch(`${host}/api/ingest/file`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              filename: file.name,
-              pdf_base64: base64,
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            const extracted = data.text || data.summary || "";
-            if (extracted) {
-              const snippet = extracted.slice(0, 2000);
-              input = input ? `[Context: ${file.name}]\n${snippet}\n\n${input}` : `Analyze specifications from '${file.name}':\n\n${snippet}\n\n`;
-              autoResize();
-            }
-            chatStore.messages.push({
-              id: uid(),
-              role: "assistant",
-              content: data.text || "Document processed via offline parser.",
-              thinking: "Extracted document structure and parameters via offline parser.\n",
-              thinkingDone: true,
-              streaming: false,
-              digest: {
-                filename: file.name,
-                summary: data.summary || "Extracted document specifications.",
-                metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Plot Parameter Curve"],
-              },
-            });
-            chatStore.save();
-            scrollToBottom();
-          }
-        } catch (err) {
-          console.error("PDF Ingest error:", err);
-        }
-      };
-      reader.readAsDataURL(file);
-
-    } else {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const content = String(reader.result || "");
-        chatStore.messages.push({
-          id: uid(),
-          role: "user",
-          content: `Attached document '${file.name}'.`,
-          thinking: "",
-          thinkingDone: true,
-          streaming: false,
-          attachment: {
-            name: file.name,
-            size: file.size,
-            type: "document",
-          },
-        });
-        chatStore.save();
-        scrollToBottom();
-
-        const host = getAgentHost();
-        const token = getVigyanToken();
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (token) headers["X-Vigyan-Token"] = token;
-
-        try {
-          const res = await fetch(`${host}/api/ingest/file`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              filename: file.name,
-              content: content.slice(0, 10000),
-            }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const extracted = data.text || data.summary || content;
-            if (extracted) {
-              const snippet = extracted.slice(0, 2000);
-              input = input ? `[Context: ${file.name}]\n${snippet}\n\n${input}` : `Analyze specifications from '${file.name}':\n\n${snippet}\n\n`;
-              autoResize();
-            }
-            chatStore.messages.push({
-              id: uid(),
-              role: "assistant",
-              content: data.summary,
-              thinking: "Parsed text parameters directly on local device.\n",
-              thinkingDone: true,
-              streaming: false,
-              digest: {
-                filename: file.name,
-                summary: data.summary,
-                metrics: data.metrics || [],
-                actions: data.suggested_actions || ["Derive Analytical Proof", "Plot Parameter Curve"],
-              },
-            });
-            chatStore.save();
-            scrollToBottom();
-          }
-        } catch (err) {
-          send(`I have imported '${file.name}'. Analyze parameters:\n\n\`\`\`\n${content.slice(0, 2000)}\n\`\`\``);
-        }
-      };
-      reader.readAsText(file);
-    }
-  }
-
-  function handleActionClick(actionText: string) {
-    if (actionText.includes("Proof") || actionText.includes("Analytical")) {
-      send("Derive the step-by-step analytical proof and verified equations for these parameters.");
-    } else if (actionText.includes("Plot") || actionText.includes("Curve")) {
-      send("Plot the parameter response curve based on the extracted values.");
-    } else {
-      send(actionText);
-    }
-  }
 
   const fontClass: Record<"sm" | "md" | "lg", string> = {
     sm: "text-[13px]",
@@ -335,6 +60,7 @@
     if (textareaEl) {
       textareaEl.style.height = "auto";
     }
+
     isStreaming = true;
 
     chatStore.messages.push({
@@ -383,13 +109,11 @@
             chatStore.messages[idx].thinking = `[Symbolically Verified]: ${chunk.text}\n` + chatStore.messages[idx].thinking;
           }
           scrollToBottom();
-        } else if (chunk.type === "tool_result") {
+        } else if (chunk.toolData) {
           if (!chatStore.messages[idx].toolResults) {
             chatStore.messages[idx].toolResults = [];
           }
-          if (chunk.toolData) {
-            chatStore.messages[idx].toolResults.push(chunk.toolData);
-          }
+          chatStore.messages[idx].toolResults!.push(chunk.toolData);
           scrollToBottom();
         } else if (chunk.type === "answer") {
           if (!chatStore.messages[idx].thinkingDone) chatStore.messages[idx].thinkingDone = true;
@@ -439,17 +163,6 @@
 
 <div class="flex flex-col h-full bg-[#000000] text-[#f3f4f6] {fontClass[fontSize]} relative">
 
-  <!-- Full-Window Obsidian Frosted Drag Overlay -->
-  {#if isDragging}
-    <div class="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none animate-fade-in border-2 border-dashed border-[#10b981]/60 m-3 rounded-2xl select-none">
-      <div class="w-16 h-16 rounded-2xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-center justify-center text-3xl text-[#10b981] mb-3 shadow-[0_0_24px_rgba(16,185,129,0.3)]">
-        ⇪
-      </div>
-      <div class="text-base font-semibold text-white tracking-wide">Drop Document or Image to Analyze</div>
-      <div class="text-xs text-[#9ca3af] mt-1">Instant on-device analysis and mathematical verification</div>
-    </div>
-  {/if}
-
   <!-- Centered Message Canvas (768px reading container) -->
   <div
     bind:this={scrollEl}
@@ -480,7 +193,7 @@
                 onclick={() => send(s.prompt)}
                 class="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#08090d] border border-white/10 text-xs text-[#9ca3af] hover:text-white hover:border-white/25 transition-all shadow-sm cursor-pointer"
               >
-                <span class="text-sm font-mono text-[#10b981]">{s.icon}</span>
+                <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.08] text-[#10b981] font-semibold">{s.badge}</span>
                 <span>{s.label}</span>
               </button>
             {/each}
@@ -519,7 +232,6 @@
                   sympyGrounding={msg.sympyGrounding}
                   digest={msg.digest}
                   canTrimPrior={i > 0}
-                  onAction={handleActionClick}
                   onDelete={(id) => chatStore.deleteMessage(id)}
                   onTrimPrior={(id) => chatStore.trimHistoryBefore(id)}
                 />
@@ -532,44 +244,20 @@
     </div>
   </div>
 
-  <!-- Floating Bottom Input Dock with Drag & Drop Ingestion -->
+  <!-- Floating Bottom Input Dock -->
   <div
     class="px-4 pb-4 pt-1 flex-shrink-0 z-20 relative"
-    ondragover={(e) => { e.preventDefault(); isDragging = true; }}
-    ondragleave={() => (isDragging = false)}
-    ondrop={handleFileDrop}
     role="region"
-    aria-label="Chat input and file drop dock"
+    aria-label="Chat input dock"
   >
-    <!-- Hidden file input for attachment button -->
-    <input
-      type="file"
-      bind:this={fileInputEl}
-      onchange={handleFileInputChange}
-      accept="image/*,.pdf,.csv,.txt,.json,.py,.md"
-      class="hidden"
-    />
-
     <div class="max-w-[720px] mx-auto w-full flex flex-col items-center">
       <div class="w-full flex items-center gap-3 bg-[#06080e]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.85)] focus-within:border-[#38bdf8]/40 transition-all">
-        <!-- Attachment button for local document ingestion -->
-        <button
-          type="button"
-          onclick={() => fileInputEl?.click()}
-          class="w-7 h-7 rounded-lg text-[#9ca3af] hover:text-[#38bdf8] hover:bg-white/[0.06] flex items-center justify-center transition-all flex-shrink-0 cursor-pointer"
-          title="Attach document or image"
-        >
-          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M15.621 4.379a3 3 0 00-4.242 0l-7 7a3 3 0 004.241 4.243h.001l.497-.5a.75.75 0 011.064 1.057l-.498.501-.002.002a4.5 4.5 0 01-6.364-6.364l7-7a4.5 4.5 0 016.368 6.36l-3.455 3.553A2.625 2.625 0 119.5 9.525l3.45-3.451a.75.75 0 111.061 1.06l-3.45 3.451a1.125 1.125 0 001.587 1.595l3.454-3.553a3 3 0 00.02-4.248z" clip-rule="evenodd" />
-          </svg>
-        </button>
-
         <textarea
           bind:this={textareaEl}
           bind:value={input}
           oninput={autoResize}
           onkeydown={handleKeydown}
-          placeholder="Ask a scientific question, derive a proof, analyze a circuit, or drop a document…"
+          placeholder="Ask a scientific question, derive a proof, analyze a circuit…"
           rows={1}
           disabled={isStreaming}
           class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
