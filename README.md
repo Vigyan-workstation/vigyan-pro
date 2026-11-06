@@ -158,5 +158,4 @@ You may not use or permit any third party to use this software, its algorithms, 
 
 For commercial licensing and enterprise deployment inquiries:
 - **Web**: https://experimentlab.in
-- **Support**: support@experimentlab.in
-- **Licensing**: licensing@experimentlab.in
+- **Email**: support@experimentlab.in
