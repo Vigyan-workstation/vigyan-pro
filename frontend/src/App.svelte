@@ -1,13 +1,15 @@
 <script lang="ts">
   // App.svelte — Root Obsidian Executive Frame
-  // Nualt x Steve Jobs sovereign engineering workstation interface.
+  // Sovereign scientific engineering workstation interface.
   // 100% Offline, Zero Cloud Egress, Air-Gapped STEM Workstation.
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
   import LedgerDrawer from "./components/LedgerDrawer.svelte";
+  import ArtifactStudio from "./components/ArtifactStudio.svelte";
   import { checkOllamaStatus, fetchTelemetry, DEFAULT_MODEL } from "./lib/ollama";
   import { chatStore } from "./lib/chatStore.svelte";
+  import { artifactStore } from "./lib/artifactStore.svelte";
 
   let settingsOpen = $state(false);
   let ledgerOpen = $state(false);
@@ -35,6 +37,7 @@
       } else if (e.key === "Escape") {
         if (settingsOpen) settingsOpen = false;
         if (ledgerOpen) ledgerOpen = false;
+        if (artifactStore.activeArtifact) artifactStore.closeArtifact();
       }
     };
     window.addEventListener("keydown", handleGlobalKeydown);
@@ -131,9 +134,23 @@
     </div>
   </header>
 
-  <!-- Main: Unified Centered Reading & STEM Proof Container -->
-  <main class="flex-1 overflow-hidden relative w-full h-full">
-    <Chat {model} {fontSize} />
+  <!-- Main: Unified Centered Reading & STEM Proof Container (Supports Split Artifact Studio) -->
+  <main class="flex-1 overflow-hidden relative w-full h-full flex flex-row">
+    <!-- Left: Sovereign Dialogue Stream -->
+    <div class="h-full flex-1 min-w-[360px] overflow-hidden transition-all duration-300">
+      <Chat {model} {fontSize} />
+    </div>
+
+    <!-- Right: Sovereign Artifact Studio (Split Canvas) -->
+    {#if artifactStore.activeArtifact}
+      <div class="w-px bg-white/10 flex-shrink-0"></div>
+      <div class="h-full w-[50%] min-w-[420px] max-w-[70%] flex-shrink-0 animate-in slide-in-from-right-4 duration-200">
+        <ArtifactStudio
+          artifact={artifactStore.activeArtifact}
+          onClose={() => artifactStore.closeArtifact()}
+        />
+      </div>
+    {/if}
   </main>
 
   <!-- Learning Ledger Slide-in Drawer -->

@@ -2,8 +2,10 @@
   import { renderMath } from "../lib/katex";
   import StemInlineCard from "./StemInlineCard.svelte";
   import AttachmentCard from "./AttachmentCard.svelte";
+  import InlineArtifactPill from "./InlineArtifactPill.svelte";
   import type { ToolResult } from "../lib/ollama";
   import type { Attachment, Digest } from "../lib/chatStore.svelte";
+  import type { Artifact } from "../lib/artifactStore.svelte";
 
   interface Props {
     id?: string;
@@ -14,6 +16,7 @@
     sympyGrounding?: string;
     attachment?: Attachment;
     digest?: Digest;
+    artifact?: Artifact;
     canTrimPrior?: boolean;
     onAction?: (actionText: string) => void;
     onDelete?: (id: string) => void;
@@ -28,6 +31,7 @@
     sympyGrounding,
     attachment,
     digest,
+    artifact,
     canTrimPrior = false,
     onAction,
     onDelete,
@@ -146,6 +150,11 @@
             <StemInlineCard tool={t} />
           {/each}
         </div>
+      {/if}
+
+      <!-- Sovereign Artifact Reference Pill (Click-to-Open) -->
+      {#if artifact}
+        <InlineArtifactPill {artifact} />
       {/if}
 
       <!-- Assistant text response with offline KaTeX typography -->

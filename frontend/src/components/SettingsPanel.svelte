@@ -1,6 +1,6 @@
 <script lang="ts">
   // SettingsPanel — Sovereign Executive Preferences Drawer
-  // Ultra-luxurious, zero developer plumbing, Steve Jobs-grade simplicity.
+  // Offline scientific settings and configuration panel.
   import { chatStore } from "../lib/chatStore.svelte";
 
   interface Props {

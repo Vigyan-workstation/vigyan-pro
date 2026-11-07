@@ -115,7 +115,7 @@ export function renderMath(text: string): string {
 
   // Re-inject mathematical typography placeholders
   for (const { id, html } of placeholders) {
-    finalHtml = finalHtml.replace(id, html);
+    finalHtml = finalHtml.split(id).join(html);
   }
 
   return finalHtml;

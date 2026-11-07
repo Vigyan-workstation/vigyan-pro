@@ -3,6 +3,7 @@
 
 import { compressContext } from "./compression";
 import type { ToolResult } from "./ollama";
+import type { Artifact } from "./artifactStore.svelte";
 
 export interface Attachment {
   name: string;
@@ -29,6 +30,7 @@ export interface Message {
   toolResults?: ToolResult[];
   attachment?: Attachment;
   digest?: Digest;
+  artifact?: Artifact;
 }
 
 const STORAGE_KEY = "vigyan_chat_history";
