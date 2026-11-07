@@ -36,7 +36,7 @@ Analytical derivation and symbolic verification certified by Vigyan AST Engine.
 \\end{abstract}
 
 \\section{Derivation and Governing Formulations}
-${artifact.content.replace(/```[a-z]*\n?/g, "").replace(/#/g, "%")}
+${artifact.content.replace(/```[a-z]*\n?/g, "").replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "").replace(/#/g, "%").trim()}
 
 \\section{SymPy Verification Metrics}
 Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically Exact)

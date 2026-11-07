@@ -84,11 +84,12 @@
       }
 
       const artId = `A-${Math.floor(100 + Math.random() * 900)}`;
+      const cleanContent = content.replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "").trim();
       const artifact: Artifact = {
         id: artId,
         title: title,
         type: "derivation",
-        content: content,
+        content: cleanContent,
         verified: true,
         sympyResidual: "0.000e+00",
         createdAt: Date.now(),
