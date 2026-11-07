@@ -16,7 +16,10 @@ export function renderMath(text: string): string {
   if (!text) return "";
 
   // Normalize Windows newlines and multiple backslashes before brackets
-  let src = text.replace(/\r\n/g, "\n");
+  // Strip stray or hallucinated LLM tags (e.g. </code>, </pre>, <solution>, </solution>)
+  let src = text
+    .replace(/\r\n/g, "\n")
+    .replace(/<\/?(?:code|pre|solution|sstream|latex|math|think)>/gi, "");
 
   const placeholders: { id: string; html: string }[] = [];
   const makePlaceholder = (html: string) => {

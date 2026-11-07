@@ -199,7 +199,7 @@ export async function streamChat(
                 }
               } else if (eventName === "token") {
                 let tokenText = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-                tokenText = tokenText.replace(/<\/sstream>/g, "").replace(/<solution>/g, "").replace(/<\/solution>/g, "");
+                tokenText = tokenText.replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "");
                 if (tokenText) onChunk({ type: "answer", text: tokenText });
               } else if (eventName === "sympy") {
                 onChunk({ type: "sympy", text: typeof parsed === "string" ? parsed : JSON.stringify(parsed) });
@@ -213,7 +213,7 @@ export async function streamChat(
             } catch {
               // Raw string fallback
               if (eventName === "token") {
-                let tokenText = dataStr.replace(/<\/sstream>/g, "").replace(/<solution>/g, "").replace(/<\/solution>/g, "");
+                let tokenText = dataStr.replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "");
                 if (tokenText) onChunk({ type: "answer", text: tokenText });
               }
             }
@@ -254,6 +254,8 @@ export async function streamChat(
             "</sstream>",
             "<solution>",
             "</solution>",
+            "</code>",
+            "</pre>",
             "User:",
             "\n\nUser",
             "Human:"
@@ -284,7 +286,7 @@ export async function streamChat(
   let inThink = false;
 
   const flush = (raw: string) => {
-    raw = raw.replace(/<\/sstream>/g, "").replace(/<solution>/g, "").replace(/<\/solution>/g, "");
+    raw = raw.replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "");
     if (!raw) return;
     let i = 0;
     while (i < raw.length) {
