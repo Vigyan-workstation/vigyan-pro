@@ -1,32 +1,20 @@
 <script lang="ts">
   // SettingsPanel — Sovereign Executive Preferences Drawer
-  // Ultra-luxurious, zero developer plumbing, Steve Jobs-grade simplicity.
+  // Offline scientific settings and configuration panel.
   import { chatStore } from "../lib/chatStore.svelte";
 
   interface Props {
     open: boolean;
-    model?: string;
-    fontSize: "sm" | "md" | "lg";
     onClose: () => void;
-    onModelChange?: (m: string) => void;
-    onFontSizeChange: (s: "sm" | "md" | "lg") => void;
   }
 
   let {
     open,
-    fontSize,
     onClose,
-    onFontSizeChange,
   }: Props = $props();
 
   let confirmReset = $state(false);
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const fontLabels: Record<"sm" | "md" | "lg", string> = {
-    sm: "Compact",
-    md: "Standard",
-    lg: "Large",
-  };
 
   function handleResetChat() {
     if (!confirmReset) {
@@ -64,9 +52,11 @@
     <span class="text-xs font-semibold text-white tracking-wider uppercase">Preferences</span>
     <button
       onclick={onClose}
-      class="text-[#9ca3af] hover:text-white transition-colors text-base leading-none p-1 cursor-pointer"
+      class="text-[#9ca3af] hover:text-white transition-colors p-1 cursor-pointer flex items-center justify-center"
       aria-label="Close"
-    >✕</button>
+    >
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
 
   <!-- Content -->
@@ -89,33 +79,12 @@
       </div>
     </section>
 
-    <!-- Typography Size -->
-    <section>
-      <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af] block mb-2">Reading Typography</span>
-      <div class="flex gap-2 bg-[#10121a] p-1 rounded-xl border border-[rgba(255,255,255,0.08)]">
-        {#each (["sm", "md", "lg"] as ("sm" | "md" | "lg")[]) as size}
-          <button
-            type="button"
-            onclick={() => onFontSizeChange(size)}
-            class="flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer {fontSize === size
-              ? 'bg-white text-black font-semibold shadow-sm'
-              : 'text-[#9ca3af] hover:text-white'}"
-          >
-            {fontLabels[size]}
-          </button>
-        {/each}
-      </div>
-      <p class="text-[11px] text-[#6b7280] mt-1.5 leading-relaxed">
-        Adjust typography scale for formula legibility and comfortable scientific reading.
-      </p>
-    </section>
-
     <!-- Storage & Privacy -->
     <section>
       <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af] block mb-2">Storage & Privacy</span>
       <div class="bg-[#10121a] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 space-y-3">
         <p class="text-[11px] text-[#9ca3af] leading-relaxed">
-          Your conversations, mathematical proofs, and indexed documents reside exclusively in local storage on this computer.
+          Your conversations and mathematical proofs reside exclusively in local storage on this computer.
         </p>
         <button
           type="button"
@@ -135,11 +104,25 @@
       <div class="bg-[#10121a] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 space-y-2 text-[11px]">
         <div class="flex items-center justify-between text-white">
           <span class="font-medium">Vigyan Pro Desktop</span>
-          <span class="font-mono text-[10px] text-[#9ca3af]">v3.2</span>
+          <span class="font-mono text-[10px] text-[#9ca3af]">v3.4.0</span>
         </div>
         <p class="text-[#6b7280] leading-relaxed">
-          Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS) and offline vector retrieval.
+          Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS).
         </p>
+        <div class="pt-2 border-t border-[rgba(255,255,255,0.06)] space-y-1 text-[10px]">
+          <div class="flex justify-between">
+            <span class="text-[#6b7280]">Developer</span>
+            <span class="text-slate-300">ExperimentLab AI</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-[#6b7280]">Website</span>
+            <a href="https://experimentlab.in" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:underline">experimentlab.in</a>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-[#6b7280]">Support</span>
+            <span class="text-slate-300">support@experimentlab.in</span>
+          </div>
+        </div>
       </div>
     </section>
 

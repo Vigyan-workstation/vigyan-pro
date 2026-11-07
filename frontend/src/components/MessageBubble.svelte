@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { renderMath, extractPlottableFormula } from "../lib/katex";
+  import { renderMath } from "../lib/katex";
   import StemInlineCard from "./StemInlineCard.svelte";
   import AttachmentCard from "./AttachmentCard.svelte";
+  import InlineArtifactPill from "./InlineArtifactPill.svelte";
   import type { ToolResult } from "../lib/ollama";
   import type { Attachment, Digest } from "../lib/chatStore.svelte";
+  import type { Artifact } from "../lib/artifactStore.svelte";
 
   interface Props {
     id?: string;
@@ -14,6 +16,7 @@
     sympyGrounding?: string;
     attachment?: Attachment;
     digest?: Digest;
+    artifact?: Artifact;
     canTrimPrior?: boolean;
     onAction?: (actionText: string) => void;
     onDelete?: (id: string) => void;
@@ -28,6 +31,7 @@
     sympyGrounding,
     attachment,
     digest,
+    artifact,
     canTrimPrior = false,
     onAction,
     onDelete,
@@ -35,7 +39,19 @@
   }: Props = $props();
 
   let copied = $state(false);
-  let activePlotExpr = $state<string | null>(null);
+  let copiedLatex = $state(false);
+
+  const isUser = $derived(role === "user");
+
+  const latexFormulas = $derived.by(() => {
+    if (!content || isUser) return [];
+    const formulas: string[] = [];
+    const display = content.match(/\$\$([\s\S]+?)\$\$/g);
+    if (display) formulas.push(...display.map((f) => f.slice(2, -2).trim()));
+    const inline = content.match(/(?<!\$)\$([^\$\n]+?)\$(?!\$)/g);
+    if (inline) formulas.push(...inline.map((f) => f.slice(1, -1).trim()));
+    return formulas;
+  });
 
   function handleCopy() {
     if (!content) return;
@@ -48,21 +64,22 @@
     } catch {}
   }
 
-  const isUser = $derived(role === "user");
+  function handleCopyLatex() {
+    if (latexFormulas.length === 0) return;
+    try {
+      const textToCopy = latexFormulas.join("\n\n");
+      navigator.clipboard.writeText(textToCopy);
+      copiedLatex = true;
+      setTimeout(() => {
+        copiedLatex = false;
+      }, 1500);
+    } catch {}
+  }
 
   // Render math in assistant messages
   const rendered = $derived(
     isUser ? content : renderMath(content)
   );
-
-  // Check if a mathematical formula can be plotted (if not already handled by toolResults)
-  const plottableFormula = $derived(
-    !isUser && !streaming && toolResults.length === 0 ? extractPlottableFormula(content) : null
-  );
-
-  function openFormulaPlot(expr: string) {
-    activePlotExpr = expr;
-  }
 </script>
 
 <div class="flex w-full animate-fade-in {isUser ? 'justify-end' : 'justify-start'} my-2 group">
@@ -135,24 +152,14 @@
         </div>
       {/if}
 
+      <!-- Sovereign Artifact Reference Pill (Click-to-Open) -->
+      {#if artifact}
+        <InlineArtifactPill {artifact} />
+      {/if}
+
       <!-- Assistant text response with offline KaTeX typography -->
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       <div class="prose-vigyan text-[14px] select-text">{@html rendered}{#if streaming}<span class="animate-blink text-[#10b981] ml-0.5">▋</span>{/if}</div>
-
-      <!-- 1-Click Interactive Plot Curve Button (renders in-situ) -->
-      {#if plottableFormula && !activePlotExpr}
-        <button
-          onclick={() => openFormulaPlot(plottableFormula)}
-          class="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 text-[#10b981] hover:bg-[#10b981]/20 text-xs font-medium transition-all cursor-pointer"
-        >
-          <span>∫</span>
-          <span>Plot Curve: y = {plottableFormula}</span>
-        </button>
-      {/if}
-
-      {#if activePlotExpr}
-        <StemInlineCard tool={{ tool: "plot", render_type: "plot", expression: activePlotExpr, title: `Curve: y = ${activePlotExpr}` }} />
-      {/if}
     {/if}
 
     <!-- Discreet Hover Micro-Toolbar for Context Actions -->
@@ -172,6 +179,16 @@
         >
           {copied ? "Copied" : "Copy"}
         </button>
+        {#if latexFormulas.length > 0}
+          <button
+            type="button"
+            onclick={handleCopyLatex}
+            title="Copy mathematical LaTeX equations to clipboard"
+            class="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-[#10b981]/20 hover:text-[#10b981] hover:border-[#10b981]/30 border border-white/[0.08] transition-colors cursor-pointer text-[10px] font-mono"
+          >
+            {copiedLatex ? "LaTeX Copied" : "Copy LaTeX"}
+          </button>
+        {/if}
         {#if canTrimPrior && onTrimPrior}
           <button
             type="button"
