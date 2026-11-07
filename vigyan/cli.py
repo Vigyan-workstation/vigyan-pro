@@ -138,7 +138,7 @@ SymPy Residual Error: \\texttt{{{residual}}} (Analytically Exact, 0\\% Error).
         }, indent=2))
         return
 
-    table = Table(title=f"📐 {title}", border_style="cyan")
+    table = Table(title=f"[MATH] {title}", border_style="cyan")
     table.add_column("Formulation / Step", style="bold white", width=25)
     table.add_column("Certified Analytical Expression", style="green")
     for lbl, eq in equations:

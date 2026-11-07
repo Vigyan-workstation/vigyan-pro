@@ -1,5 +1,5 @@
 """
-🏛️ VIGYAN AUTONOMOUS SELF-FINE-TUNING RLVR ENGINE
+VIGYAN AUTONOMOUS SELF-FINE-TUNING RLVR ENGINE
 ==================================================
 Empirical self-training via Reinforcement Learning with Verifiable Rewards (RLVR).
 Features:
