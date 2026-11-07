@@ -3,7 +3,12 @@
 **Version**: 4.0.0 Sovereign Engineering Edition  
 **Developed by**: [ExperimentLab AI](https://experimentlab.in)  
 **License**: [PolyForm Noncommercial License 1.0.0](LICENSE) (Non-Commercial Use Only)  
+**Back Research**: [Buy Me A Chai](https://buymeachai.in/shreyansh001boy)  
 **Security Standard**: Air-Gapped • Zero Cloud Egress • Deterministic AST CAS • Loopback Isolated  
+
+[![License](https://img.shields.io/badge/License-PolyForm_Noncommercial_1.0.0-blue.svg?style=flat)](LICENSE)
+[![Back Research](https://img.shields.io/badge/Back_Research-Buy_Me_A_Chai-d97706?style=flat)](https://buymeachai.in/shreyansh001boy)
+[![Discord](https://img.shields.io/badge/Discord-Experimentlab_Community-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.com/invite/Jck3tD6mhf)  
 
 ---
 
@@ -138,6 +143,10 @@ python scripts/verify_agent_guardrails.py
 # 2. Run unit and security test suite
 pytest tests/ -v
 ```
+
+### Back Sovereign Open-Source Research
+
+If Vigyan Pro or our open-weight foundation models accelerate your work or engineering research, you can support our independent computing and pretraining infrastructure via [Buy Me A Chai](https://buymeachai.in/shreyansh001boy).
 
 ---
 
