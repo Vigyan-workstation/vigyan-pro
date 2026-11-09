@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vigyan"
-version = "4.0.0"
+version = "4.1.0"
 description = "Vigyan Pro: Sovereign Offline Physical Engineering Intelligence Workstation."
 readme = "README.md"
 authors = [
@@ -40,6 +40,17 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
+]
+stem = [
+    "pint>=0.23",
+    "scipy>=1.11.0",
+    "build123d>=0.5.0",
+    "rdkit>=2023.9.0",
+    "typst-py>=0.11.0",
+    "huggingface-hub>=0.20.0",
+]
+all = [
+    "vigyan[stem,dev]",
 ]
 
 [project.scripts]

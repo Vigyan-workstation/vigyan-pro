@@ -1,6 +1,6 @@
 # Vigyan Pro: Sovereign Offline STEM Intelligence Workstation
 
-**Version**: 4.0.0 Sovereign Engineering Edition  
+**Version**: 4.1.0 Sovereign Engineering Edition  
 **Developed by**: [ExperimentLab AI](https://experimentlab.in)  
 **License**: [PolyForm Noncommercial License 1.0.0](LICENSE) (Non-Commercial Use Only)  
 **Back Research**: [Buy Me A Chai](https://buymeachai.in/shreyansh001boy)  
@@ -20,37 +20,55 @@ Vigyan Pro operates with 0% cloud dependencies. All computation, inference, and 
 
 ---
 
-## 2. Core Architectural Pillars
+## 2. Multi-OS Monolithic Downloads (with AI Model)
 
-### 2.1 Deterministic SymPy CAS Engine (`vigyan math`)
+Users can download fully self-contained monolithic bundles directly from GitHub Releases or Hugging Face. Each bundle includes the application, the Svelte 5 desktop studio, and the pre-packaged 1.4 GB **Vigyan-3B Quad-Master AI model** inside `models/`:
+
+| Platform | Download Bundle | Features & Launcher |
+|---|---|---|
+| **Linux (x86_64)** | [`vigyan-pro-4.1.0-linux.tar.gz`](https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v4.1.0/vigyan-pro-4.1.0-linux.tar.gz) | WebKitGTK / Localhost Shell • `python run.py` |
+| **Windows 10/11** | [`vigyan-pro-4.1.0-windows.zip`](https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v4.1.0/vigyan-pro-4.1.0-windows.zip) | Microsoft Edge WebView2 • Double-click `launch_win.bat` |
+| **macOS (Apple Silicon & Intel)** | [`vigyan-pro-4.1.0-macos.tar.gz`](https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v4.1.0/vigyan-pro-4.1.0-macos.tar.gz) | Apple Cocoa WKWebView • Run `./src/launch_mac.sh` |
+| **Standalone Model** | [`vigyan-3b-quad-master-iq3_m.gguf`](https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v4.1.0/vigyan-3b-quad-master-iq3_m.gguf) | Raw 1.4 GB GGUF Model (also on [Hugging Face](https://huggingface.co/Experimentlab/Vigyan-Models-GGUF)) |
+
+---
+
+## 3. Core Architectural Pillars
+
+### 3.1 Deterministic SymPy CAS Engine (`vigyan math`)
 - Exact analytical calculus (derivatives, integrals, limits, Taylor series expansions).
 - Non-linear algebraic solving, matrix determinants, and trigonometric identities with 0% error.
 - Verified AST sandboxing (`validate_sympy_ast`) rejecting code injection, lambdas, and dunder attribute traversal.
 - Returns verified analytical formulas, LaTeX representations, and optional numerical evaluations.
 
-### 2.2 Sovereign Model Registry & HF Hub (`vigyan model`)
+### 3.2 Multiphysics & Parametric Engineering Engines
+- **Parametric 3D CAD (`vigyan cad`)**: build123d + OpenCASCADE solid modeling generating manufacturing-ready STL meshes.
+- **Multiphysics ODE Simulation (`vigyan sim`)**: SciPy RK45 adaptive numerical integrator for ballistic drag and harmonic dynamics.
+- **Cheminformatics (`vigyan chem`)**: RDKit molecular analysis, Lipinski Rule of 5 descriptors, and vector SVG generation.
+- **Dimensional Algebra (`vigyan unit`)**: Pint & Astropy strict dimensional conversion and unit validation.
+
+### 3.3 Split-Pane Artifact Studio & Typst PDF Generation
+- Unified split-pane UI featuring Three.js 3D STL viewer, interactive 2D simulation canvas with real-time 4th-order Runge-Kutta (RK4) sliders, and chemical structure views.
+- Embedded Rust-native **Typst compiler** generating publication-grade vector PDFs with formal title blocks and SymPy verification badges in <50ms.
+- 1-click "Copy LaTeX" for seamless Overleaf collaboration.
+
+### 3.4 Sovereign Model Registry & HF Hub (`vigyan model`)
 - Integrated local model discovery across `~/.vigyan/models/` and `models/`.
 - Direct connectivity with official Hugging Face Hub repository `Experimentlab/Vigyan-Models-GGUF`.
 - Inspect active weights, file sizes, and quantization formats (`vigyan model status`).
 - Query and stream public or gated model weights with token authentication (`vigyan model pull`).
 
-### 2.3 Sovereign Learning Ledger (`vigyan ledger`)
+### 3.5 Sovereign Learning Ledger (`vigyan ledger`)
 - Plain-file reversible operational memory stored locally in `.agents/ledger.jsonl`.
 - Enforces a strict 150-line context budget ceiling to keep inference fast and clean.
 - Auto-classifies engineering rules (`math`, `cad`, `eda`, `code`, `rule`).
 - Full reversibility via `vigyan undo <id>` or in-chat `/undo`.
 
-### 2.4 Hybrid Smart Keep-Alive Daemon (`vigyan/core.py`)
+### 3.6 Hybrid Smart Keep-Alive Daemon (`vigyan/core.py`)
 - Background `llama-server` supervisor serving on private loopback (`127.0.0.1:8086`).
 - Automatic 10-minute idle reaper reclaims host RAM when no queries are active.
 - Immediate manual reclamation via `vigyan stop`.
 - ChatML turn stop tokens preventing token runaway and socket timeouts.
-
-### 2.5 Multi-OS Native Desktop Workstation (`run.py`)
-- **Linux**: Native WebKitGTK with obsidian titanium monochrome design system.
-- **macOS**: Native Cocoa WKWebView (`src/launch_desktop_mac.py`).
-- **Windows**: Microsoft Edge WebView2 with Windows Job Object process supervision (`src/launch_desktop_win.py`).
-- Instant KaTeX mathematical rendering with 1-click "Copy LaTeX" micro-buttons for Overleaf.
 
 ---
 

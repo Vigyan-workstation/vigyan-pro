@@ -1,4 +1,5 @@
 import sys
+import os
 import shutil
 import json
 from typing import Optional
@@ -6,6 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.markup import escape
 
 from vigyan.core import check_engine_health, DEFAULT_ENGINE_URL
 from vigyan.constants import lookup_constant, search_axioms, PHYSICAL_CONSTANTS
@@ -14,6 +16,22 @@ from vigyan.ledger import add_rule, undo_rule, get_active_rules, get_budget_tele
 def _lazy_solve_math(spec: str, **kw):
     from vigyan.tools.math import solve_math
     return solve_math(spec, **kw)
+
+def _lazy_convert_units(spec: str, **kw):
+    from vigyan.tools.units import convert_units
+    return convert_units(spec, **kw)
+
+def _lazy_simulate_ode(spec: str, **kw):
+    from vigyan.tools.sim import simulate_ode
+    return simulate_ode(spec, **kw)
+
+def _lazy_generate_cad(spec: str, **kw):
+    from vigyan.tools.cad import generate_cad
+    return generate_cad(spec, **kw)
+
+def _lazy_analyze_chem(spec: str, **kw):
+    from vigyan.tools.chem import analyze_molecule
+    return analyze_molecule(spec, **kw)
 
 app = typer.Typer(
     name="vigyan",
@@ -26,6 +44,26 @@ AVAILABLE_TOOLS = {
     "math": {
         "description": "Deterministic SymPy CAS analytical solver (0% error)",
         "handler": lambda spec, **kw: _lazy_solve_math(spec, **kw),
+        "binary": None
+    },
+    "unit": {
+        "description": "Pint & Astropy dimensional unit algebra and conversions",
+        "handler": lambda spec, **kw: _lazy_convert_units(spec, **kw),
+        "binary": None
+    },
+    "sim": {
+        "description": "SciPy RK45 nonlinear ODE and trajectory physics simulation",
+        "handler": lambda spec, **kw: _lazy_simulate_ode(spec, **kw),
+        "binary": None
+    },
+    "cad": {
+        "description": "build123d parametric 3D CAD modeling and STL export",
+        "handler": lambda spec, **kw: _lazy_generate_cad(spec, **kw),
+        "binary": None
+    },
+    "chem": {
+        "description": "RDKit molecular SMILES analysis and 2D vector depiction",
+        "handler": lambda spec, **kw: _lazy_analyze_chem(spec, **kw),
         "binary": None
     }
 }
@@ -67,6 +105,149 @@ def math_cmd(
     else:
         console.print(Panel(f"[red]Failed to derive expression:[/red] {query}", title="Error", border_style="red"))
 
+@app.command(name="unit", help="Perform dimensional analysis and unit conversions using Pint.")
+def unit_cmd(
+    expression: str = typer.Argument(..., help="Unit conversion expression (e.g. '100 km/h to m/s' or '50 kW to hp')"),
+    to_unit: Optional[str] = typer.Option(None, "--to", "-t", help="Target unit if not specified in expression"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    from vigyan.tools.units import convert_units
+    res = convert_units(expression, target_unit=to_unit)
+    if as_json:
+        print(json.dumps({
+            "status": res.status,
+            "input": res.input_expression,
+            "value": res.result_value,
+            "unit": res.result_unit,
+            "formatted": res.formatted,
+            "dimensions": res.dimensional_formula,
+            "error": res.error_message,
+            "execution_time_ms": res.execution_time_ms
+        }, indent=2))
+        return
+
+    if res.status == "success":
+        table = Table(title="Pint Dimensional Unit Verification", border_style="cyan")
+        table.add_column("Property", style="bold white", width=20)
+        table.add_column("Value", style="green")
+        table.add_row("Input Expression", res.input_expression)
+        table.add_row("Converted Result", res.formatted)
+        table.add_row("Dimensional Formula", escape(res.dimensional_formula))
+        table.add_row("Execution Time", f"{res.execution_time_ms:.2f} ms")
+        console.print(table)
+    else:
+        console.print(f"[bold red]Unit Error:[/bold red] {res.error_message}")
+
+@app.command(name="sim", help="Run nonlinear ODE or trajectory simulation via SciPy RK45.")
+def sim_cmd(
+    system: str = typer.Argument("projectile", help="System type: 'projectile' or 'oscillator'"),
+    v0: float = typer.Option(50.0, "--v0", help="Initial velocity in m/s (for projectile)"),
+    angle: float = typer.Option(45.0, "--angle", "-a", help="Launch angle in degrees (for projectile)"),
+    mass: float = typer.Option(1.0, "--mass", "-m", help="Mass in kg"),
+    drag: float = typer.Option(0.05, "--drag", "-d", help="Drag coefficient"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    from vigyan.tools.sim import simulate_ode
+    params = {"v0": v0, "angle": angle, "mass": mass, "drag_k": drag}
+    res = simulate_ode(system_type=system, params=params)
+
+    if as_json:
+        print(json.dumps({
+            "status": res.status,
+            "system": res.system_description,
+            "metrics": res.summary_metrics,
+            "error": res.error_message,
+            "execution_time_ms": res.execution_time_ms
+        }, indent=2))
+        return
+
+    if res.status == "success":
+        table = Table(title=f"SciPy RK45 Simulation: {res.system_description}", border_style="green")
+        table.add_column("Metric", style="bold white", width=25)
+        table.add_column("Value", style="cyan")
+        for k, v in res.summary_metrics.items():
+            table.add_row(k.replace("_", " ").title(), str(v))
+        table.add_row("Execution Time", f"{res.execution_time_ms:.2f} ms")
+        console.print(table)
+    else:
+        console.print(f"[bold red]Simulation Error:[/bold red] {res.error_message}")
+
+@app.command(name="cad", help="Generate parametric 3D CAD parts and export STL via build123d.")
+def cad_cmd(
+    part: str = typer.Argument("bracket", help="Part type: 'bracket' or 'flange'"),
+    out: Optional[str] = typer.Option(None, "--out", "-o", help="Output STL file path"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    from vigyan.tools.cad import generate_cad
+    res = generate_cad(part_type=part, output_path=out)
+
+    if as_json:
+        print(json.dumps({
+            "status": res.status,
+            "design": res.design_name,
+            "format": res.export_format,
+            "file": res.file_path,
+            "volume_mm3": res.volume_mm3,
+            "bounding_box": res.bounding_box_mm,
+            "error": res.error_message,
+            "execution_time_ms": res.execution_time_ms
+        }, indent=2))
+        return
+
+    if res.status == "success":
+        table = Table(title=f"build123d Parametric 3D CAD: {res.design_name.title()}", border_style="magenta")
+        table.add_column("Property", style="bold white", width=20)
+        table.add_column("Value", style="green")
+        table.add_row("Part Type", res.design_name)
+        table.add_row("Exported File", res.file_path or "N/A")
+        table.add_row("Solid Volume", f"{res.volume_mm3:,.2f} mm³")
+        table.add_row("Bounding Box X", f"{res.bounding_box_mm.get('x_min')} to {res.bounding_box_mm.get('x_max')} mm")
+        table.add_row("Bounding Box Y", f"{res.bounding_box_mm.get('y_min')} to {res.bounding_box_mm.get('y_max')} mm")
+        table.add_row("Bounding Box Z", f"{res.bounding_box_mm.get('z_min')} to {res.bounding_box_mm.get('z_max')} mm")
+        table.add_row("Execution Time", f"{res.execution_time_ms:.2f} ms")
+        console.print(table)
+    else:
+        console.print(f"[bold red]CAD Error:[/bold red] {res.error_message}")
+
+@app.command(name="chem", help="Analyze chemical SMILES strings and generate 2D molecular structures via RDKit.")
+def chem_cmd(
+    smiles: str = typer.Argument(..., help="Chemical SMILES string (e.g. 'CC(=O)Oc1ccccc1C(=O)O' for Aspirin)"),
+    as_json: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON to stdout")
+):
+    from vigyan.tools.chem import analyze_molecule
+    res = analyze_molecule(smiles, generate_svg=True)
+
+    if as_json:
+        print(json.dumps({
+            "status": res.status,
+            "smiles": res.smiles,
+            "formula": res.molecular_formula,
+            "mw": res.molecular_weight,
+            "logp": res.logp,
+            "tpsa": res.tpsa,
+            "hbd": res.h_bond_donors,
+            "hba": res.h_bond_acceptors,
+            "error": res.error_message,
+            "execution_time_ms": res.execution_time_ms
+        }, indent=2))
+        return
+
+    if res.status == "success":
+        table = Table(title="RDKit Molecular Analysis", border_style="yellow")
+        table.add_column("Descriptor", style="bold white", width=25)
+        table.add_column("Value", style="cyan")
+        table.add_row("SMILES", res.smiles)
+        table.add_row("Molecular Formula", res.molecular_formula)
+        table.add_row("Molecular Weight", f"{res.molecular_weight:.3f} g/mol")
+        table.add_row("LogP (Lipophilicity)", str(res.logp))
+        table.add_row("TPSA (Polar Surface Area)", f"{res.tpsa} Å²")
+        table.add_row("H-Bond Donors", str(res.h_bond_donors))
+        table.add_row("H-Bond Acceptors", str(res.h_bond_acceptors))
+        table.add_row("Execution Time", f"{res.execution_time_ms:.2f} ms")
+        console.print(table)
+    else:
+        console.print(f"[bold red]Chemistry Error:[/bold red] {res.error_message}")
+
 @app.command(name="derive", help="Derive analytical proofs with SymPy verification and Overleaf LaTeX generation.")
 def derive_cmd(
     query: str = typer.Argument(..., help="Mathematical or engineering problem (e.g. 'underdamped RLC circuit' or 'diff(sin(x)*exp(x), x)')"),
@@ -75,30 +256,28 @@ def derive_cmd(
 ):
     from vigyan.tools.math import solve_math
 
-    q_lower = query.lower()
     res = solve_math(query, evaluate_numerical=True)
 
-    if "rlc" in q_lower or res.status != "success":
-        title = "RLC Circuit Underdamped Transient Proof"
-        equations = [
-            ("Governing ODE", "L \\frac{d^2 i(t)}{dt^2} + R \\frac{di(t)}{dt} + \\frac{1}{C} i(t) = 0"),
-            ("Characteristic Roots", "s_{1,2} = -\\alpha \\pm j \\omega_d"),
-            ("Attenuation Alpha", "\\alpha = \\frac{R}{2L}"),
-            ("Undamped Frequency", "\\omega_0 = \\frac{1}{\\sqrt{LC}}"),
-            ("Damped Frequency", "\\omega_d = \\sqrt{\\omega_0^2 - \\alpha^2}"),
-            ("Step Response Solution", "i(t) = \\frac{V_0}{\\omega_d L} e^{-\\alpha t} \\sin(\\omega_d t)")
-        ]
-        residual = "0.000e+00"
-    else:
-        title = f"SymPy Analytical Derivation: {query}"
-        equations = [
-            ("Input Expression", getattr(res, "expression", query)),
-            ("Exact Solution", getattr(res, "solution", "")),
-            ("LaTeX Representation", getattr(res, "latex", ""))
-        ]
-        if getattr(res, "evaluated_numerical", None):
-            equations.append(("Numerical Value", str(res.evaluated_numerical)))
-        residual = "0.000e+00"
+    if res.status != "success":
+        if as_json:
+            print(json.dumps({
+                "status": "error",
+                "query": query,
+                "error": res.error_message or "Failed to derive analytical solution"
+            }, indent=2))
+        else:
+            console.print(f"[bold red]Derivation Error:[/bold red] {res.error_message or 'Failed to solve expression'}")
+        raise typer.Exit(code=1)
+
+    title = f"SymPy Analytical Derivation: {query}"
+    equations = [
+        ("Input Expression", getattr(res, "expression", query)),
+        ("Exact Solution", getattr(res, "solution", "")),
+        ("LaTeX Representation", getattr(res, "latex", ""))
+    ]
+    if getattr(res, "evaluated_numerical", None):
+        equations.append(("Numerical Value", str(res.evaluated_numerical)))
+    residual = "0.000e+00"
 
     latex_doc = f"""\\documentclass[11pt,a4paper]{{article}}
 \\usepackage[margin=1in]{{geometry}}
@@ -479,6 +658,59 @@ def chat_cmd():
                     response_chunks.append(chunk)
                 console.print("")
                 full_reply = "".join(response_chunks).strip()
+
+                # Parse and execute any <tool_call> tags emitted in full_reply
+                import re
+                tool_matches = re.findall(r"<tool_call>(.*?)</tool_call>", full_reply, re.DOTALL)
+                for t_str in tool_matches:
+                    try:
+                        t_data = json.loads(t_str.strip())
+                        t_name = t_data.get("name")
+                        t_args = t_data.get("arguments", {})
+                        if t_name in ("cad_generate", "cad"):
+                            from vigyan.tools.cad import generate_cad
+                            cad_res = generate_cad(part_type=t_args.get("part_type", "bracket"), dimensions=t_args.get("dimensions", {}))
+                            if cad_res.status == "success":
+                                c_table = Table(title=f"3D CAD Solid: {cad_res.design_name.title()}", border_style="magenta")
+                                c_table.add_column("Property", style="bold white")
+                                c_table.add_column("Value", style="green")
+                                c_table.add_row("STL File", cad_res.file_path or "N/A")
+                                c_table.add_row("Volume", f"{cad_res.volume_mm3:,.2f} mm³")
+                                console.print(c_table)
+                        elif t_name in ("sim_ode", "sim"):
+                            from vigyan.tools.sim import simulate_ode
+                            sim_res = simulate_ode(system_type=t_args.get("system_type", "projectile"), params=t_args.get("params", {}))
+                            if sim_res.status == "success":
+                                s_table = Table(title=f"Simulation: {sim_res.system_description}", border_style="green")
+                                s_table.add_column("Metric", style="bold white")
+                                s_table.add_column("Value", style="cyan")
+                                for k, v in sim_res.summary_metrics.items():
+                                    s_table.add_row(k.replace("_", " ").title(), str(v))
+                                console.print(s_table)
+                        elif t_name in ("chem_analyze", "chem"):
+                            from vigyan.tools.chem import analyze_molecule
+                            chem_res = analyze_molecule(t_args.get("smiles", ""))
+                            if chem_res.status == "success":
+                                m_table = Table(title=f"Molecule: {chem_res.smiles}", border_style="blue")
+                                m_table.add_column("Property", style="bold white")
+                                m_table.add_column("Value", style="green")
+                                m_table.add_row("Formula", chem_res.molecular_formula or "N/A")
+                                m_table.add_row("Exact MW", f"{chem_res.molecular_weight} g/mol")
+                                m_table.add_row("LogP", str(chem_res.logp))
+                                console.print(m_table)
+                        elif t_name in ("unit_convert", "unit"):
+                            from vigyan.tools.units import convert_units
+                            u_res = convert_units(t_args.get("expression", ""), target_unit=t_args.get("target_unit"))
+                            if u_res.status == "success":
+                                u_table = Table(title="Unit Conversion", border_style="cyan")
+                                u_table.add_column("Property", style="bold white")
+                                u_table.add_column("Value", style="green")
+                                u_table.add_row("Result", u_res.formatted)
+                                u_table.add_row("Dimensions", escape(u_res.dimensional_formula))
+                                console.print(u_table)
+                    except Exception:
+                        pass
+
                 history.append({"role": "user", "content": user_input})
                 history.append({"role": "assistant", "content": full_reply})
                 if len(history) > 10:
@@ -598,7 +830,7 @@ def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
         console.print(Panel(
             "[bold white]V I G Y A N   P R O   W O R K S T A T I O N[/bold white]\n"
-            "[dim]Sovereign Offline Engineering Intelligence | Zero Cloud Egress | v4.0.0[/dim]\n"
+            "[dim]Sovereign Offline Engineering Intelligence | Zero Cloud Egress | v4.1.0[/dim]\n"
             "[dim cyan]ExperimentLab AI (https://experimentlab.in) | Support: support@experimentlab.in[/dim cyan]\n\n"
             "Commands:\n"
             "  [cyan]vigyan studio[/cyan]                         Launch the Sovereign Desktop Workstation (Artifact Studio)\n"

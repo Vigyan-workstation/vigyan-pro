@@ -22,9 +22,10 @@ export interface ToolResult {
 }
 
 export interface StreamChunk {
-  type: "thinking" | "answer" | "done" | "error" | "tool_result" | "sympy";
+  type: "thinking" | "answer" | "done" | "error" | "tool_result" | "sympy" | "artifact";
   text: string;
   toolData?: ToolResult;
+  artifactData?: any;
 }
 
 export function getAgentHost(): string {
@@ -205,6 +206,8 @@ export async function streamChat(
                 onChunk({ type: "sympy", text: typeof parsed === "string" ? parsed : JSON.stringify(parsed) });
               } else if (eventName === "tool_result") {
                 onChunk({ type: "tool_result", text: "", toolData: parsed as ToolResult });
+              } else if (eventName === "artifact") {
+                onChunk({ type: "artifact", text: "", artifactData: parsed });
               } else if (eventName === "done") {
                 onChunk({ type: "done", text: "" });
                 isStreamDone = true;

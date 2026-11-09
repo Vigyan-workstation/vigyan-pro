@@ -2,7 +2,7 @@
 Vigyan Pro: Sovereign Offline Physical Engineering Intelligence Workstation.
 """
 
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 
 from vigyan.types import ToolResult, MathResult, Artifact
 from vigyan.core import check_engine_health, query_engine, EngineOfflineError

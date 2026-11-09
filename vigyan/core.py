@@ -69,11 +69,10 @@ def query_engine(
     if not check_engine_health(target_url, timeout=0.2):
         if check_engine_health(FALLBACK_ENGINE_URL, timeout=0.2):
             target_url = FALLBACK_ENGINE_URL
-        else:
+        elif not ensure_engine_running(port=8086):
             raise EngineOfflineError(
-                f"Vigyan local engine is unreachable on {target_url} and {FALLBACK_ENGINE_URL}.\n"
-                "Please launch Vigyan Pro Desktop or start the local llama-server via:\n"
-                "  llama-server -m models/vigyan-3b-quad-master-iq3_m.gguf --port 8086 --no-jinja"
+                f"Vigyan local engine is unreachable on {target_url}.\n"
+                "Please verify that ~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf exists."
             )
 
     payload: Dict[str, Any] = {
@@ -135,10 +134,10 @@ def stream_engine(
     if not check_engine_health(target_url, timeout=0.2):
         if check_engine_health(FALLBACK_ENGINE_URL, timeout=0.2):
             target_url = FALLBACK_ENGINE_URL
-        else:
+        elif not ensure_engine_running(port=8086):
             raise EngineOfflineError(
-                f"Vigyan local engine is unreachable on {target_url} and {FALLBACK_ENGINE_URL}.\n"
-                "Please launch Vigyan Pro Desktop or use 'vigyan chat' to start the local engine."
+                f"Vigyan local engine is unreachable on {target_url}.\n"
+                "Please verify that ~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf exists."
             )
 
     try:
@@ -296,7 +295,7 @@ def run_daemon(port: int = 8086, idle_timeout: float = 600.0) -> None:
     try:
         while True:
             time.sleep(10.0)
-            if not sup.is_alive:
+            if not sup.is_alive():
                 break
             last_act = time.time()
             try:

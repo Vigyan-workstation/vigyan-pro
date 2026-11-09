@@ -1,6 +1,6 @@
 {
   "name": "vigyan-pro",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "author": "ExperimentLab AI <support@experimentlab.in>",
   "homepage": "https://experimentlab.in",
   "private": true,
@@ -18,5 +18,9 @@
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2",
     "vite": "^5.4.8"
+  },
+  "dependencies": {
+    "@types/three": "^0.187.0",
+    "three": "^0.187.0"
   }
 }

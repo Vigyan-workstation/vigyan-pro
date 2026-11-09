@@ -1,5 +1,7 @@
 # Packaging & distribution outputs
 /dist/
+dist_release/
+dist_artifacts/
 frontend/dist/
 frontend/node_modules/
 !src/dist/

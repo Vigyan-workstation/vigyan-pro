@@ -85,13 +85,14 @@
 
       const artId = `A-${Math.floor(100 + Math.random() * 900)}`;
       const cleanContent = content.replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "").trim();
+      const isSympyVerified = Boolean(msg.sympyGrounding && msg.sympyGrounding.trim().length > 0);
       const artifact: Artifact = {
         id: artId,
         title: title,
         type: "derivation",
         content: cleanContent,
-        verified: true,
-        sympyResidual: "0.000e+00",
+        verified: isSympyVerified,
+        sympyResidual: isSympyVerified ? "0.000e+00" : undefined,
         createdAt: Date.now(),
       };
       msg.artifact = artifact;
@@ -171,6 +172,11 @@
             chatStore.messages[idx].thinking = `[Symbolically Verified]: ${chunk.text}\n` + chatStore.messages[idx].thinking;
           }
           scrollToBottom();
+        } else if (chunk.type === "artifact" && chunk.artifactData) {
+          artifactStore.openArtifact(chunk.artifactData);
+          chatStore.messages[idx].artifact = chunk.artifactData;
+          chatStore.save();
+          scrollToBottom();
         } else if (chunk.toolData) {
           if (!chatStore.messages[idx].toolResults) {
             chatStore.messages[idx].toolResults = [];
@@ -185,34 +191,7 @@
           chatStore.messages[idx].thinkingDone = true;
           chatStore.messages[idx].streaming = false;
           if (chunk.type === "error") {
-            // Offline fallback for STEM derivations if local engine is unbooted
-            if (trimmed.toLowerCase().includes("rlc")) {
-              chatStore.messages[idx].content = `### Governing Second-Order Differential Equation
-For a series RLC circuit driven by step voltage $V_0$:
-$$L \\frac{d^2 i(t)}{dt^2} + R \\frac{di(t)}{dt} + \\frac{1}{C} i(t) = 0$$
-
-Dividing through by inductance $L$:
-$$\\frac{d^2 i(t)}{dt^2} + 2\\alpha \\frac{di(t)}{dt} + \\omega_0^2 i(t) = 0$$
-
-where attenuation coefficient $\\alpha$ and undamped resonant frequency $\\omega_0$ are:
-$$\\alpha = \\frac{R}{2L} = \\frac{20\\,\\Omega}{2 \\times 0.1\\,\\text{H}} = 100\\,\\text{s}^{-1}$$
-$$\\omega_0 = \\frac{1}{\\sqrt{LC}} = \\frac{1}{\\sqrt{0.1 \\times 100 \\times 10^{-6}}} = 316.23\\,\\text{rad/s}$$
-
-### Underdamped Condition Validation
-The damping ratio $\\zeta$ is:
-$$\\zeta = \\frac{\\alpha}{\\omega_0} = \\frac{100}{316.23} \\approx 0.316 < 1 \\quad \\implies \\quad \\text{Underdamped Response}$$
-
-The damped natural frequency $\\omega_d$ is:
-$$\\omega_d = \\sqrt{\\omega_0^2 - \\alpha^2} = \\sqrt{316.23^2 - 100^2} = 300.00\\,\\text{rad/s}$$
-
-### Analytical Solution
-Applying initial conditions $i(0) = 0$ and $v_C(0) = 0$:
-$$i(t) = \\frac{V_0}{\\omega_d L} e^{-\\alpha t} \\sin(\\omega_d t)$$
-
-$$\\text{SymPy AST Verification: Residual Error } \\mathcal{R} = 0.000\\times 10^0 \\text{ (Analytically Exact)}$$`;
-            } else {
-              chatStore.messages[idx].content = chunk.text;
-            }
+            chatStore.messages[idx].content = chunk.text || "Inference engine connection failed. Please ensure the local Vigyan service is running.";
           }
           synthesizeArtifactIfMath(idx, trimmed);
           chatStore.save();

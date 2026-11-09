@@ -177,3 +177,52 @@ def pull_model(
     )
 
     return downloaded_path
+
+def download_model_direct(
+    filename: str = "vigyan-3b-quad-master-iq3_m.gguf",
+    target_dir: Optional[str] = None
+) -> str:
+    """Download model directly from official GitHub Releases or Hugging Face using zero-dependency urllib."""
+    import urllib.request
+    import shutil
+
+    dest_dir = target_dir or get_models_dir()
+    os.makedirs(dest_dir, exist_ok=True)
+    target_file = os.path.join(dest_dir, filename)
+    if os.path.isfile(target_file) and os.path.getsize(target_file) > 100_000_000:
+        return target_file
+
+    urls = [
+        f"https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v4.1.0/{filename}",
+        f"https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/{filename}"
+    ]
+
+    last_err = None
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Vigyan-Downloader/4.1.0"})
+            with urllib.request.urlopen(req, timeout=60) as resp, open(target_file + ".tmp", "wb") as out:
+                shutil.copyfileobj(resp, out)
+            os.replace(target_file + ".tmp", target_file)
+            return target_file
+        except Exception as e:
+            last_err = e
+            if os.path.isfile(target_file + ".tmp"):
+                try:
+                    os.remove(target_file + ".tmp")
+                except OSError:
+                    pass
+            continue
+    raise RuntimeError(f"Could not retrieve sovereign model '{filename}': {last_err}")
+
+def ensure_default_model(auto_download: bool = True) -> Optional[str]:
+    """Ensures at least one sovereign GGUF model is present locally, downloading directly if necessary."""
+    path = find_model_path()
+    if path:
+        return path
+    if auto_download:
+        try:
+            return download_model_direct("vigyan-3b-quad-master-iq3_m.gguf")
+        except Exception:
+            return None
+    return None

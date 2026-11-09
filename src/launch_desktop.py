@@ -62,7 +62,7 @@ from vigyan.tools.math import solve_math
 try:
     from version import __version__
 except Exception:
-    __version__ = "3.4.0"
+    __version__ = "4.1.0"
 
 try:
     import psutil
@@ -946,7 +946,7 @@ def calc_circuit(circuit_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
             return {"tool": "circuit_calc", "success": False, "error": str(e)}
 
     # 3. 555 ASTABLE TIMER
-    elif ctype in ("555_timer", "555", "astable"):
+    elif ctype in ("555_timer", "555", "astable", "555_astable", "555-astable"):
         try:
             r1 = float(params.get("r1", 10000.0))
             r2 = float(params.get("r2", 47000.0))
@@ -1198,7 +1198,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             ram_pct = tel.get("ram_used_pct", tel.get("ram_pct", get_current_ram_percent()))
             payload.update({
                 "status": "online",
-                "version": "v3.4.0",
+                "version": f"v{__version__}",
                 "agent": "Vigyan-Sovereign-Neuro-Symbolic-Bridge",
                 "llama_server": LLAMA_SUPERVISOR.is_healthy(),
                 "sympy": True,
@@ -1325,6 +1325,32 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
+        if self.path.startswith("/api/export-typst"):
+            from vigyan.tools.typst_export import compile_pdf
+            title = body.get("title", "Scientific Derivation")
+            content = body.get("content", "")
+            author = body.get("author", "Vigyan Sovereign Scientific Workstation")
+            residual = body.get("verified_residual", "0.000e+00")
+            metrics = body.get("metrics", {})
+            try:
+                pdf_bytes = compile_pdf(title, content, author, residual, metrics)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Disposition", 'attachment; filename="report.pdf"')
+                self.send_header("Content-Length", str(len(pdf_bytes)))
+                origin = self.headers.get("Origin", "")
+                if origin.startswith("http://127.0.0.1:") or origin.startswith("http://localhost:") or origin == "null" or not origin:
+                    self.send_header("Access-Control-Allow-Origin", origin if origin else "http://127.0.0.1")
+                    self.send_header("Access-Control-Allow-Credentials", "true")
+                else:
+                    self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1")
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+            except Exception as e:
+                self._send_cors(500)
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            return
+
         if self.path.startswith("/api/chat") or self.path.startswith("/api/agent/stream"):
             telemetry = get_system_telemetry()
             user_query = (body.get("query") or body.get("message") or "").strip()
@@ -1383,16 +1409,19 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
 
             tool_spec = (
                 "\n\nYou have access to the following deterministic STEM AST tools when requested:\n"
+                "- cad_generate: {\"name\": \"cad_generate\", \"arguments\": {\"part_type\": \"bracket|flange\", \"dimensions\": {\"width\": 40, \"height\": 40, \"thickness\": 5}}}\n"
+                "- sim_ode: {\"name\": \"sim_ode\", \"arguments\": {\"system_type\": \"projectile|oscillator\", \"params\": {\"v0\": 50, \"angle\": 45}}}\n"
+                "- chem_analyze: {\"name\": \"chem_analyze\", \"arguments\": {\"smiles\": \"CC(=O)Oc1ccccc1C(=O)O\"}}\n"
+                "- unit_convert: {\"name\": \"unit_convert\", \"arguments\": {\"expression\": \"100 km/h to m/s\"}}\n"
                 "- plot_function: {\"name\": \"plot_function\", \"arguments\": {\"expression\": \"sin(x)\", \"x_min\": -5.0, \"x_max\": 5.0, \"points\": 100}}\n"
                 "- circuit_calc: {\"name\": \"circuit_calc\", \"arguments\": {\"circuit_type\": \"rc_filter|rlc_resonance|555_astable\", \"params\": {\"r\": 10000, \"c\": 1e-7}}}\n"
-                "- physics_sim: {\"name\": \"physics_sim\", \"arguments\": {\"sim_type\": \"kepler_orbit|projectile\", \"params\": {...}}}\n"
                 "To invoke a tool, emit: <tool_call>{\"name\": \"...\", \"arguments\": {...}}</tool_call>"
             )
 
             sys_prompt = (
                 "You are Vigyan AI, a sovereign STEM, math, and physics intelligence system architected by Shreyansh Singh. "
                 "Solve problems with mathematical precision, concise explanations, and clean LaTeX ($$...$$). Be direct, rigorous, and professional. "
-                "When requested to synthesize electrical circuits, physics simulations, or function plots, emit structured <tool_call> JSON specifications."
+                "When requested to design 3D CAD parts, run physics ODE simulations, analyze chemical molecules, or convert units, emit structured <tool_call> JSON specifications."
                 f"{tool_spec}"
             )
             if enrichment.get("sympy"):
@@ -1646,6 +1675,107 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     y_lbl = t_args.get("y_label", "y")
                     plot_res = evaluate_plot(expr, x_min, x_max, pts, title, x_lbl, y_lbl)
                     emit_fn("tool_result", plot_res)
+                elif t_name in ("cad_generate", "cad"):
+                    from vigyan.tools.cad import generate_cad
+                    ptype = t_args.get("part_type", t_args.get("part", "bracket"))
+                    dims = t_args.get("dimensions", t_args.get("params", {}))
+                    cad_res = generate_cad(part_type=ptype, dimensions=dims)
+                    if cad_res.status == "success" and cad_res.file_path and os.path.exists(cad_res.file_path):
+                        with open(cad_res.file_path, "rb") as f:
+                            stl_bytes = f.read()
+                        try:
+                            os.unlink(cad_res.file_path)
+                        except OSError:
+                            pass
+                        b64_stl = base64.b64encode(stl_bytes).decode("ascii")
+                        emit_fn("artifact", {
+                            "id": f"cad_{int(time.time())}",
+                            "title": f"3D CAD: {cad_res.design_name.title()}",
+                            "type": "cad",
+                            "content": f"### Parametric 3D Solid Model\n\n- **Part Type:** `{cad_res.design_name}`\n- **Solid Volume:** `{cad_res.volume_mm3:,.2f} mm³`\n- **Bounding Box:** `{json.dumps(cad_res.bounding_box_mm)}`",
+                            "stlData": f"data:application/sla;base64,{b64_stl}",
+                            "stlFileName": f"{cad_res.design_name}.stl",
+                            "stlMetrics": {"volume_mm3": cad_res.volume_mm3, "bounding_box": cad_res.bounding_box_mm},
+                            "verified": True,
+                            "createdAt": int(time.time() * 1000)
+                        })
+                    emit_fn("tool_result", {
+                        "tool": "cad_generate",
+                        "status": cad_res.status,
+                        "design": cad_res.design_name,
+                        "volume_mm3": cad_res.volume_mm3,
+                        "bounding_box": cad_res.bounding_box_mm,
+                        "error": cad_res.error_message
+                    })
+                elif t_name in ("sim_ode", "sim"):
+                    from vigyan.tools.sim import simulate_ode
+                    stype = t_args.get("system_type", t_args.get("sim_type", "projectile"))
+                    sparams = t_args.get("params") if isinstance(t_args.get("params"), dict) else t_args
+                    sim_res = simulate_ode(system_type=stype, params=sparams)
+                    if sim_res.status == "success":
+                        emit_fn("artifact", {
+                            "id": f"sim_{int(time.time())}",
+                            "title": sim_res.system_description,
+                            "type": "sim",
+                            "content": f"### SciPy RK45 Adaptive ODE Simulation\n\n**System:** {sim_res.system_description}\n\n```json\n{json.dumps(sim_res.summary_metrics, indent=2)}\n```",
+                            "simData": {
+                                "system": sim_res.system_description,
+                                "metrics": sim_res.summary_metrics,
+                                "trajectories": sim_res.state_trajectories,
+                                "timePoints": sim_res.time_points
+                            },
+                            "verified": True,
+                            "createdAt": int(time.time() * 1000)
+                        })
+                    emit_fn("tool_result", {
+                        "tool": "sim_ode",
+                        "status": sim_res.status,
+                        "system": sim_res.system_description,
+                        "metrics": sim_res.summary_metrics,
+                        "error": sim_res.error_message
+                    })
+                elif t_name in ("chem_analyze", "chem"):
+                    from vigyan.tools.chem import analyze_molecule
+                    smiles = t_args.get("smiles", "")
+                    chem_res = analyze_molecule(smiles=smiles, generate_svg=True)
+                    if chem_res.status == "success":
+                        emit_fn("artifact", {
+                            "id": f"chem_{int(time.time())}",
+                            "title": f"{smiles}",
+                            "type": "chem",
+                            "content": f"### RDKit Molecular Structure Analysis\n\n- **Formula:** `{chem_res.molecular_formula}`\n- **Exact MW:** `{chem_res.molecular_weight}` g/mol\n- **LogP:** `{chem_res.logp}`\n- **TPSA:** `{chem_res.tpsa}` Å²",
+                            "chemSvg": chem_res.svg_depiction,
+                            "chemDescriptors": {
+                                "formula": chem_res.molecular_formula,
+                                "mw": chem_res.molecular_weight,
+                                "logp": chem_res.logp,
+                                "tpsa": chem_res.tpsa,
+                                "hbd": chem_res.h_bond_donors,
+                                "hba": chem_res.h_bond_acceptors
+                            },
+                            "verified": True,
+                            "createdAt": int(time.time() * 1000)
+                        })
+                    emit_fn("tool_result", {
+                        "tool": "chem_analyze",
+                        "status": chem_res.status,
+                        "formula": chem_res.molecular_formula,
+                        "mw": chem_res.molecular_weight,
+                        "logp": chem_res.logp,
+                        "error": chem_res.error_message
+                    })
+                elif t_name in ("unit_convert", "unit"):
+                    from vigyan.tools.units import convert_units
+                    expr = t_args.get("expression", "")
+                    t_unit = t_args.get("target_unit") or t_args.get("to")
+                    unit_res = convert_units(expr, target_unit=t_unit)
+                    emit_fn("tool_result", {
+                        "tool": "unit_convert",
+                        "status": unit_res.status,
+                        "formatted": unit_res.formatted,
+                        "dimensions": unit_res.dimensional_formula,
+                        "error": unit_res.error_message
+                    })
                 elif t_name == "circuit_calc":
                     ctype = t_args.get("circuit_type", "rc_filter")
                     cparams = t_args.get("params") if isinstance(t_args.get("params"), dict) else t_args

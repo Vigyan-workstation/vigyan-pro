@@ -66,10 +66,28 @@ def main():
         sys.exit(0)
     except Exception as exc:
         print(f"[Error] Failed to launch desktop shell: {exc}", file=sys.stderr)
-        import webbrowser
-        index_path = os.path.join(src_dir, "dist", "index.html")
-        print(f"[*] Falling back to default browser: file://{index_path}")
-        webbrowser.open(f"file://{os.path.abspath(index_path)}")
+        dist_dir = os.path.join(src_dir, "dist")
+        if os.path.isdir(dist_dir):
+            import http.server
+            import socketserver
+            import webbrowser
+
+            class Handler(http.server.SimpleHTTPRequestHandler):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, directory=dist_dir, **kwargs)
+
+                def log_message(self, format, *args):
+                    pass  # Quiet logging
+
+            try:
+                with socketserver.TCPServer(("127.0.0.1", 0), Handler) as httpd:
+                    port = httpd.server_address[1]
+                    url = f"http://127.0.0.1:{port}"
+                    print(f"[*] Falling back to localhost browser server: {url} (Ctrl+C to stop)...")
+                    webbrowser.open(url)
+                    httpd.serve_forever()
+            except KeyboardInterrupt:
+                print("\n[*] Browser server stopped.")
         sys.exit(1)
 
 
