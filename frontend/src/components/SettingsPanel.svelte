@@ -162,24 +162,24 @@
 
 <!-- Apple Fluid Spring Slide-in Drawer -->
 <aside
-  class="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 flex flex-col bg-[#07080b] border-l border-white/[0.08] shadow-2xl transition-transform duration-300 {open
+  class="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 flex flex-col bg-black border-l border-white/10 shadow-2xl transition-transform duration-300 {open
     ? 'translate-x-0'
     : 'translate-x-full'}"
   style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); will-change: transform;"
 >
-  <!-- Executive Header -->
-  <div class="px-5 py-3.5 border-b border-white/[0.07] bg-[#0a0c10] flex items-center justify-between flex-shrink-0">
+  <!-- Executive Monochrome Header -->
+  <div class="px-5 py-4 border-b border-white/10 bg-black flex items-center justify-between flex-shrink-0">
     <div class="flex items-center gap-2">
       <span class="text-xs font-mono font-semibold tracking-wider text-white uppercase">Workstation Preferences</span>
       {#if saveNotice}
-        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-full transition-all">
+        <span class="text-[10px] font-mono text-black bg-white px-2.5 py-0.5 rounded-full font-semibold transition-all">
           ✓ {saveNotice}
         </span>
       {/if}
     </div>
     <button
       onclick={onClose}
-      class="text-neutral-500 hover:text-white transition-colors p-1 cursor-pointer flex items-center justify-center rounded"
+      class="text-neutral-400 hover:text-white transition-colors p-1.5 cursor-pointer flex items-center justify-center rounded-full hover:bg-white/10"
       aria-label="Close"
     >
       <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -190,11 +190,11 @@
   </div>
 
   <!-- Content Feed -->
-  <div class="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+  <div class="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
 
-    <!-- Active Engine Card -->
+    <!-- Active Engine Card (Spherical rounded-3xl) -->
     <section class="space-y-2">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between px-1">
         <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400">Intelligence Engine</span>
         {#if onOpenModels}
           <button
@@ -202,85 +202,85 @@
               onClose();
               onOpenModels();
             }}
-            class="text-[10px] font-mono text-sky-400 hover:underline cursor-pointer flex items-center gap-1"
+            class="text-[11px] font-mono text-neutral-300 hover:text-white hover:underline cursor-pointer flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 transition-colors"
           >
             <span>Models Catalog</span>
             <span>›</span>
           </button>
         {/if}
       </div>
-      <div class="bg-[#0c0e14] rounded-xl border border-white/[0.08] p-3.5 flex items-center justify-between gap-3">
+      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 flex items-center justify-between gap-3 shadow-md">
         <div class="min-w-0 flex-1">
           <h3 class="text-xs font-semibold text-white tracking-tight truncate">
             {activeModelName ? activeModelName.replace(/\.gguf$/i, "") : "Offline Engine"}
           </h3>
           <p class="text-[10px] text-neutral-400 font-mono mt-0.5 truncate">
-            Hardware Tier: {hardwareTier} • {totalRamGb} GB Host RAM
+            Tier: {hardwareTier} • {totalRamGb} GB Host RAM
           </p>
         </div>
-        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[10px] font-mono text-emerald-400 flex-shrink-0">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black text-[10px] font-mono font-semibold flex-shrink-0 shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-black"></span>
           Active
         </span>
       </div>
     </section>
 
-    <!-- Inference Tuning Section -->
-    <section class="space-y-3">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block">Inference Parameters</span>
-      <div class="bg-[#0c0e14] rounded-xl border border-white/[0.08] p-4 space-y-4">
+    <!-- Inference Tuning Section (Spherical rounded-3xl) -->
+    <section class="space-y-2">
+      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">Inference Parameters</span>
+      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 space-y-4 shadow-md">
         
-        <!-- Temperature Presets -->
+        <!-- Temperature Presets (Spherical rounded-full capsules) -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <label for="temp-slider" class="text-xs text-neutral-300 font-medium">Temperature</label>
-            <span class="text-xs font-mono text-sky-400 font-semibold">{temperature.toFixed(2)}</span>
+            <span class="text-xs font-mono text-white font-semibold">{temperature.toFixed(2)}</span>
           </div>
-          <div class="grid grid-cols-3 gap-1.5">
+          <div class="grid grid-cols-3 gap-2">
             <button
               onclick={() => {
                 temperature = 0.0;
                 updateSetting("temperature", 0.0);
               }}
-              class="py-1.5 px-2 rounded-lg text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature === 0.0
-                ? 'bg-sky-500/20 border-sky-500/40 text-sky-200 shadow-sm'
-                : 'bg-white/[0.03] border-white/5 text-neutral-400 hover:text-white hover:bg-white/[0.06]'}"
+              class="py-2 px-2.5 rounded-full text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature === 0.0
+                ? 'bg-white border-white text-black font-semibold shadow-md'
+                : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
             >
               <span class="font-semibold">0.0 Exact</span>
-              <span class="text-[8px] text-neutral-400">Math & Proofs</span>
+              <span class="text-[8px] {temperature === 0.0 ? 'text-neutral-700' : 'text-neutral-500'}">Math & Proofs</span>
             </button>
             <button
               onclick={() => {
                 temperature = 0.2;
                 updateSetting("temperature", 0.2);
               }}
-              class="py-1.5 px-2 rounded-lg text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature > 0.05 && temperature <= 0.3
-                ? 'bg-sky-500/20 border-sky-500/40 text-sky-200 shadow-sm'
-                : 'bg-white/[0.03] border-white/5 text-neutral-400 hover:text-white hover:bg-white/[0.06]'}"
+              class="py-2 px-2.5 rounded-full text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature > 0.05 && temperature <= 0.3
+                ? 'bg-white border-white text-black font-semibold shadow-md'
+                : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
             >
               <span class="font-semibold">0.2 Balanced</span>
-              <span class="text-[8px] text-neutral-400">Standard STEM</span>
+              <span class="text-[8px] {temperature > 0.05 && temperature <= 0.3 ? 'text-neutral-700' : 'text-neutral-500'}">Standard STEM</span>
             </button>
             <button
               onclick={() => {
                 temperature = 0.7;
                 updateSetting("temperature", 0.7);
               }}
-              class="py-1.5 px-2 rounded-lg text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature > 0.3
-                ? 'bg-sky-500/20 border-sky-500/40 text-sky-200 shadow-sm'
-                : 'bg-white/[0.03] border-white/5 text-neutral-400 hover:text-white hover:bg-white/[0.06]'}"
+              class="py-2 px-2.5 rounded-full text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature > 0.3
+                ? 'bg-white border-white text-black font-semibold shadow-md'
+                : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
             >
-              <span class="font-semibold">0.7 Exploratory</span>
-              <span class="text-[8px] text-neutral-400">Brainstorming</span>
+              <span class="font-semibold">0.7 Creative</span>
+              <span class="text-[8px] {temperature > 0.3 ? 'text-neutral-700' : 'text-neutral-500'}">Brainstorming</span>
             </button>
           </div>
         </div>
 
         <!-- CPU Threading Clamp -->
-        <div class="space-y-1.5 pt-2 border-t border-white/[0.05]">
+        <div class="space-y-1.5 pt-2 border-t border-white/10">
           <div class="flex items-center justify-between">
             <span class="text-xs text-neutral-300 font-medium">CPU Compute Threads</span>
-            <span class="text-xs font-mono text-emerald-400 font-semibold">{cpuThreads} of {maxThreads} cores</span>
+            <span class="text-xs font-mono text-white font-semibold">{cpuThreads} of {maxThreads} cores</span>
           </div>
           <p class="text-[10px] text-neutral-500 leading-normal">
             Clamping threads preserves host responsiveness and prevents screen freezes.
@@ -294,13 +294,13 @@
               step="1"
               bind:value={cpuThreads}
               onchange={() => updateSetting("cpu_threads", cpuThreads)}
-              class="w-full accent-emerald-500 cursor-pointer h-1.5 bg-neutral-800 rounded-lg"
+              class="w-full accent-white cursor-pointer h-2 bg-neutral-800 rounded-full border border-white/10"
             />
           </div>
         </div>
 
-        <!-- Context Window Size -->
-        <div class="space-y-2 pt-2 border-t border-white/[0.05]">
+        <!-- Context Window Size (Spherical rounded-full capsules) -->
+        <div class="space-y-2 pt-2 border-t border-white/10">
           <div class="flex items-center justify-between">
             <span class="text-xs text-neutral-300 font-medium">Context Window</span>
             <span class="text-xs font-mono text-neutral-400">{contextWindow} tokens</span>
@@ -312,9 +312,9 @@
                   contextWindow = ctx;
                   updateSetting("context_window", ctx);
                 }}
-                class="flex-1 py-1 rounded-lg text-xs font-mono border transition-all cursor-pointer {contextWindow === ctx
-                  ? 'bg-white/10 border-white/20 text-white font-semibold'
-                  : 'bg-white/[0.02] border-white/5 text-neutral-400 hover:text-white'}"
+                class="flex-1 py-1.5 rounded-full text-xs font-mono border transition-all cursor-pointer {contextWindow === ctx
+                  ? 'bg-white border-white text-black font-semibold shadow-md'
+                  : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
               >
                 {ctx}
               </button>
@@ -325,12 +325,12 @@
       </div>
     </section>
 
-    <!-- Appearance & Workspace Section -->
-    <section class="space-y-3">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block">Appearance & Workspace</span>
-      <div class="bg-[#0c0e14] rounded-xl border border-white/[0.08] p-4 space-y-4">
+    <!-- Appearance & Workspace Section (Spherical rounded-3xl) -->
+    <section class="space-y-2">
+      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">Appearance & Workspace</span>
+      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 space-y-4 shadow-md">
         
-        <!-- Font Size Scale -->
+        <!-- Font Size Scale (Spherical rounded-full capsules) -->
         <div class="space-y-2">
           <span class="text-xs text-neutral-300 font-medium block">Dialogue Font Scale</span>
           <div class="flex items-center gap-2">
@@ -344,9 +344,9 @@
                   fontSize = f.id as any;
                   updateSetting("font_size", f.id);
                 }}
-                class="flex-1 py-1.5 rounded-lg text-xs font-mono border transition-all cursor-pointer {fontSize === f.id
-                  ? 'bg-white/10 border-white/20 text-white font-semibold'
-                  : 'bg-white/[0.02] border-white/5 text-neutral-400 hover:text-white'}"
+                class="flex-1 py-1.5 rounded-full text-xs font-mono border transition-all cursor-pointer {fontSize === f.id
+                  ? 'bg-white border-white text-black font-semibold shadow-md'
+                  : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
               >
                 {f.label}
               </button>
@@ -355,7 +355,7 @@
         </div>
 
         <!-- Split Canvas Auto-Open -->
-        <div class="flex items-center justify-between pt-2 border-t border-white/[0.05]">
+        <div class="flex items-center justify-between pt-2 border-t border-white/10">
           <div>
             <span class="text-xs text-neutral-300 font-medium block">Artifact Studio Canvas</span>
             <span class="text-[10px] text-neutral-500">Auto-expand split canvas when plots are generated</span>
@@ -365,30 +365,30 @@
               autoOpenCanvas = !autoOpenCanvas;
               updateSetting("auto_open_canvas", autoOpenCanvas);
             }}
-            class="w-9 h-5 rounded-full transition-colors p-0.5 cursor-pointer relative {autoOpenCanvas ? 'bg-emerald-500' : 'bg-neutral-800'}"
+            class="w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer relative {autoOpenCanvas ? 'bg-white' : 'bg-neutral-800 border border-white/10'}"
             aria-label="Toggle auto canvas"
           >
-            <div class="w-4 h-4 rounded-full bg-white transition-transform {autoOpenCanvas ? 'translate-x-4' : 'translate-x-0'}"></div>
+            <div class="w-5 h-5 rounded-full transition-transform {autoOpenCanvas ? 'bg-black translate-x-5' : 'bg-neutral-400 translate-x-0'}"></div>
           </button>
         </div>
 
       </div>
     </section>
 
-    <!-- Storage & System Diagnostics -->
-    <section class="space-y-3">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block">Storage & Diagnostics</span>
-      <div class="bg-[#0c0e14] rounded-xl border border-white/[0.08] p-4 space-y-3 text-xs">
+    <!-- Storage & System Diagnostics (Spherical rounded-3xl) -->
+    <section class="space-y-2">
+      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">Storage & Diagnostics</span>
+      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 space-y-3 text-xs shadow-md">
         {#if storageStats}
           <div class="space-y-1.5">
             <div class="flex items-center justify-between text-[11px] font-mono">
               <span class="text-neutral-400">Models Storage (~/.vigyan/models/)</span>
               <span class="text-white font-semibold">{storageStats.models_formatted || "0 MB"}</span>
             </div>
-            <!-- Disk Usage Meter -->
-            <div class="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
+            <!-- Monochrome Spherical Disk Usage Meter -->
+            <div class="w-full h-2 bg-neutral-900 rounded-full overflow-hidden border border-white/10">
               <div
-                class="h-full bg-sky-500 transition-all duration-300"
+                class="h-full bg-white rounded-full transition-all duration-300"
                 style="width: {Math.max(5, Math.min(100, storageStats.disk_percent || 15))}%;"
               ></div>
             </div>
@@ -399,13 +399,13 @@
           </div>
         {/if}
 
-        <div class="pt-2 border-t border-white/[0.05]">
+        <div class="pt-2 border-t border-white/10">
           <button
             type="button"
             onclick={handleResetChat}
-            class="w-full py-2 px-3 rounded-lg text-xs font-mono font-medium transition-all border cursor-pointer {confirmReset
-              ? 'bg-rose-950/60 border-rose-500 text-rose-200 animate-pulse'
-              : 'bg-white/[0.03] border-white/10 text-rose-400 hover:bg-rose-950/20 hover:border-rose-800/40'}"
+            class="w-full py-2.5 px-4 rounded-full text-xs font-mono font-medium transition-all border cursor-pointer {confirmReset
+              ? 'bg-white text-black border-white animate-pulse font-semibold shadow-md'
+              : 'bg-white/[0.04] border-white/15 text-neutral-300 hover:bg-white hover:text-black hover:border-white'}"
           >
             {confirmReset ? "Click again to confirm reset" : "Clear Conversation History"}
           </button>
@@ -413,18 +413,18 @@
       </div>
     </section>
 
-    <!-- About Section -->
+    <!-- About Section (Spherical rounded-3xl) -->
     <section class="space-y-2">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block">About</span>
-      <div class="bg-[#0c0e14] border border-white/[0.08] rounded-xl p-3.5 space-y-2 text-[11px]">
+      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">About</span>
+      <div class="bg-[#0a0a0a] border border-white/10 rounded-3xl p-4 space-y-2.5 text-[11px] shadow-md">
         <div class="flex items-center justify-between text-white">
-          <span class="font-medium">Vigyan Pro Desktop</span>
-          <span class="font-mono text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded-full">v5.0.0</span>
+          <span class="font-semibold text-xs">Vigyan Pro Desktop</span>
+          <span class="font-mono text-[10px] text-black bg-white px-2.5 py-0.5 rounded-full font-semibold">v5.0.0</span>
         </div>
         <p class="text-neutral-400 leading-relaxed text-[10px]">
           Sovereign physical and mathematical engineering intelligence workstation combining local SLMs with exact closed-form SymPy CAS algebra.
         </p>
-        <div class="pt-2 border-t border-white/[0.05] space-y-1 text-[10px] font-mono text-neutral-500">
+        <div class="pt-2.5 border-t border-white/10 space-y-1 text-[10px] font-mono text-neutral-500">
           <div class="flex justify-between">
             <span>Author</span>
             <span class="text-neutral-300">ExperimentLab AI</span>

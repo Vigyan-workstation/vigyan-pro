@@ -158,8 +158,25 @@
       {/if}
 
       <!-- Assistant text response with offline KaTeX typography -->
+      {#if !content && streaming}
+        <div class="flex items-center gap-3 py-1.5 select-none">
+          <div class="flex items-center gap-[3px] h-4 px-1" aria-label="Generating animation">
+            {#each [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as i}
+              <span
+                class="quantum-bar bg-white rounded-full"
+                style="animation-delay: {i * 0.08}s;"
+              ></span>
+            {/each}
+          </div>
+          <span class="text-xs font-mono text-neutral-300 font-medium">
+            Generating sovereign response…
+          </span>
+        </div>
+      {/if}
       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-      <div class="prose-vigyan text-[14px] select-text">{@html rendered}{#if streaming}<span class="animate-blink text-[#10b981] ml-0.5">▋</span>{/if}</div>
+      {#if content}
+        <div class="prose-vigyan text-[14px] select-text">{@html rendered}{#if streaming}<span class="animate-blink text-white ml-1 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">▋</span>{/if}</div>
+      {/if}
     {/if}
 
     <!-- Discreet Hover Micro-Toolbar for Context Actions -->
@@ -215,6 +232,24 @@
 </div>
 
 <style>
+  @keyframes quantumWave {
+    0%, 100% {
+      height: 4px;
+      opacity: 0.35;
+      transform: scaleY(1);
+    }
+    50% {
+      height: 15px;
+      opacity: 1;
+      transform: scaleY(1.15);
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+    }
+  }
+  .quantum-bar {
+    width: 2.5px;
+    min-height: 4px;
+    animation: quantumWave 1.05s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  }
   :global(.prose-vigyan .katex) {
     font-size: 1.08em;
   }

@@ -103,10 +103,10 @@
   }
 
   export async function downloadFlagship() {
-    let target = models.find(m => m.id === "vigyan-3b-quad-master" || m.filename.includes("vigyan-3b-quad-master"));
+    let target = models.find(m => m.id === "vigyan-3b-quad-master" || m.filename.includes("vigyan-3b-quad-master") || m.filename.includes("vigyan-2b-stem"));
     if (!target) {
-      await fetchCatalog(true);
-      target = models.find(m => m.id === "vigyan-3b-quad-master" || m.filename.includes("vigyan-3b-quad-master"));
+      await fetchCatalog(true, true);
+      target = models.find(m => m.id === "vigyan-3b-quad-master" || m.filename.includes("vigyan-3b-quad-master") || m.filename.includes("vigyan-2b-stem"));
     }
     if (target) {
       await handleDownload(target);
@@ -734,6 +734,19 @@
                 class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 cursor-pointer flex items-center gap-1"
               >
                 <span>Activate Now ›</span>
+              </button>
+            </div>
+          {:else if dl && dl.status === 'error'}
+            <div class="flex items-center justify-between pt-1 gap-2">
+              <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-rose-400 truncate">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                <span class="truncate">Download failed: {dl.error || "Network error"}</span>
+              </span>
+              <button
+                onclick={() => handleDownload(m)}
+                class="px-2.5 py-1 rounded text-[11px] font-mono font-medium bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 cursor-pointer flex items-center gap-1 flex-shrink-0"
+              >
+                <span>Retry ↻</span>
               </button>
             </div>
           {:else}

@@ -1087,20 +1087,20 @@ VERIFIED_EXPERIMENTLAB_MODELS = [
         "name": "Vigyan-3B Quad-Master",
         "tag": "vigyan-3b",
         "filename": "vigyan-3b-quad-master-iq3_m.gguf",
-        "size_bytes": 1490000000,
+        "size_bytes": 1488894752,
         "size_formatted": "1.39 GB",
         "ram_required_gb": 4.0,
         "domain": "Flagship STEM, Calculus & Exact CAS",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
     },
     {
         "id": "vigyan-2b-stem-q4_k_m",
         "name": "Vigyan-2B STEM Reasoner",
         "tag": "vigyan-2b-stem",
         "filename": "vigyan-2b-stem-q4_k_m.gguf",
-        "size_bytes": 1260000000,
-        "size_formatted": "1.18 GB",
+        "size_bytes": 1170000000,
+        "size_formatted": "1.09 GB",
         "ram_required_gb": 3.0,
         "domain": "Fast Real Analysis & Theorem Prover",
         "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-stem-q4_k_m.gguf?download=true",
@@ -1111,8 +1111,8 @@ VERIFIED_EXPERIMENTLAB_MODELS = [
         "name": "Vigyan-2B Reasoning",
         "tag": "vigyan-2b-reasoning",
         "filename": "vigyan-2b-reasoning-q4_k_m.gguf",
-        "size_bytes": 1260000000,
-        "size_formatted": "1.18 GB",
+        "size_bytes": 1170000000,
+        "size_formatted": "1.09 GB",
         "ram_required_gb": 3.0,
         "domain": "Deterministic Logic & Multi-Step Reasoning",
         "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-reasoning-q4_k_m.gguf?download=true",
@@ -1122,73 +1122,85 @@ VERIFIED_EXPERIMENTLAB_MODELS = [
         "id": "vigyan-1.5b-4x-moe",
         "name": "Vigyan-1.5B 4x-MoE",
         "tag": "vigyan-1.5b-moe",
-        "filename": "vigyan-1.5b-4x-moe.gguf",
-        "size_bytes": 1180000000,
-        "size_formatted": "1.10 GB",
-        "ram_required_gb": 3.0,
+        "filename": "vigyan-1.5b-4x-moe.Q4_K_M.gguf",
+        "size_bytes": 3920000000,
+        "size_formatted": "3.65 GB",
+        "ram_required_gb": 4.5,
         "domain": "High-Velocity Top-2 MoE Calculus",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-1.5B-4x-MoE/resolve/main/vigyan-1.5b-4x-moe.gguf?download=true",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-1.5B-4x-MoE/resolve/main/vigyan-1.5b-4x-moe.Q4_K_M.gguf?download=true",
         "hf_repo": "Experimentlab/Vigyan-1.5B-4x-MoE",
+    },
+    {
+        "id": "vigyan-1.5b-quad-master-q4_k_m",
+        "name": "Vigyan-1.5B Quad-Master",
+        "tag": "vigyan-1.5b-quad",
+        "filename": "vigyan-1.5b-quad-master-q4_k_m.gguf",
+        "size_bytes": 1116000000,
+        "size_formatted": "1.04 GB",
+        "ram_required_gb": 2.5,
+        "domain": "Ultra-Lightweight Exact Analytical Engine",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-1.5b-quad-master/resolve/main/vigyan-1.5b-quad-master-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-1.5b-quad-master",
     },
     {
         "id": "vigyan-7b-stem-q4_k_m",
         "name": "Vigyan-7B STEM Instruct",
         "tag": "vigyan-7b-stem",
         "filename": "vigyan-7b-stem-q4_k_m.gguf",
-        "size_bytes": 4400000000,
-        "size_formatted": "4.10 GB",
+        "size_bytes": 4467000000,
+        "size_formatted": "4.16 GB",
         "ram_required_gb": 8.0,
         "domain": "Comprehensive Science & Physical Engineering",
         "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-7b-stem-q4_k_m.gguf?download=true",
         "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
     },
     {
-        "id": "olmo2-7b-phd-pure-math",
-        "name": "OLMo2-7B PhD Pure Math",
-        "tag": "olmo2-phd-math",
-        "filename": "olmo2-7b-phd-pure-math.gguf",
-        "size_bytes": 4400000000,
-        "size_formatted": "4.10 GB",
+        "id": "vigyan-7b-quad-master-q4_k_m",
+        "name": "Vigyan-7B Quad-Master",
+        "tag": "vigyan-7b-quad",
+        "filename": "vigyan-7b-quad-master-q4_k_m.gguf",
+        "size_bytes": 4467000000,
+        "size_formatted": "4.16 GB",
         "ram_required_gb": 8.0,
-        "domain": "Doctoral Proofs & Abstract Algebra",
-        "hf_url": "https://huggingface.co/Experimentlab/olmo2-7b-phd-pure-math/resolve/main/olmo2-7b-phd-pure-math.gguf?download=true",
-        "hf_repo": "Experimentlab/olmo2-7b-phd-pure-math",
+        "domain": "Doctoral Proofs & Advanced Symbolic Algebra",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-olmo2-7b-quad-master/resolve/main/vigyan-7b-quad-master-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-olmo2-7b-quad-master",
     },
     {
-        "id": "olmo2-7b-silicon-rtl-eda",
-        "name": "OLMo2-7B Silicon RTL & EDA",
-        "tag": "olmo2-silicon-eda",
-        "filename": "olmo2-7b-silicon-rtl-eda.gguf",
-        "size_bytes": 4400000000,
-        "size_formatted": "4.10 GB",
+        "id": "vigyan-7b-moe-q4_k_m",
+        "name": "Vigyan-7B MoE Masterpiece",
+        "tag": "vigyan-7b-moe",
+        "filename": "vigyan-7b-moe-q4_k_m.gguf",
+        "size_bytes": 4209000000,
+        "size_formatted": "3.92 GB",
         "ram_required_gb": 8.0,
-        "domain": "Verilog RTL & VLSI Circuit Synthesis",
-        "hf_url": "https://huggingface.co/Experimentlab/olmo2-7b-silicon-rtl-eda/resolve/main/olmo2-7b-silicon-rtl-eda.gguf?download=true",
-        "hf_repo": "Experimentlab/olmo2-7b-silicon-rtl-eda",
+        "domain": "Sparse Mixture-of-Experts STEM Synthesis",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-olmoe-1b-7b-dpo-masterpiece/resolve/main/vigyan-7b-moe-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-olmoe-1b-7b-dpo-masterpiece",
     },
     {
-        "id": "olmo2-7b-biomed-chem",
-        "name": "OLMo2-7B BioMed & Chem",
-        "tag": "olmo2-biomed",
-        "filename": "olmo2-7b-biomed-chem.gguf",
-        "size_bytes": 4400000000,
-        "size_formatted": "4.10 GB",
-        "ram_required_gb": 8.0,
-        "domain": "Bio-Molecular Alignment & Pharmacology",
-        "hf_url": "https://huggingface.co/Experimentlab/olmo2-7b-biomed-chem/resolve/main/olmo2-7b-biomed-chem.gguf?download=true",
-        "hf_repo": "Experimentlab/olmo2-7b-biomed-chem",
+        "id": "vidhi-ai-1.5b-q4_k_m",
+        "name": "Vidhi-AI-1.5B Legal Reasoner",
+        "tag": "vidhi-1.5b",
+        "filename": "vidhi-ai-1.5b-q4_k_m.gguf",
+        "size_bytes": 1116000000,
+        "size_formatted": "1.04 GB",
+        "ram_required_gb": 2.5,
+        "domain": "Sovereign Legal Jurisprudence & Statutory Analysis",
+        "hf_url": "https://huggingface.co/shreyansh12183/vidhi-ai-1.5b-sovereign-masterpiece/resolve/main/vidhi-ai-1.5b-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vidhi-ai-1.5b-sovereign-masterpiece",
     },
     {
-        "id": "vigyan-vl-4b-iq3_m",
-        "name": "Vigyan-VL-4B Multimodal",
-        "tag": "vigyan-vl-4b",
-        "filename": "vigyan-vl-4b-iq3_m.gguf",
-        "size_bytes": 2570000000,
-        "size_formatted": "2.40 GB",
-        "ram_required_gb": 6.0,
-        "domain": "Vision-Language, Schematics & Diagram OCR",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vl4b/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
+        "id": "vigyan-125m-q4_k_m",
+        "name": "Vigyan-125M Canary Reasoner",
+        "tag": "vigyan-125m",
+        "filename": "vigyan-125m-q4_k_m.gguf",
+        "size_bytes": 150000000,
+        "size_formatted": "0.14 GB",
+        "ram_required_gb": 1.0,
+        "domain": "Ultra-Fast Micro-Edge Canary Model",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-125m-158bit-gguf/resolve/main/vigyan-125m-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-125m-158bit-gguf",
     }
 ]
 
@@ -1432,7 +1444,8 @@ def _infer_model_domain(filename: str, repo_id: str) -> str:
 
 
 def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
-    """Scan all Hugging Face repos under author 'Experimentlab' dynamically."""
+    """Scan all public Hugging Face repos under Experimentlab and author accounts dynamically."""
+    import concurrent.futures
     cache_file = os.path.expanduser("~/.vigyan/models/hf_catalog_cache.json")
     now = time.time()
     
@@ -1441,67 +1454,100 @@ def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]
             with open(cache_file, "r") as f:
                 data = json.load(f)
                 if now - data.get("timestamp", 0) < 600:
-                    return data.get("models", [])
+                    cached = data.get("models", [])
+                    if cached:
+                        return cached
         except Exception:
             pass
 
     discovered = []
     seen_filenames = set()
-    try:
-        req = urllib.request.Request(
-            "https://huggingface.co/api/models?author=Experimentlab",
-            headers={"User-Agent": "Vigyan-Pro-Discovery/5.0"}
-        )
-        with urllib.request.urlopen(req, timeout=5) as r:
-            repos = json.loads(r.read())
+    authors = ["Experimentlab", "shreyansh12183"]
+    all_repos = []
 
-        for repo in repos:
-            repo_id = repo.get("id")
-            if not repo_id or repo_id.endswith("/README"):
-                continue
-            try:
-                tree_url = f"https://huggingface.co/api/models/{repo_id}/tree/main?recursive=True"
-                treq = urllib.request.Request(tree_url, headers={"User-Agent": "Vigyan-Pro-Discovery/5.0"})
-                with urllib.request.urlopen(treq, timeout=4) as tr:
-                    tree = json.loads(tr.read())
-                    for f in tree:
-                        path = f.get("path", "")
-                        if path.endswith(".gguf") and not os.path.basename(path).startswith("mmproj"):
-                            fname = os.path.basename(path)
-                            if fname in seen_filenames:
-                                continue
+    for author in authors:
+        try:
+            req = urllib.request.Request(
+                f"https://huggingface.co/api/models?author={author}",
+                headers={"User-Agent": "Vigyan-Pro-Discovery/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as r:
+                r_list = json.loads(r.read())
+                for repo in r_list:
+                    # STRICT GUARD: Never include or probe private repositories
+                    if repo.get("private", False):
+                        continue
+                    repo_id = repo.get("id")
+                    if repo_id and not repo_id.endswith("/README"):
+                        all_repos.append(repo_id)
+        except Exception:
+            pass
+
+    def scan_repo_tree(repo_id: str) -> List[Dict[str, Any]]:
+        repo_discovered = []
+        try:
+            tree_url = f"https://huggingface.co/api/models/{repo_id}/tree/main?recursive=True"
+            treq = urllib.request.Request(tree_url, headers={"User-Agent": "Vigyan-Pro-Discovery/5.0"})
+            with urllib.request.urlopen(treq, timeout=4) as tr:
+                tree = json.loads(tr.read())
+                for f in tree:
+                    path = f.get("path", "")
+                    if path.endswith(".gguf") and not os.path.basename(path).startswith("mmproj"):
+                        fname = os.path.basename(path)
+                        size_bytes = f.get("size", 0)
+                        size_gb = round(size_bytes / (1024 ** 3), 2)
+                        ram_req = max(2.0, round(size_gb * 1.4 + 0.8, 1))
+                        hf_url = f"https://huggingface.co/{repo_id}/resolve/main/{path}?download=true"
+                        
+                        repo_discovered.append({
+                            "id": fname.replace(".gguf", "").lower(),
+                            "name": _format_clean_model_name(fname, repo_id),
+                            "tag": fname.replace(".gguf", "").lower(),
+                            "filename": fname,
+                            "rel_path": path,
+                            "size_bytes": size_bytes,
+                            "size_formatted": f"{size_gb} GB",
+                            "ram_required_gb": ram_req,
+                            "domain": _infer_model_domain(fname, repo_id),
+                            "hf_url": hf_url,
+                            "hf_repo": repo_id
+                        })
+        except Exception:
+            pass
+        return repo_discovered
+
+    if all_repos:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(scan_repo_tree, r_id) for r_id in all_repos]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    res = future.result()
+                    for item in res:
+                        fname = item["filename"]
+                        if fname not in seen_filenames:
                             seen_filenames.add(fname)
-                            size_bytes = f.get("size", 0)
-                            size_gb = round(size_bytes / (1024 ** 3), 2)
-                            ram_req = max(2.0, round(size_gb * 1.4 + 0.8, 1))
-                            hf_url = f"https://huggingface.co/{repo_id}/resolve/main/{path}?download=true"
-                            
-                            discovered.append({
-                                "id": fname.replace(".gguf", "").lower(),
-                                "name": _format_clean_model_name(fname, repo_id),
-                                "tag": fname.replace(".gguf", "").lower(),
-                                "filename": fname,
-                                "rel_path": path,
-                                "size_bytes": size_bytes,
-                                "size_formatted": f"{size_gb} GB",
-                                "ram_required_gb": ram_req,
-                                "domain": _infer_model_domain(fname, repo_id),
-                                "hf_url": hf_url,
-                                "hf_repo": repo_id
-                            })
-            except Exception:
-                pass
+                            discovered.append(item)
+                except Exception:
+                    pass
 
-        if discovered:
-            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-            try:
-                with open(cache_file, "w") as f:
-                    json.dump({"timestamp": now, "models": discovered}, f, indent=2)
-            except Exception:
-                pass
-            return discovered
-    except Exception:
-        pass
+    if discovered:
+        # Sort so flagship and compact models appear at top
+        discovered.sort(key=lambda m: (
+            0 if "3b-quad-master" in m["filename"] else
+            1 if "2b-stem" in m["filename"] else
+            2 if "1.5b-quad" in m["filename"] else
+            3 if "moe" in m["filename"] else
+            4 if "reasoning" in m["filename"] else
+            5 if "7b" in m["filename"] else 6,
+            m["size_bytes"]
+        ))
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        try:
+            with open(cache_file, "w") as f:
+                json.dump({"timestamp": now, "models": discovered}, f, indent=2)
+        except Exception:
+            pass
+        return discovered
 
     if os.path.isfile(cache_file):
         try:
