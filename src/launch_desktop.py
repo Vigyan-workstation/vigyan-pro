@@ -58,25 +58,12 @@ for _sys_p in (
     if os.path.isdir(_sys_p) and _sys_p not in sys.path:
         sys.path.append(_sys_p)
 
-# Set Ollama hybrid compute acceleration flags before spawning daemon
-os.environ.setdefault("OLLAMA_FLASH_ATTENTION", "1")
-os.environ.setdefault("OLLAMA_KV_CACHE_TYPE", "q8_0")
-os.environ.setdefault("OLLAMA_NUM_PARALLEL", "1")
-os.environ.setdefault("OLLAMA_IGPU_ENABLE", "1")
-os.environ.setdefault("OLLAMA_ORIGINS", "*")
-
-from ollama_supervisor import OllamaSupervisor
 from llama_supervisor import LlamaServerSupervisor
-
-try:
-    import tools
-except Exception:
-    tools = None
 
 try:
     from version import __version__
 except Exception:
-    __version__ = "2.7.0-beta.1"
+    __version__ = "5.0.0"
 
 try:
     import psutil
@@ -2076,6 +2063,87 @@ def compress_conversation_history(messages: List[Dict[str, str]], max_tokens_est
 
 
 # ==============================================================================
+# 3.25 USER WORKSTATION PREFERENCES & STORAGE MANAGEMENT
+# ==============================================================================
+CONFIG_FILE = os.path.expanduser("~/.vigyan/config.json")
+
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "temperature": 0.0,
+    "cpu_threads": max(1, min(4, (os.cpu_count() or 4) - 1)),
+    "context_window": 2048,
+    "font_size": "md",
+    "auto_open_canvas": True,
+}
+
+
+def load_user_config() -> Dict[str, Any]:
+    os.makedirs(os.path.expanduser("~/.vigyan"), exist_ok=True)
+    cfg = dict(DEFAULT_CONFIG)
+    if os.path.isfile(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    cfg.update(data)
+        except Exception:
+            pass
+    return cfg
+
+
+def save_user_config(updates: Dict[str, Any]) -> Dict[str, Any]:
+    os.makedirs(os.path.expanduser("~/.vigyan"), exist_ok=True)
+    cfg = load_user_config()
+    for k, v in updates.items():
+        if k in DEFAULT_CONFIG:
+            cfg[k] = v
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as exc:
+        print(f"[Warning] Failed to persist config to {CONFIG_FILE}: {exc}", file=sys.stderr)
+    return cfg
+
+
+def get_storage_stats() -> Dict[str, Any]:
+    models_dir = os.path.expanduser("~/.vigyan/models")
+    total_model_bytes = 0
+    if os.path.isdir(models_dir):
+        for root, _, files in os.walk(models_dir):
+            for file in files:
+                try:
+                    total_model_bytes += os.path.getsize(os.path.join(root, file))
+                except OSError:
+                    pass
+
+    total_disk_bytes, used_disk_bytes, free_disk_bytes = 0, 0, 0
+    try:
+        usage = shutil.disk_usage(models_dir if os.path.isdir(models_dir) else os.path.expanduser("~"))
+        total_disk_bytes = usage.total
+        free_disk_bytes = usage.free
+        used_disk_bytes = usage.used
+    except Exception:
+        pass
+
+    def _fmt(b: int) -> str:
+        if b >= 1024**3:
+            return f"{b / (1024**3):.2f} GB"
+        if b >= 1024**2:
+            return f"{b / (1024**2):.1f} MB"
+        return f"{b / 1024:.0f} KB"
+
+    return {
+        "models_dir": models_dir,
+        "models_bytes": total_model_bytes,
+        "models_formatted": _fmt(total_model_bytes),
+        "free_bytes": free_disk_bytes,
+        "free_formatted": _fmt(free_disk_bytes),
+        "total_bytes": total_disk_bytes,
+        "total_formatted": _fmt(total_disk_bytes),
+        "disk_percent": round((used_disk_bytes / total_disk_bytes * 100), 1) if total_disk_bytes > 0 else 0
+    }
+
+
+# ==============================================================================
 # 3.3 EMBEDDED LOCAL SOVEREIGN AGENT & NEURO-SYMBOLIC BRIDGE (PORT 8085)
 # ==============================================================================
 class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
@@ -2146,6 +2214,20 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             self._send_cors(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
+
+        if self.path.startswith("/api/settings"):
+            cfg = load_user_config()
+            cfg["max_cpu_threads"] = os.cpu_count() or 4
+            cfg["hardware"] = _STATIC_HW_CACHE or _discover_static_hardware()
+            self._send_cors(200)
+            self.wfile.write(json.dumps(cfg).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/storage"):
+            stats = get_storage_stats()
+            self._send_cors(200)
+            self.wfile.write(json.dumps(stats).encode("utf-8"))
+            return
         else:
             # Universal cross-platform static file serving (dist/ priority then src/)
             clean_path = self.path.split("?")[0]
@@ -2213,6 +2295,16 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             body = json.loads(raw)
         except Exception:
             body = {}
+
+        if self.path.startswith("/api/settings"):
+            updated = save_user_config(body)
+            if "cpu_threads" in body and hasattr(LLAMA_SUPERVISOR, "_threads"):
+                LLAMA_SUPERVISOR._threads = body["cpu_threads"]
+            if "context_window" in body and hasattr(LLAMA_SUPERVISOR, "_ctx_size"):
+                LLAMA_SUPERVISOR._ctx_size = body["context_window"]
+            self._send_cors(200)
+            self.wfile.write(json.dumps({"success": True, "settings": updated}).encode("utf-8"))
+            return
 
         if self.path == "/api/models/download/pause" or self.path.startswith("/api/models/download/pause"):
             tag = body.get("tag") or body.get("filename")
@@ -2412,24 +2504,16 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 cites = [f"[{a['domain']}: {a['law']}] {a['equation']}" for a in enrichment["graph_axioms"]]
                 _emit("memory", "<br>• " + "<br>• ".join(cites))
 
-            tool_spec = ""
-            try:
-                import tools
-                tool_spec = "\n" + tools.get_tool_schemas_prompt()
-            except Exception:
-                pass
-
             sys_prompt = (
                 "You are Vigyan AI, a sovereign STEM, math, and physics intelligence system architected by Shreyansh Singh. "
                 "Solve problems with mathematical precision, concise explanations, and clean LaTeX ($$...$$). Be direct, rigorous, and professional. "
                 "When requested to synthesize digital bus waveforms, PCB netlists, or verify mathematical plots and formulas, emit structured <tool_call> JSON specifications."
-                f"{tool_spec}"
             )
             if enrichment.get("sympy"):
                 s = enrichment["sympy"]
                 sys_prompt += f"\n[SymPy Verified Grounding]: {s.get('expression')} = {s.get('result')}"
 
-            # Sovereign Offline Ollama with RAM Governor
+            # Sovereign Offline Engine with RAM Governor
             cascade = select_cascade_model(requested_model, user_query)
             active_model = cascade["model"]
             _emit("cascade_tier", cascade)
@@ -2438,7 +2522,7 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 _emit("think", f"[RAM Guard]: System routed to {active_model} Sovereign Engine.\n")
 
             try:
-                hybrid = enrichment["hybrid"]
+                user_cfg = load_user_config()
                 user_ctx = None
                 try:
                     if body.get("num_ctx"):
@@ -2448,8 +2532,8 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 except Exception:
                     user_ctx = None
 
-                # RAM-Safe Dynamic Context Budget Clamping (Default 4096, scalable to 8192)
-                target_ctx = user_ctx or hybrid.get("num_ctx", 4096)
+                # RAM-Safe Dynamic Context Budget Clamping
+                target_ctx = user_ctx or user_cfg.get("context_window", 2048)
                 avail_ram = telemetry.get("ram_avail_gb", 4.0)
                 if target_ctx > 8192 and avail_ram < 5.0:
                     target_ctx = 8192
@@ -2469,11 +2553,13 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     ]
                 user_temp = body.get("temperature")
                 if user_temp is None:
-                    user_temp = body.get("options", {}).get("temperature", 0.05)
+                    user_temp = body.get("options", {}).get("temperature")
+                if user_temp is None:
+                    user_temp = user_cfg.get("temperature", 0.0)
                 try:
                     user_temp = max(0.0, min(2.0, float(user_temp)))
                 except Exception:
-                    user_temp = 0.05
+                    user_temp = 0.0
 
                 # Verified stop sequences and generation parameters
                 stop_sequences = [
@@ -2717,9 +2803,6 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     sparams = t_args.get("params") if isinstance(t_args.get("params"), dict) else t_args
                     phys_res = calc_physics(stype, sparams)
                     emit_fn("tool_result", phys_res)
-                elif tools and t_name in tools.get_all_tools():
-                    tool_res = tools.dispatch_tool(t_name, t_args)
-                    emit_fn("tool_result", tool_res)
             except Exception:
                 pass
 
@@ -2740,7 +2823,12 @@ def start_neuro_symbolic_bridge_server(port: int = 8085) -> Optional[int]:
 # ==============================================================================
 # 4. OLLAMA DAEMON SUPERVISOR & WEBKITGTK WORKSTATION SHELL
 # ==============================================================================
-LLAMA_SUPERVISOR = LlamaServerSupervisor(port=8086)
+_init_cfg = load_user_config()
+LLAMA_SUPERVISOR = LlamaServerSupervisor(
+    port=8086,
+    threads=_init_cfg.get("cpu_threads"),
+    ctx_size=_init_cfg.get("context_window")
+)
 
 
 def ensure_llama_server() -> None:

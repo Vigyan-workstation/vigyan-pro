@@ -77,15 +77,19 @@
   }
 
   function getModelTitle(m: ModelItem): string {
+    const raw = (m.name || m.filename || "").replace(/\.gguf$/i, "").toLowerCase();
+    if (raw.includes("3b-quad-master")) return "Vigyan-3B Quad-Master";
+    if (raw.includes("1.5b-4x-moe") || raw.includes("1.5b-moe")) return "Vigyan-1.5B (4x MoE)";
+    if (raw.includes("2b-stem")) return "Vigyan-2B STEM Reasoner";
+    if (raw.includes("2b-reasoning")) return "Vigyan-2B Logic Reasoner";
+    if (raw.includes("7b-stem") || raw.includes("4th-gen-7b") || raw.includes("gen-4-7b")) return "Vigyan-7B STEM Engine";
+    if (raw.includes("silicon-rtl") || raw.includes("silicon-eda")) return "OLMo2-7B Silicon RTL & EDA";
+    if (raw.includes("biomed-chem")) return "OLMo2-7B BioMed & Chem";
+    if (raw.includes("vl-4b") || raw.includes("vl4b")) return "Vigyan-VL-4B Multimodal";
     if (m.name && !m.name.toLowerCase().endsWith(".gguf") && m.name !== m.filename) {
       return m.name;
     }
-    const clean = (m.name || m.filename || "").replace(/\.gguf$/i, "");
-    if (/quad-master/i.test(clean)) return "Vigyan-3B Quad-Master";
-    if (/4th-gen-7b|gen-4-7b/i.test(clean)) return "Vigyan-7B Gen-4";
-    if (/deepseek.*1\.5b/i.test(clean)) return "DeepSeek-R1 Distill 1.5B";
-    if (/vigyan-2b/i.test(clean)) return "Vigyan-2B Reasoner";
-    return clean
+    return raw
       .split(/[-_]/)
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
@@ -404,12 +408,12 @@
   ></button>
 {/if}
 
-<!-- Obsidian Executive Slide-in Drawer -->
+<!-- Obsidian Executive Slide-in Drawer with Apple Fluid Spring Curve -->
 <aside
-  class="fixed top-0 right-0 h-full w-full sm:w-[440px] z-50 flex flex-col bg-[#07080b] border-l border-white/[0.08] shadow-2xl transition-transform duration-200 {open
+  class="fixed top-0 right-0 h-full w-full sm:w-[440px] z-50 flex flex-col bg-[#07080b] border-l border-white/[0.08] shadow-2xl transition-transform duration-300 {open
     ? 'translate-x-0'
     : 'translate-x-full'}"
-  style="will-change: transform;"
+  style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); will-change: transform;"
 >
   <!-- Executive Header -->
   <div class="px-5 py-3.5 border-b border-white/[0.07] bg-[#0a0c10] flex-shrink-0">
@@ -714,29 +718,23 @@
                   style="width: {Math.max(2, Math.min(100, dl.progress_pct))}%;"
                 ></div>
               </div>
-              <div class="flex items-center justify-end gap-1.5 pt-1">
-                {#if dl.status === 'paused'}
-                  <button
-                    onclick={() => handleResumeDownload(dl)}
-                    class="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 cursor-pointer"
-                  >
-                    ▶ Resume
-                  </button>
-                {:else}
-                  <button
-                    onclick={() => handlePauseDownload(dl)}
-                    class="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white cursor-pointer"
-                  >
-                    ⏸ Pause
-                  </button>
-                {/if}
-                <button
-                  onclick={() => handleCancelDownload(dl)}
-                  class="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 cursor-pointer"
-                >
-                  ✕ Cancel
-                </button>
+              <div class="flex items-center justify-between text-[10px] font-mono text-neutral-400 pt-0.5">
+                <span>{dl.status === 'paused' ? 'Paused in Download Manager' : 'Streaming via Hugging Face'}</span>
+                <span class="text-neutral-500">Deck controls above ↑</span>
               </div>
+            </div>
+          {:else if dl && (dl.status === 'completed' || dl.status === 'ready' || dl.progress_pct >= 99.9) && !m.is_installed}
+            <div class="flex items-center justify-between pt-1">
+              <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Download Complete</span>
+              </span>
+              <button
+                onclick={() => handleSwap(m)}
+                class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 cursor-pointer flex items-center gap-1"
+              >
+                <span>Activate Now ›</span>
+              </button>
             </div>
           {:else}
             <!-- Button Deck -->

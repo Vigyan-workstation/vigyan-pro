@@ -445,16 +445,34 @@ def ensure_first_run_interactive() -> Optional[str]:
     return None
 
 
+def load_cli_config() -> Dict[str, Any]:
+    """Read ~/.vigyan/config.json if available to synchronize CLI and GUI preferences."""
+    cfg_file = os.path.expanduser("~/.vigyan/config.json")
+    if os.path.isfile(cfg_file):
+        try:
+            with open(cfg_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+    return {}
+
+
 def query_local_server(prompt: str, host: str = DEFAULT_HOST, stream: bool = True) -> bool:
     """Stream inference from running llama-server on loopback."""
+    cfg = load_cli_config()
+    temp = cfg.get("temperature", 0.0)
+    ctx = cfg.get("context_window", 2048)
+
     url = f"{host}/v1/chat/completions"
     payload = json.dumps({
         "messages": [
             {"role": "system", "content": "You are Vigyan, an air-gapped sovereign AI assistant for STEM, mathematical proof, physics simulation, and engineering intelligence."},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.1,
-        "max_tokens": 2048,
+        "temperature": temp,
+        "max_tokens": ctx,
         "stop": ["<|im_end|>", "<|endoftext|>", "<|im_start|>", "User:", "\n\nUser"],
         "stream": stream
     }).encode("utf-8")
@@ -513,7 +531,10 @@ def start_supervisor_for_model(model_path: str):
     global DEFAULT_HOST
     try:
         from llama_supervisor import LlamaServerSupervisor
-        sup = LlamaServerSupervisor(model_path=model_path, port=8086)
+        cfg = load_cli_config()
+        threads = cfg.get("cpu_threads")
+        ctx_size = cfg.get("context_window", 2048)
+        sup = LlamaServerSupervisor(model_path=model_path, port=8086, threads=threads, ctx_size=ctx_size)
         if sup.is_healthy():
             return sup
         print(f"Starting engine ({os.path.basename(model_path)})...", file=sys.stderr)
@@ -522,7 +543,7 @@ def start_supervisor_for_model(model_path: str):
         if not ready and not sup.is_healthy():
             from llama_supervisor import find_available_port
             dyn_port = find_available_port(8087, 8100)
-            sup = LlamaServerSupervisor(model_path=model_path, port=dyn_port)
+            sup = LlamaServerSupervisor(model_path=model_path, port=dyn_port, threads=threads, ctx_size=ctx_size)
             sup.start()
             sup.wait_until_ready(timeout=15.0)
             DEFAULT_HOST = f"http://127.0.0.1:{dyn_port}"

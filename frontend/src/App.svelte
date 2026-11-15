@@ -5,7 +5,6 @@
   import { onMount } from "svelte";
   import Chat from "./components/Chat.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
-  import LedgerDrawer from "./components/LedgerDrawer.svelte";
   import ModelsDrawer, { type DownloadInfo } from "./components/ModelsDrawer.svelte";
   import ArtifactStudio from "./components/ArtifactStudio.svelte";
   import { checkOllamaStatus, fetchTelemetry, DEFAULT_MODEL, getAgentHost, getVigyanToken } from "./lib/ollama";
@@ -13,7 +12,6 @@
   import { artifactStore } from "./lib/artifactStore.svelte";
 
   let settingsOpen = $state(false);
-  let ledgerOpen = $state(false);
   let modelsOpen = $state(false);
   let ollamaConnected = $state(false);
   let model = $state(DEFAULT_MODEL);
@@ -81,16 +79,12 @@
       } else if (isMeta && e.key.toLowerCase() === "m") {
         e.preventDefault();
         modelsOpen = !modelsOpen;
-      } else if (isMeta && e.key.toLowerCase() === "l") {
-        e.preventDefault();
-        ledgerOpen = !ledgerOpen;
       } else if (isMeta && e.key === ",") {
         e.preventDefault();
         settingsOpen = !settingsOpen;
       } else if (e.key === "Escape") {
         if (modelsOpen) modelsOpen = false;
         if (settingsOpen) settingsOpen = false;
-        if (ledgerOpen) ledgerOpen = false;
         if (artifactStore.activeArtifact) artifactStore.closeArtifact();
       }
     };
@@ -210,6 +204,23 @@
         </button>
       {/if}
 
+      <!-- Direct Models Drawer Button -->
+      <button
+        onclick={() => (modelsOpen = !modelsOpen)}
+        class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-transparent"
+        title="Intelligence Models (Cmd+M)"
+      >
+        <svg class="w-3.5 h-3.5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        <span class="hidden md:inline">Models</span>
+        {#if installedCount > 0}
+          <span class="text-[9px] px-1 rounded-full bg-white/10 text-neutral-300 font-mono">{installedCount}</span>
+        {/if}
+      </button>
+
       <button
         onclick={() => (settingsOpen = !settingsOpen)}
         class="w-7 h-7 flex items-center justify-center rounded-lg text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer"
@@ -279,19 +290,13 @@
     }}
   />
 
-  <!-- Learning Ledger Slide-in Drawer -->
-  <LedgerDrawer
-    open={ledgerOpen}
-    onClose={() => (ledgerOpen = false)}
-  />
-
   <!-- Settings Slide-in Drawer -->
   <SettingsPanel
     open={settingsOpen}
     onClose={() => (settingsOpen = false)}
     {activeModelName}
-    onOpenLedger={() => (ledgerOpen = true)}
     onOpenModels={() => (modelsOpen = true)}
+    onFontSizeChange={(size) => (fontSize = size)}
   />
 
 </div>
