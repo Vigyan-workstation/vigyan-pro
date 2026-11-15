@@ -49,10 +49,10 @@ if %ERRORLEVEL% equ 0 (
     exit /b %ERRORLEVEL%
 )
 
-REM Direct Edge App Mode fallback if Python is not in PATH
-set "INDEX_PATH=%~dp0dist\index.html"
-set "FILE_URL=file:///%INDEX_PATH:\=/%"
-
-echo [WARN] Python not in PATH. Launching Microsoft Edge App Mode directly...
-start "" msedge.exe --app="%FILE_URL%" --window-size=1340,760 --force-dark-mode
-exit /b 0
+echo ========================================================
+echo   [ERROR] Python 3.10+ is required to run Vigyan Pro.
+echo   Please install Python from https://www.python.org/
+echo   or download the self-contained portable Windows bundle.
+echo ========================================================
+pause
+exit /b 1

@@ -17,10 +17,95 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import platform
+import socket
 from collections.abc import Callable, Sequence
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+
+def find_available_port(start_port: int = 8086, max_attempts: int = 20) -> int:
+    """Find an available TCP port on loopback starting from start_port."""
+    for p in range(start_port, start_port + max_attempts):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("127.0.0.1", p))
+                return p
+            except OSError:
+                continue
+    return start_port
+
+
+def detect_hardware_profile() -> dict:
+    """Probes system memory, CPU physical cores, and GPU capabilities.
+    Returns safe defaults for llama-server parameters without freezing host OS.
+    """
+    total_ram = 8.0
+    avail_ram = 4.0
+    cores = 4
+    try:
+        import psutil
+        vm = psutil.virtual_memory()
+        total_ram = round(vm.total / (1024 ** 3), 1)
+        avail_ram = round(vm.available / (1024 ** 3), 1)
+        cores = psutil.cpu_count(logical=False) or os.cpu_count() or 4
+    except Exception:
+        pass
+
+    # Apple Silicon Metal detection
+    if sys.platform == "darwin" and platform.machine() == "arm64":
+        return {
+            "tier": "apple_silicon",
+            "device": "Apple Silicon Metal",
+            "total_ram_gb": total_ram,
+            "avail_ram_gb": avail_ram,
+            "vram_gb": total_ram,
+            "recommended_ngl": 99,
+            "threads": max(1, cores),
+            "context_size": 4096 if total_ram >= 16 else 2048,
+        }
+
+    # NVIDIA CUDA detection
+    vram_gb = 0.0
+    gpu_name = "CPU / Integrated Graphics"
+    try:
+        smi = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=1
+        )
+        if smi.returncode == 0 and smi.stdout.strip():
+            first_line = smi.stdout.strip().split("\n")[0]
+            if "," in first_line:
+                name_part, vram_part = first_line.split(",", 1)
+                gpu_name = name_part.strip()
+                vram_gb = round(float(vram_part.strip()) / 1024, 1)
+    except Exception:
+        pass
+
+    if vram_gb >= 8.0:
+        tier = "workstation_gpu"
+        ngl = 99
+        ctx = 4096
+    elif vram_gb >= 4.0:
+        tier = "mainstream_hybrid"
+        ngl = 20
+        ctx = 2048
+    else:
+        tier = "cpu_budget"
+        ngl = 0  # Force CPU AVX2 to prevent starving host memory on iGPUs
+        ctx = 2048 if avail_ram >= 2.5 else 1024
+
+    return {
+        "tier": tier,
+        "device": gpu_name,
+        "total_ram_gb": total_ram,
+        "avail_ram_gb": avail_ram,
+        "vram_gb": vram_gb,
+        "recommended_ngl": ngl,
+        "threads": max(1, cores - 1),  # Leave 1 core for OS/UI responsiveness
+        "context_size": ctx,
+    }
 
 
 def find_llama_server_binary() -> Optional[str]:
@@ -92,9 +177,47 @@ def find_model_path(preferred_path: Optional[str] = None) -> Optional[str]:
         os.path.join(project_root, "models", "vigyan-3b-quad-master-iq3_m.gguf"),
         os.path.join(base_dir, "models", "vigyan-3b-quad-master-iq3_m.gguf"),
         os.path.expanduser("~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"),
+        os.path.expanduser("~/.vigyan/models/vl4b/vigyan-vl-4b-iq3_m.gguf"),
         "/opt/vigyan-pro/models/vigyan-3b-quad-master-iq3_m.gguf",
         # Fallbacks for alternate quantized artifacts if 3b quad master is absent
         os.path.expanduser("~/.vigyan/models/vigyan-1.5b-quad-master-q4_k_m.gguf"),
+    ]
+
+    for cand in candidates:
+        if os.path.isfile(cand):
+            return os.path.abspath(cand)
+
+    return None
+
+
+def find_mmproj_path(model_path: Optional[str] = None, preferred_path: Optional[str] = None) -> Optional[str]:
+    """Discover multimodal projector GGUF weights for vision-language models only:
+
+    1. preferred_path argument or VIGYAN_MMPROJ_PATH env
+    2. Alongside model_path: mmproj-vigyan-vl-4b-f16.gguf or mmproj-*.gguf (only if model is VL)
+    """
+    env_override = os.environ.get("VIGYAN_MMPROJ_PATH")
+    if env_override and os.path.isfile(os.path.expanduser(env_override)):
+        return os.path.abspath(os.path.expanduser(env_override))
+
+    if preferred_path and os.path.isfile(os.path.expanduser(preferred_path)):
+        return os.path.abspath(os.path.expanduser(preferred_path))
+
+    # A multimodal projector is strictly for vision-language models
+    if not model_path:
+        return None
+
+    model_base = os.path.basename(model_path).lower()
+    is_vl = any(k in model_base for k in ("vl", "vision", "multimodal", "minicpm", "gemma-3-4b"))
+    if not is_vl and "vl4b" not in model_path.lower():
+        return None
+
+    model_dir = os.path.dirname(os.path.abspath(model_path))
+    candidates = [
+        os.path.join(model_dir, "mmproj-vigyan-vl-4b-f16.gguf"),
+        os.path.join(model_dir, "mmproj-model-f16.gguf"),
+        os.path.expanduser("~/.vigyan/models/vl4b/mmproj-vigyan-vl-4b-f16.gguf"),
+        os.path.expanduser("~/.vigyan/models/mmproj-vigyan-vl-4b-f16.gguf"),
     ]
 
     for cand in candidates:
@@ -162,12 +285,14 @@ class LlamaServerSupervisor:
     def __init__(
         self,
         model_path: Optional[str] = None,
+        mmproj_path: Optional[str] = None,
         server_bin: Optional[str] = None,
         host: str = "127.0.0.1",
         port: int = 8086,
-        ctx_size: int = 4096,
+        ctx_size: Optional[int] = None,
         batch_size: int = 256,
-        threads: int = 4,
+        threads: Optional[int] = None,
+        ngl: Optional[int] = None,
         command: Optional[Sequence[str]] = None,
         is_healthy: Optional[Callable[[], bool]] = None,
         stop_timeout: float = 5.0,
@@ -176,14 +301,22 @@ class LlamaServerSupervisor:
         extra_env: Optional[dict[str, str]] = None,
         extra_args: Optional[Sequence[str]] = None,
     ) -> None:
-        # Dynamic RAM Guard: If available RAM is constrained (<2.5 GB), clamp ctx_size to 2048 to prevent OOM
-        if ctx_size > 2048:
+        # Hardware auto-profiling & defensive memory guard
+        hw = detect_hardware_profile()
+        if ctx_size is None:
+            ctx_size = hw["context_size"]
+        elif ctx_size > 2048:
             avail_gb = get_available_memory_gb()
             if avail_gb < 2.5:
                 ctx_size = 2048
                 logger.info("Host available RAM is low (%.2f GB < 2.5 GB). Clamped ctx_size to 2048.", avail_gb)
 
+        if threads is None:
+            threads = hw["threads"]
+
+        self._ngl = ngl if ngl is not None else hw["recommended_ngl"]
         self._model_path = model_path
+        self._mmproj_path = mmproj_path
         self._server_bin = server_bin
         self._host = host
         self._port = port
@@ -225,6 +358,10 @@ class LlamaServerSupervisor:
         return self._model_path or find_model_path()
 
     @property
+    def mmproj_path(self) -> Optional[str]:
+        return self._mmproj_path or find_mmproj_path(self.model_path)
+
+    @property
     def server_bin(self) -> Optional[str]:
         return self._server_bin or find_llama_server_binary()
 
@@ -259,6 +396,17 @@ class LlamaServerSupervisor:
             "--host", str(self._host),
             "--port", str(self._port),
         ]
+        if self._ngl > 0:
+            cmd.extend(["--n-gpu-layers", str(self._ngl)])
+
+        mmproj = self.mmproj_path
+        if mmproj and os.path.isfile(mmproj):
+            cmd.extend([
+                "--mmproj", str(mmproj),
+                "--image-max-tokens", "512",
+                "--image-min-tokens", "256",
+            ])
+
         if self._extra_args:
             cmd.extend(self._extra_args)
         return cmd
@@ -438,3 +586,33 @@ class LlamaServerSupervisor:
 
         self._process = None
         self._close_job()
+
+    def is_alive(self) -> bool:
+        """True while child process is alive and active."""
+        return self._process is not None and self._process.poll() is None
+
+    def swap_model(self, new_model_path: str) -> bool:
+        """Hot-swap the active model by restarting llama-server (<400ms via mmap).
+
+        Re-tunes thread count, context size, and GPU layer offload for the target model.
+        """
+        target = os.path.abspath(os.path.expanduser(new_model_path))
+        if not os.path.isfile(target):
+            raise FileNotFoundError(f"GGUF model weights not found at: {target}")
+
+        logger.info("Hot-swapping llama-server to new model weights: %s", target)
+        self.stop()
+        self._model_path = target
+        self._restarts = 0
+        self._mmproj_path = find_mmproj_path(target)
+
+        # Apply hardware governor auto-tuning for new model
+        hw = detect_hardware_profile()
+        self._threads = hw["threads"]
+        self._ctx_size = hw["context_size"]
+        self._ngl = hw["recommended_ngl"]
+
+        started = self.start()
+        if started:
+            self.wait_until_ready(timeout=10.0)
+        return self.is_healthy() or started

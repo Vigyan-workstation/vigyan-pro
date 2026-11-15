@@ -12,8 +12,32 @@
   interface Props {
     model: string;
     fontSize?: "sm" | "md" | "lg";
+    installedCount?: number;
+    activeDownload?: {
+      filename?: string;
+      name?: string;
+      status?: string;
+      progress_pct: number;
+      speed_mbps: number;
+      eta_formatted?: string;
+    } | null;
+    onStartDownload?: () => void;
+    onOpenModels?: () => void;
+    onPauseDownload?: (dl: any) => void;
+    onResumeDownload?: (dl: any) => void;
+    onCancelDownload?: (dl: any) => void;
   }
-  let { model, fontSize = "md" }: Props = $props();
+  let {
+    model,
+    fontSize = "md",
+    installedCount = 1,
+    activeDownload = null,
+    onStartDownload,
+    onOpenModels,
+    onPauseDownload,
+    onResumeDownload,
+    onCancelDownload,
+  }: Props = $props();
 
   let input = $state("");
   let isStreaming = $state(false);
@@ -185,34 +209,7 @@
           chatStore.messages[idx].thinkingDone = true;
           chatStore.messages[idx].streaming = false;
           if (chunk.type === "error") {
-            // Offline fallback for STEM derivations if local engine is unbooted
-            if (trimmed.toLowerCase().includes("rlc")) {
-              chatStore.messages[idx].content = `### Governing Second-Order Differential Equation
-For a series RLC circuit driven by step voltage $V_0$:
-$$L \\frac{d^2 i(t)}{dt^2} + R \\frac{di(t)}{dt} + \\frac{1}{C} i(t) = 0$$
-
-Dividing through by inductance $L$:
-$$\\frac{d^2 i(t)}{dt^2} + 2\\alpha \\frac{di(t)}{dt} + \\omega_0^2 i(t) = 0$$
-
-where attenuation coefficient $\\alpha$ and undamped resonant frequency $\\omega_0$ are:
-$$\\alpha = \\frac{R}{2L} = \\frac{20\\,\\Omega}{2 \\times 0.1\\,\\text{H}} = 100\\,\\text{s}^{-1}$$
-$$\\omega_0 = \\frac{1}{\\sqrt{LC}} = \\frac{1}{\\sqrt{0.1 \\times 100 \\times 10^{-6}}} = 316.23\\,\\text{rad/s}$$
-
-### Underdamped Condition Validation
-The damping ratio $\\zeta$ is:
-$$\\zeta = \\frac{\\alpha}{\\omega_0} = \\frac{100}{316.23} \\approx 0.316 < 1 \\quad \\implies \\quad \\text{Underdamped Response}$$
-
-The damped natural frequency $\\omega_d$ is:
-$$\\omega_d = \\sqrt{\\omega_0^2 - \\alpha^2} = \\sqrt{316.23^2 - 100^2} = 300.00\\,\\text{rad/s}$$
-
-### Analytical Solution
-Applying initial conditions $i(0) = 0$ and $v_C(0) = 0$:
-$$i(t) = \\frac{V_0}{\\omega_d L} e^{-\\alpha t} \\sin(\\omega_d t)$$
-
-$$\\text{SymPy AST Verification: Residual Error } \\mathcal{R} = 0.000\\times 10^0 \\text{ (Analytically Exact)}$$`;
-            } else {
-              chatStore.messages[idx].content = chunk.text;
-            }
+            chatStore.messages[idx].content = chunk.text || "Unable to reach local intelligence engine. Please check that a model is installed in Models (Cmd+M).";
           }
           synthesizeArtifactIfMath(idx, trimmed);
           chatStore.save();
@@ -345,40 +342,169 @@ $$\\text{SymPy AST Verification: Residual Error } \\mathcal{R} = 0.000\\times 10
       <!-- Non-Blocking Docked Action Card -->
       <DockedActionBar />
 
-      <div class="w-full flex items-center gap-3 bg-[#06080e]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.85)] focus-within:border-[#38bdf8]/40 transition-all">
-        <textarea
-          bind:this={textareaEl}
-          bind:value={input}
-          oninput={autoResize}
-          onkeydown={handleKeydown}
-          placeholder="Ask a scientific question, derive a proof, analyze a circuit…"
-          rows={1}
-          disabled={isStreaming}
-          class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
-          style="scrollbar-width: none;"
-        ></textarea>
-
-        {#if isStreaming}
-          <button
-            onclick={stop}
-            class="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 text-[#e2e8f0] hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer"
-            title="Halt generation (Escape)"
-          >
-            <span class="w-2.5 h-2.5 bg-white rounded-sm block"></span>
-          </button>
+      {#if installedCount === 0}
+        {#if activeDownload && (activeDownload.status === "downloading" || activeDownload.status === "starting" || activeDownload.status === "paused")}
+          <!-- In-Dock Download Progress Deck -->
+          <div class="w-full bg-[#080a10] border border-sky-500/30 rounded-2xl p-4 shadow-[0_12px_40px_rgba(0,0,0,0.85)] space-y-2.5">
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="flex items-center gap-2 {activeDownload.status === 'paused' ? 'text-amber-400' : 'text-sky-400'} font-medium truncate max-w-[200px]">
+                {#if activeDownload.status === 'paused'}
+                  <span>⏸ Paused: {activeDownload.name || 'Model'}</span>
+                {:else}
+                  <svg class="w-3.5 h-3.5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span class="truncate">Downloading {activeDownload.name || 'Flagship'}…</span>
+                {/if}
+              </span>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-neutral-300 font-mono text-[11px]">
+                  {activeDownload.progress_pct.toFixed(1)}% ({activeDownload.status === 'paused' ? '0 MB/s' : `${activeDownload.speed_mbps.toFixed(1)} MB/s`})
+                </span>
+                {#if activeDownload.eta_formatted && activeDownload.status !== 'paused'}
+                  <span class="text-neutral-500 text-[10px] hidden sm:inline">• {activeDownload.eta_formatted}</span>
+                {/if}
+                {#if onPauseDownload && (activeDownload.status === 'downloading' || activeDownload.status === 'starting')}
+                  <button
+                    onclick={() => onPauseDownload && onPauseDownload(activeDownload)}
+                    class="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white cursor-pointer ml-1"
+                    title="Pause download"
+                  >
+                    ⏸ Pause
+                  </button>
+                {:else if onResumeDownload && activeDownload.status === 'paused'}
+                  <button
+                    onclick={() => onResumeDownload && onResumeDownload(activeDownload)}
+                    class="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 cursor-pointer ml-1"
+                    title="Resume download"
+                  >
+                    ▶ Resume
+                  </button>
+                {/if}
+                {#if onCancelDownload}
+                  <button
+                    onclick={() => onCancelDownload && onCancelDownload(activeDownload)}
+                    class="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 cursor-pointer"
+                    title="Cancel download"
+                  >
+                    ✕
+                  </button>
+                {/if}
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
+              <div
+                class="h-full {activeDownload.status === 'paused' ? 'bg-amber-500' : 'bg-gradient-to-r from-sky-500 to-emerald-400'} transition-all duration-300"
+                style="width: {Math.max(2, Math.min(100, activeDownload.progress_pct))}%;"
+              ></div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-neutral-500 font-sans">
+              <span>Hugging Face: Experimentlab • Automatically unlocks when ready</span>
+              {#if onOpenModels}
+                <button onclick={onOpenModels} class="text-sky-400 hover:underline cursor-pointer text-[10px] font-mono">
+                  View in Manager ›
+                </button>
+              {/if}
+            </div>
+          </div>
         {:else}
-          <button
-            onclick={() => send(input)}
-            disabled={!input.trim()}
-            class="flex-shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all shadow-md font-bold cursor-pointer"
-            title="Send (Enter)"
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 translate-y-[-0.5px]">
-              <path fill-rule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clip-rule="evenodd"/>
-            </svg>
-          </button>
+          <!-- In-Dock Actionable Locked Bar -->
+          <div class="w-full bg-[#080a10] border border-white/10 rounded-2xl px-5 py-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.85)] flex items-center justify-between gap-4">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0"></span>
+              <span class="text-xs text-neutral-300 font-sans truncate">
+                No engine installed yet. Download Flagship model to begin offline computing.
+              </span>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button
+                onclick={onStartDownload}
+                class="px-4 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span>Download Flagship (1.39 GB)</span>
+              </button>
+              {#if onOpenModels}
+                <button
+                  onclick={onOpenModels}
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-mono text-neutral-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                >
+                  Browse all
+                </button>
+              {/if}
+            </div>
+          </div>
         {/if}
-      </div>
+      {:else}
+        <!-- Compact Floating Progress Pill above Input if downloading in background -->
+        {#if activeDownload && (activeDownload.status === "downloading" || activeDownload.status === "starting" || activeDownload.status === "paused")}
+          <div class="w-full mb-2 bg-[#090b12]/90 backdrop-blur-md border border-sky-500/25 rounded-xl px-3.5 py-2 flex items-center justify-between gap-3 text-xs font-mono shadow-lg">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2 h-2 rounded-full {activeDownload.status === 'paused' ? 'bg-amber-400' : 'bg-sky-400 animate-pulse'} flex-shrink-0"></span>
+              <span class="text-white truncate text-[11px]">
+                {activeDownload.status === 'paused' ? 'Paused' : 'Downloading'} {activeDownload.name || 'Model'}
+              </span>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <span class="text-sky-400 text-[11px] font-semibold">
+                {activeDownload.progress_pct.toFixed(0)}%
+              </span>
+              {#if activeDownload.eta_formatted && activeDownload.status !== 'paused'}
+                <span class="text-neutral-500 text-[10px] hidden sm:inline">{activeDownload.eta_formatted}</span>
+              {/if}
+              {#if onPauseDownload && (activeDownload.status === 'downloading' || activeDownload.status === 'starting')}
+                <button onclick={() => onPauseDownload && onPauseDownload(activeDownload)} class="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-neutral-300 cursor-pointer">
+                  ⏸
+                </button>
+              {:else if onResumeDownload && activeDownload.status === 'paused'}
+                <button onclick={() => onResumeDownload && onResumeDownload(activeDownload)} class="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 cursor-pointer">
+                  ▶
+                </button>
+              {/if}
+              {#if onCancelDownload}
+                <button onclick={() => onCancelDownload && onCancelDownload(activeDownload)} class="px-1.5 py-0.5 rounded text-[10px] text-rose-400 hover:text-rose-300 cursor-pointer">
+                  ✕
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/if}
+
+        <div class="w-full flex items-center gap-3 bg-[#06080e]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.85)] focus-within:border-[#38bdf8]/40 transition-all">
+          <textarea
+            bind:this={textareaEl}
+            bind:value={input}
+            oninput={autoResize}
+            onkeydown={handleKeydown}
+            placeholder="Ask a scientific question, derive a proof, analyze a circuit…"
+            rows={1}
+            disabled={isStreaming}
+            class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
+            style="scrollbar-width: none;"
+          ></textarea>
+
+          {#if isStreaming}
+            <button
+              onclick={stop}
+              class="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 border border-white/20 text-[#e2e8f0] hover:bg-white/20 flex items-center justify-center transition-all cursor-pointer"
+              title="Halt generation (Escape)"
+            >
+              <span class="w-2.5 h-2.5 bg-white rounded-sm block"></span>
+            </button>
+          {:else}
+            <button
+              onclick={() => send(input)}
+              disabled={!input.trim()}
+              class="flex-shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all shadow-md font-bold cursor-pointer"
+              title="Send (Enter)"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 translate-y-[-0.5px]">
+                <path fill-rule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clip-rule="evenodd"/>
+              </svg>
+            </button>
+          {/if}
+        </div>
+      {/if}
 
       <p class="text-[10px] font-mono text-[#6b7280] text-center mt-2 tracking-wide select-none">
         100% Offline &amp; Private · Verified Symbolic Mathematics · On-Device Intelligence

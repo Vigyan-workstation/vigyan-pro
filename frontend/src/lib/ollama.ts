@@ -49,18 +49,10 @@ export function getVigyanToken(): string {
   return "";
 }
 
-export const OLLAMA_BASE = "http://127.0.0.1:11434";
-
 export async function checkOllamaStatus(): Promise<boolean> {
-  // Check embedded bridge first
+  // Check embedded bridge
   try {
     const res = await fetch(`${getAgentHost()}/health`, { signal: AbortSignal.timeout(1500) });
-    if (res.ok) return true;
-  } catch {}
-
-  // Fallback check Ollama daemon
-  try {
-    const res = await fetch(`${OLLAMA_BASE}/api/tags`, { signal: AbortSignal.timeout(1500) });
     return res.ok;
   } catch {
     return false;
@@ -101,18 +93,7 @@ export async function getAvailableModels(): Promise<string[]> {
       }
     }
   } catch {}
-
-  try {
-    const res = await fetch(`${OLLAMA_BASE}/api/tags`, { signal: AbortSignal.timeout(2000) });
-    if (!res.ok) return [DEFAULT_MODEL];
-    const data = await res.json();
-    const models = (data.models ?? [])
-      .map((m: { name: string }) => m.name)
-      .filter((name: string) => !name.includes("7b") && !name.includes("frontier"));
-    return models.length > 0 ? models : [DEFAULT_MODEL];
-  } catch {
-    return [DEFAULT_MODEL];
-  }
+  return [DEFAULT_MODEL];
 }
 
 /**
@@ -225,126 +206,18 @@ export async function streamChat(
       }
       if (!isStreamDone) onChunk({ type: "done", text: "" });
       return;
+    } else {
+      onChunk({
+        type: "error",
+        text: "Unable to reach local intelligence engine. Please check that a model is installed in Models (Cmd+M) or try again.",
+      });
+      return;
     }
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") return;
-    // Fall through to direct Ollama if bridge unreachable
-  }
-
-  // ATTEMPT 2: Fallback to Direct Local Ollama Daemon
-  let directResp: Response;
-  try {
-    directResp = await fetch(`${OLLAMA_BASE}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: model || DEFAULT_MODEL,
-        messages: payloadMessages,
-        stream: true,
-        options: {
-          num_ctx: userCtx || 4096,
-          num_batch: 256,
-          num_thread: 4,
-          repeat_penalty: 1.15,
-          repeat_last_n: 64,
-          stop: [
-            "<|im_start|>",
-            "<|im_end|>",
-            "<|endoftext|>",
-            "</sstream>",
-            "<solution>",
-            "</solution>",
-            "</code>",
-            "</pre>",
-            "User:",
-            "\n\nUser",
-            "Human:"
-          ]
-        }
-      }),
-      signal,
+    onChunk({
+      type: "error",
+      text: "Unable to reach local intelligence engine. Please check that a model is installed in Models (Cmd+M) or try again.",
     });
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === "AbortError") return;
-    onChunk({ type: "error", text: "Warming up sovereign engine... Please try again in a moment." });
-    return;
-  }
-
-  if (!directResp.ok) {
-    onChunk({ type: "error", text: `Sovereign engine returned status ${directResp.status}. Please try again.` });
-    return;
-  }
-
-  const reader = directResp.body?.getReader();
-  if (!reader) {
-    onChunk({ type: "error", text: "No response stream available." });
-    return;
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let inThink = false;
-
-  const flush = (raw: string) => {
-    raw = raw.replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "");
-    if (!raw) return;
-    let i = 0;
-    while (i < raw.length) {
-      if (inThink) {
-        const end = raw.indexOf("</think>", i);
-        if (end === -1) {
-          const chunk = raw.slice(i);
-          onChunk({ type: "thinking", text: chunk });
-          i = raw.length;
-        } else {
-          const chunk = raw.slice(i, end);
-          if (chunk) onChunk({ type: "thinking", text: chunk });
-          inThink = false;
-          i = end + "</think>".length;
-        }
-      } else {
-        const start = raw.indexOf("<think>", i);
-        if (start === -1) {
-          const chunk = raw.slice(i);
-          onChunk({ type: "answer", text: chunk });
-          i = raw.length;
-        } else {
-          const before = raw.slice(i, start);
-          if (before) onChunk({ type: "answer", text: before });
-          inThink = true;
-          i = start + "<think>".length;
-        }
-      }
-    }
-  };
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const obj = JSON.parse(line);
-          const thinking: string = obj?.message?.thinking ?? "";
-          const tokenStr: string = obj?.message?.content ?? "";
-          if (thinking) onChunk({ type: "thinking", text: thinking });
-          if (tokenStr) flush(tokenStr);
-          if (obj?.done) break;
-        } catch {}
-      }
-    }
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name !== "AbortError") {
-      onChunk({ type: "error", text: "The stream was interrupted." });
-    }
-  } finally {
-    reader.releaseLock();
-    onChunk({ type: "done", text: "" });
   }
 }

@@ -6,14 +6,21 @@
   interface Props {
     open: boolean;
     onClose: () => void;
+    activeModelName?: string;
+    onOpenLedger?: () => void;
+    onOpenModels?: () => void;
   }
 
   let {
     open,
     onClose,
+    activeModelName = "",
+    onOpenLedger,
+    onOpenModels,
   }: Props = $props();
 
   let confirmReset = $state(false);
+  let fontSize = $state("medium");
   let resetTimer: ReturnType<typeof setTimeout> | null = null;
 
   function handleResetChat() {
@@ -64,18 +71,58 @@
 
     <!-- Engine Information Card -->
     <section>
-      <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af] block mb-2">Intelligence Engine</span>
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af]">Intelligence Engine</span>
+        {#if onOpenModels}
+          <button
+            onclick={() => {
+              onClose();
+              onOpenModels();
+            }}
+            class="text-[10px] font-mono text-sky-400 hover:underline cursor-pointer"
+          >
+            Manage Models ›
+          </button>
+        {/if}
+      </div>
       <div class="bg-[#10121a] rounded-xl border border-[rgba(255,255,255,0.08)] p-4 space-y-3">
-        <div class="flex items-start justify-between">
-          <div>
-            <h3 class="text-sm font-semibold text-white tracking-tight">Vigyan 3B Quad-Master</h3>
-            <p class="text-[11px] text-[#9ca3af] font-mono mt-0.5">IQ3_M Sovereign Edition</p>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-semibold text-white tracking-tight truncate">
+              {activeModelName ? activeModelName.replace(/\.gguf$/i, "") : "Offline Engine"}
+            </h3>
+            <p class="text-[11px] text-[#9ca3af] font-mono mt-0.5 truncate">
+              {activeModelName ? "Sovereign GGUF Local Instance" : "No model active"}
+            </p>
           </div>
-          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#10b981]/10 border border-[#10b981]/25 text-[10px] font-medium text-[#10b981]">
+          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#10b981]/10 border border-[#10b981]/25 text-[10px] font-medium text-[#10b981] flex-shrink-0">
             <span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
             Active
           </span>
         </div>
+      </div>
+    </section>
+
+    <!-- Autonomous Learning Ledger -->
+    <section>
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-[#9ca3af] block mb-2">Learning Ledger</span>
+      <div class="bg-[#10121a] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 space-y-3">
+        <p class="text-[11px] text-[#9ca3af] leading-relaxed">
+          Manage learned operational habits, mathematical rules, and context budget in <span class="font-mono text-white">.agents/ledger.jsonl</span>.
+        </p>
+        {#if onOpenLedger}
+          <button
+            type="button"
+            onclick={() => {
+              onClose();
+              onOpenLedger();
+            }}
+            class="w-full py-2 px-3 rounded-lg text-xs font-mono font-medium transition-all border border-white/10 bg-white/[0.04] text-sky-400 hover:bg-sky-950/20 hover:border-sky-500/30 cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+            <span>Open Ledger Rules (Cmd+L)</span>
+          </button>
+        {/if}
       </div>
     </section>
 
@@ -104,7 +151,7 @@
       <div class="bg-[#10121a] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 space-y-2 text-[11px]">
         <div class="flex items-center justify-between text-white">
           <span class="font-medium">Vigyan Pro Desktop</span>
-          <span class="font-mono text-[10px] text-[#9ca3af]">v3.4.0</span>
+          <span class="font-mono text-[10px] text-emerald-400">v4.2.0</span>
         </div>
         <p class="text-[#6b7280] leading-relaxed">
           Sovereign STEM workstation combining local neural inference with exact symbolic algebra (SymPy CAS).

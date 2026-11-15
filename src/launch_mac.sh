@@ -17,6 +17,9 @@ for py_cmd in "$DIR/../.venv/bin/python3" "$DIR/.venv/bin/python3" "$HOME/.vigya
     fi
 done
 
-INDEX_PATH="$DIR/dist/index.html"
-echo "[WARN] Python 3 not detected. Opening UI directly in default browser..."
-open "file://$INDEX_PATH"
+echo "========================================================"
+echo "  [ERROR] Python 3.10+ is required to run Vigyan Pro."
+echo "  Please install Python using 'brew install python3'"
+echo "  or download from https://www.python.org/"
+echo "========================================================"
+exit 1

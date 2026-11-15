@@ -8,8 +8,8 @@
 
 set -e
 
-RAW_VERSION="3.3.0"
-BUNDLE_WEIGHTS=true
+RAW_VERSION="5.0.0"
+BUNDLE_WEIGHTS=false
 
 for arg in "$@"; do
     if [ "$arg" = "--bundle-weights" ] || [ "$arg" = "--bundled" ]; then
@@ -82,6 +82,10 @@ cp -r "$SCRIPT_DIR/src/"* "$DEB_STAGE/opt/vigyan-pro/src/"
 cp -r "$SCRIPT_DIR/assets/"* "$DEB_STAGE/opt/vigyan-pro/assets/"
 cp "$SCRIPT_DIR/bin/vigyan-pro" "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
 chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
+if [ -f "$SCRIPT_DIR/bin/vigyan" ]; then
+    cp "$SCRIPT_DIR/bin/vigyan" "$DEB_STAGE/opt/vigyan-pro/bin/vigyan"
+    chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/vigyan"
+fi
 
 # Copy llama-server into staged bin
 if [ -n "$LLAMA_SERVER_SRC" ]; then
@@ -97,8 +101,11 @@ if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
     cp "$MODEL_SOURCE" "$DEB_STAGE/opt/vigyan-pro/models/"
 fi
 
-# Symlink to /usr/bin/vigyan-pro
+# Symlinks in /usr/bin
 ln -s "/opt/vigyan-pro/bin/vigyan-pro" "$DEB_STAGE/usr/bin/vigyan-pro"
+if [ -f "$SCRIPT_DIR/bin/vigyan" ]; then
+    ln -s "/opt/vigyan-pro/bin/vigyan" "$DEB_STAGE/usr/bin/vigyan"
+fi
 
 # Desktop Entry
 cp "$SCRIPT_DIR/assets/vigyan-pro.desktop" "$DEB_STAGE/usr/share/applications/vigyan-pro.desktop"
@@ -206,6 +213,13 @@ exec "$SCRIPT_DIR/bin/vigyan-pro" "$@"
 EOF
 chmod +x "$TAR_STAGE/launch.sh"
 
+cat <<'EOF' > "$TAR_STAGE/vigyan.sh"
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/bin/vigyan" "$@"
+EOF
+chmod +x "$TAR_STAGE/vigyan.sh"
+
 TAR_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64.tar.gz"
 tar --use-compress-program="gzip -1" -cf "$TAR_OUTPUT" -C "$SCRIPT_DIR/.build_tar" vigyan-pro
 echo "✓ Linux Archive Built: $TAR_OUTPUT"
@@ -246,6 +260,18 @@ cat <<'EOF' > "$WIN_STAGE/Vigyan-Pro.bat"
 title Vigyan Pro
 cd /d "%~dp0"
 call src\launch_win.bat %*
+EOF
+
+cat <<'EOF' > "$WIN_STAGE/Vigyan-CLI.bat"
+@echo off
+title Vigyan Pro CLI
+cd /d "%~dp0"
+if exist bin\python\python.exe (
+    set "PYTHON_CMD=bin\python\python.exe"
+) else (
+    set "PYTHON_CMD=python"
+)
+%PYTHON_CMD% src\vigyan_cli.py %*
 EOF
 
 WIN_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64.zip"
@@ -290,6 +316,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec "$DIR/src/launch_mac.sh" "$@"
 EOF
 chmod +x "$MAC_STAGE/launch.sh"
+
+cat <<'EOF' > "$MAC_STAGE/vigyan.sh"
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/bin/vigyan" "$@"
+EOF
+chmod +x "$MAC_STAGE/vigyan.sh"
 
 cat <<'EOF' > "$MAC_STAGE/Vigyan-Pro.command"
 #!/usr/bin/env bash
@@ -345,7 +378,7 @@ rm -rf "$SCRIPT_DIR/.build_mac"
 # 5. GENERATE CRYPTOGRAPHIC SHA-256 CHECKSUMS
 # ------------------------------------------------------------------------------
 echo "==> Generating Cryptographic SHA-256 Checksums for Enterprise Security Audit..."
-(cd "$DIST_DIR" && sha256sum vigyan-pro_* > SHA256SUMS)
+(cd "$DIST_DIR" && sha256sum vigyan-pro_${VERSION}_* > SHA256SUMS)
 echo "✓ Enterprise SHA256SUMS generated:"
 cat "$DIST_DIR/SHA256SUMS"
 

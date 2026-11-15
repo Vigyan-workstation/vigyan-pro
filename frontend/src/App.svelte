@@ -6,21 +6,71 @@
   import Chat from "./components/Chat.svelte";
   import SettingsPanel from "./components/SettingsPanel.svelte";
   import LedgerDrawer from "./components/LedgerDrawer.svelte";
+  import ModelsDrawer, { type DownloadInfo } from "./components/ModelsDrawer.svelte";
   import ArtifactStudio from "./components/ArtifactStudio.svelte";
-  import { checkOllamaStatus, fetchTelemetry, DEFAULT_MODEL } from "./lib/ollama";
+  import { checkOllamaStatus, fetchTelemetry, DEFAULT_MODEL, getAgentHost, getVigyanToken } from "./lib/ollama";
   import { chatStore } from "./lib/chatStore.svelte";
   import { artifactStore } from "./lib/artifactStore.svelte";
 
   let settingsOpen = $state(false);
   let ledgerOpen = $state(false);
+  let modelsOpen = $state(false);
   let ollamaConnected = $state(false);
   let model = $state(DEFAULT_MODEL);
+  let activeModelName = $state<string>("");
   let fontSize = $state<"sm" | "md" | "lg">("md");
+
+  let modelsDrawerRef = $state<any>(null);
+  let installedCount = $state<number>(1);
+  let activeDownload = $state<DownloadInfo | null>(null);
 
   // Telemetry preserved for diagnostics & tooltip inspections
   let ramUsedGb = $state<number>(1.8);
   let ramTotalGb = $state<number>(7.0);
   let ramPercent = $state<number>(26);
+  let initialCheckDone = false;
+
+  async function handlePauseDownload(dl: any) {
+    try {
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["X-Vigyan-Token"] = token;
+      await fetch(`${host}/api/models/download/pause`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tag: dl.tag || dl.filename })
+      });
+    } catch (e) {}
+  }
+
+  async function handleResumeDownload(dl: any) {
+    try {
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["X-Vigyan-Token"] = token;
+      await fetch(`${host}/api/models/download/resume`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tag: dl.tag || dl.filename })
+      });
+    } catch (e) {}
+  }
+
+  async function handleCancelDownload(dl: any) {
+    try {
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["X-Vigyan-Token"] = token;
+      await fetch(`${host}/api/models/download/cancel`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ tag: dl.tag || dl.filename, remove_part: true })
+      });
+    } catch (e) {}
+  }
 
   onMount(() => {
     const handleGlobalKeydown = (e: KeyboardEvent) => {
@@ -28,6 +78,9 @@
       if (isMeta && e.key.toLowerCase() === "k") {
         e.preventDefault();
         chatStore.clear();
+      } else if (isMeta && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        modelsOpen = !modelsOpen;
       } else if (isMeta && e.key.toLowerCase() === "l") {
         e.preventDefault();
         ledgerOpen = !ledgerOpen;
@@ -35,6 +88,7 @@
         e.preventDefault();
         settingsOpen = !settingsOpen;
       } else if (e.key === "Escape") {
+        if (modelsOpen) modelsOpen = false;
         if (settingsOpen) settingsOpen = false;
         if (ledgerOpen) ledgerOpen = false;
         if (artifactStore.activeArtifact) artifactStore.closeArtifact();
@@ -53,9 +107,38 @@
           ramUsedGb = Math.round((ramTotalGb - tel.ram_avail_gb) * 10) / 10;
         }
       }
+
+      // Check models catalog and first-run state
+      try {
+        const host = getAgentHost();
+        const token = getVigyanToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["X-Vigyan-Token"] = token;
+        const catRes = await fetch(`${host}/api/models/catalog`, { headers, signal: AbortSignal.timeout(2000) });
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          installedCount = catData.installed_count ?? 1;
+          if (catData.active_filename) {
+            activeModelName = catData.active_filename;
+          }
+          if (catData.downloads) {
+            const dl = Object.values(catData.downloads as Record<string, DownloadInfo>).find(
+              d => d.status === "downloading" || d.status === "starting"
+            );
+            activeDownload = dl || null;
+          }
+          // First-run auto-open drawer if 0 models installed
+          if (!initialCheckDone) {
+            initialCheckDone = true;
+            if (catData.installed_count === 0) {
+              modelsOpen = true;
+            }
+          }
+        }
+      } catch {}
     };
     check();
-    const interval = setInterval(check, 5_000);
+    const interval = setInterval(check, 4_000);
     return () => {
       clearInterval(interval);
       window.removeEventListener("keydown", handleGlobalKeydown);
@@ -76,25 +159,44 @@
         </svg>
       </div>
       <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
-      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-[#9ca3af]">v4.0</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0</span>
     </div>
 
-    <!-- Center: Whisper-Quiet Status Capsule -->
-    <div
-      class="hidden sm:flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.07] text-[11px] text-[#9ca3af] select-none transition-all shadow-sm"
-      title={ollamaConnected
-        ? `Sovereign Engine Active • ${ramUsedGb}G / ${ramTotalGb}G RAM (${ramPercent}%) • 100% Offline`
-        : "Connecting to local engine…"}
+    <!-- Center: Whisper-Quiet Status Capsule (Clickable to open Models Drawer) -->
+    <button
+      onclick={() => (modelsOpen = !modelsOpen)}
+      class="hidden sm:flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] text-[11px] text-[#9ca3af] hover:text-white select-none transition-all cursor-pointer shadow-sm"
+      title={activeDownload
+        ? `${activeDownload.status === 'paused' ? 'Paused' : 'Downloading'} ${activeDownload.name || activeDownload.filename}: ${activeDownload.progress_pct.toFixed(0)}% • Click to open models`
+        : ollamaConnected
+        ? `Sovereign Engine Active • ${activeModelName || 'Vigyan'} • ${ramUsedGb}G / ${ramTotalGb}G RAM (${ramPercent}%) • Click to manage models (Cmd+M)`
+        : "Connecting to local engine… Click to open Models (Cmd+M)"}
     >
-      <span
-        class="w-1.5 h-1.5 rounded-full transition-all duration-300 {ollamaConnected
-          ? 'bg-[#10b981] shadow-[0_0_6px_#10b981]'
-          : 'bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse'}"
-      ></span>
-      <span class="font-medium tracking-wide text-[#cbd5e1]">
-        {ollamaConnected ? "Offline & Grounded" : "Connecting…"}
-      </span>
-    </div>
+      {#if activeDownload && (activeDownload.status === "downloading" || activeDownload.status === "starting")}
+        <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
+        <span class="font-mono text-sky-400 font-medium">
+          ⬇ {activeDownload.progress_pct.toFixed(0)}%
+        </span>
+        <span class="text-neutral-400 truncate max-w-[140px]">
+          ({activeDownload.speed_mbps.toFixed(1)} MB/s{activeDownload.eta_formatted ? ` • ${activeDownload.eta_formatted}` : ''})
+        </span>
+      {:else if activeDownload && activeDownload.status === "paused"}
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span class="font-mono text-amber-400 font-medium">
+          ⏸ Paused ({activeDownload.progress_pct.toFixed(0)}%)
+        </span>
+      {:else}
+        <span
+          class="w-1.5 h-1.5 rounded-full transition-all duration-300 {ollamaConnected
+            ? 'bg-[#10b981] shadow-[0_0_6px_#10b981]'
+            : 'bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse'}"
+        ></span>
+        <span class="font-medium tracking-wide text-[#cbd5e1] truncate max-w-[200px]">
+          {ollamaConnected ? (activeModelName ? activeModelName.replace(/\.gguf$/i, '') : "Offline & Grounded") : "Connecting…"}
+        </span>
+      {/if}
+      <span class="text-[9px] font-mono text-neutral-500 ml-0.5">▼</span>
+    </button>
 
     <!-- Right: Frictionless Executive Actions -->
     <div class="flex items-center gap-1.5">
@@ -107,15 +209,6 @@
           <span>+ New</span>
         </button>
       {/if}
-
-      <button
-        onclick={() => (ledgerOpen = !ledgerOpen)}
-        class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-white/[0.08]"
-        title="Learning Ledger (Cmd+L)"
-      >
-        <span class="w-1.5 h-1.5 rounded-full bg-[#38bdf8]"></span>
-        <span>Ledger</span>
-      </button>
 
       <button
         onclick={() => (settingsOpen = !settingsOpen)}
@@ -138,7 +231,21 @@
   <main class="flex-1 overflow-hidden relative w-full h-full flex flex-row">
     <!-- Left: Sovereign Dialogue Stream -->
     <div class="h-full flex-1 min-w-[360px] overflow-hidden transition-all duration-300">
-      <Chat {model} {fontSize} />
+      <Chat
+        {model}
+        {fontSize}
+        {installedCount}
+        {activeDownload}
+        onStartDownload={() => {
+          if (modelsDrawerRef?.downloadFlagship) {
+            modelsDrawerRef.downloadFlagship();
+          }
+        }}
+        onOpenModels={() => (modelsOpen = true)}
+        onPauseDownload={handlePauseDownload}
+        onResumeDownload={handleResumeDownload}
+        onCancelDownload={handleCancelDownload}
+      />
     </div>
 
     <!-- Right: Sovereign Artifact Studio (Split Canvas) -->
@@ -153,6 +260,25 @@
     {/if}
   </main>
 
+  <!-- Intelligence Models Slide-in Drawer -->
+  <ModelsDrawer
+    bind:this={modelsDrawerRef}
+    open={modelsOpen}
+    onClose={() => (modelsOpen = false)}
+    onModelSwapped={(fname) => {
+      model = fname;
+      activeModelName = fname;
+    }}
+    onDownloadUpdate={(dl) => {
+      activeDownload = dl;
+    }}
+    onCatalogUpdate={(cat) => {
+      installedCount = cat.installedCount;
+      if (cat.activeModelName) activeModelName = cat.activeModelName;
+      if (cat.activeFilename) model = cat.activeFilename;
+    }}
+  />
+
   <!-- Learning Ledger Slide-in Drawer -->
   <LedgerDrawer
     open={ledgerOpen}
@@ -163,6 +289,9 @@
   <SettingsPanel
     open={settingsOpen}
     onClose={() => (settingsOpen = false)}
+    {activeModelName}
+    onOpenLedger={() => (ledgerOpen = true)}
+    onOpenModels={() => (modelsOpen = true)}
   />
 
 </div>

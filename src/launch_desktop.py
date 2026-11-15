@@ -1094,143 +1094,122 @@ def _build_model_candidates(filename: str) -> List[str]:
     return cands
 
 
-MODELS_CATALOG = {
-    "vigyan:3b": {
-        "name": "Vigyan 3B Quad-Master Sovereign Engine",
-        "tag": "vigyan:3b",
-        "size_bytes": 1698693120,
-        "size_formatted": "1.58 GB",
-        "recommended_ram": "2.5 GB+ RAM (57.50% GSM8K Certified, 22-28 tok/s CPU inference)",
-        "description": "Certified flagship mathematical and STEM foundation model with SymPy CAS verification and zero cloud egress.",
-        "dest_filename": "vigyan-3b-quad-master-iq3_m.gguf",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf",
-        "local_candidates": _build_model_candidates("vigyan-3b-quad-master-iq3_m.gguf"),
-        "template": """{{- if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
-{{ .Content }}<|im_end|>
-{{ end }}<|im_start|>assistant
-""",
-        "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+VERIFIED_EXPERIMENTLAB_MODELS = [
+    {
+        "id": "vigyan-3b-quad-master-iq3_m",
+        "name": "Vigyan-3B Quad-Master",
+        "tag": "vigyan-3b",
+        "filename": "vigyan-3b-quad-master-iq3_m.gguf",
+        "size_bytes": 1490000000,
+        "size_formatted": "1.39 GB",
+        "ram_required_gb": 4.0,
+        "domain": "Flagship STEM, Calculus & Exact CAS",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
     },
-    "vigyan:1.5b": {
-        "name": "Vigyan AI 1.5B Quad Master",
-        "tag": "vigyan:1.5b",
-        "size_bytes": 1181116006,
-        "size_formatted": "1.1 GB",
-        "recommended_ram": "2 GB+ RAM (Ultra-fast edge inference, zero latency)",
-        "description": "Proprietary high-velocity STEM & math quad-master model with instant responses, ChatML formatting, and zero-hallucination calculus.",
-        "dest_filename": "vigyan-1.5b-quad-master-q4_k_m.gguf",
-        "hf_url": "https://github.com/shreyansh001boy-tech/vigyan-desktop-releases/releases/download/v2.9.0-beta/vigyan-1.5b-quad-master-q4_k_m.gguf",
-        "local_candidates": _build_model_candidates("vigyan-1.5b-quad-master-q4_k_m.gguf"),
-        "template": """{{- if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
-{{ .Content }}<|im_end|>
-{{ end }}<|im_start|>assistant
-""",
-        "stop": ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]
+    {
+        "id": "vigyan-2b-stem-q4_k_m",
+        "name": "Vigyan-2B STEM Reasoner",
+        "tag": "vigyan-2b-stem",
+        "filename": "vigyan-2b-stem-q4_k_m.gguf",
+        "size_bytes": 1260000000,
+        "size_formatted": "1.18 GB",
+        "ram_required_gb": 3.0,
+        "domain": "Fast Real Analysis & Theorem Prover",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-stem-q4_k_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
+    },
+    {
+        "id": "vigyan-2b-reasoning-q4_k_m",
+        "name": "Vigyan-2B Reasoning",
+        "tag": "vigyan-2b-reasoning",
+        "filename": "vigyan-2b-reasoning-q4_k_m.gguf",
+        "size_bytes": 1260000000,
+        "size_formatted": "1.18 GB",
+        "ram_required_gb": 3.0,
+        "domain": "Deterministic Logic & Multi-Step Reasoning",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-reasoning-q4_k_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
+    },
+    {
+        "id": "vigyan-1.5b-4x-moe",
+        "name": "Vigyan-1.5B 4x-MoE",
+        "tag": "vigyan-1.5b-moe",
+        "filename": "vigyan-1.5b-4x-moe.gguf",
+        "size_bytes": 1180000000,
+        "size_formatted": "1.10 GB",
+        "ram_required_gb": 3.0,
+        "domain": "High-Velocity Top-2 MoE Calculus",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-1.5B-4x-MoE/resolve/main/vigyan-1.5b-4x-moe.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-1.5B-4x-MoE",
+    },
+    {
+        "id": "vigyan-7b-stem-q4_k_m",
+        "name": "Vigyan-7B STEM Instruct",
+        "tag": "vigyan-7b-stem",
+        "filename": "vigyan-7b-stem-q4_k_m.gguf",
+        "size_bytes": 4400000000,
+        "size_formatted": "4.10 GB",
+        "ram_required_gb": 8.0,
+        "domain": "Comprehensive Science & Physical Engineering",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-7b-stem-q4_k_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
+    },
+    {
+        "id": "olmo2-7b-phd-pure-math",
+        "name": "OLMo2-7B PhD Pure Math",
+        "tag": "olmo2-phd-math",
+        "filename": "olmo2-7b-phd-pure-math.gguf",
+        "size_bytes": 4400000000,
+        "size_formatted": "4.10 GB",
+        "ram_required_gb": 8.0,
+        "domain": "Doctoral Proofs & Abstract Algebra",
+        "hf_url": "https://huggingface.co/Experimentlab/olmo2-7b-phd-pure-math/resolve/main/olmo2-7b-phd-pure-math.gguf?download=true",
+        "hf_repo": "Experimentlab/olmo2-7b-phd-pure-math",
+    },
+    {
+        "id": "olmo2-7b-silicon-rtl-eda",
+        "name": "OLMo2-7B Silicon RTL & EDA",
+        "tag": "olmo2-silicon-eda",
+        "filename": "olmo2-7b-silicon-rtl-eda.gguf",
+        "size_bytes": 4400000000,
+        "size_formatted": "4.10 GB",
+        "ram_required_gb": 8.0,
+        "domain": "Verilog RTL & VLSI Circuit Synthesis",
+        "hf_url": "https://huggingface.co/Experimentlab/olmo2-7b-silicon-rtl-eda/resolve/main/olmo2-7b-silicon-rtl-eda.gguf?download=true",
+        "hf_repo": "Experimentlab/olmo2-7b-silicon-rtl-eda",
+    },
+    {
+        "id": "olmo2-7b-biomed-chem",
+        "name": "OLMo2-7B BioMed & Chem",
+        "tag": "olmo2-biomed",
+        "filename": "olmo2-7b-biomed-chem.gguf",
+        "size_bytes": 4400000000,
+        "size_formatted": "4.10 GB",
+        "ram_required_gb": 8.0,
+        "domain": "Bio-Molecular Alignment & Pharmacology",
+        "hf_url": "https://huggingface.co/Experimentlab/olmo2-7b-biomed-chem/resolve/main/olmo2-7b-biomed-chem.gguf?download=true",
+        "hf_repo": "Experimentlab/olmo2-7b-biomed-chem",
+    },
+    {
+        "id": "vigyan-vl-4b-iq3_m",
+        "name": "Vigyan-VL-4B Multimodal",
+        "tag": "vigyan-vl-4b",
+        "filename": "vigyan-vl-4b-iq3_m.gguf",
+        "size_bytes": 2570000000,
+        "size_formatted": "2.40 GB",
+        "ram_required_gb": 6.0,
+        "domain": "Vision-Language, Schematics & Diagram OCR",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vl4b/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
     }
-}
+]
 
-
-def ensure_vigyan_3b_registered() -> bool:
-    """Autonomous verifier and auto-repair for Flagship Vigyan 3B Quad-Master in Ollama."""
-    try:
-        check = subprocess.run(["ollama", "show", "vigyan:3b"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2.0, text=True)
-        if check.returncode == 0 and "</sstream>" in check.stdout and "4096" in check.stdout:
-            return True
-    except Exception:
-        pass
-
-    target_dir = os.path.expanduser("~/.vigyan/models")
-    os.makedirs(target_dir, exist_ok=True)
-    gguf_path = os.path.join(target_dir, "vigyan-3b-quad-master-iq3_m.gguf")
-
-    if not os.path.isfile(gguf_path) or os.path.getsize(gguf_path) < 1_000_000_000:
-        candidates = MODELS_CATALOG.get("vigyan:3b", {}).get("local_candidates", [])
-        found_local = None
-        for cand in candidates:
-            if cand and os.path.isfile(cand) and os.path.getsize(cand) >= 1_000_000_000:
-                found_local = cand
-                break
-
-        if found_local:
-            print(f"[INFO] Discovered bundled 3B sovereign model weights at: {found_local}", file=sys.stderr)
-            if os.path.abspath(found_local) != os.path.abspath(gguf_path):
-                try:
-                    import shutil
-                    print("[INFO] Importing 3B sovereign model into ~/.vigyan/models/...", file=sys.stderr)
-                    shutil.copy2(found_local, gguf_path)
-                except Exception:
-                    gguf_path = found_local
-            else:
-                gguf_path = found_local
-        else:
-            token_path = os.path.expanduser("~/.cache/huggingface/token")
-            hf_token = ""
-            if os.path.isfile(token_path):
-                try:
-                    with open(token_path, "r", encoding="utf-8") as f:
-                        hf_token = f.read().strip()
-                except Exception:
-                    pass
-            try:
-                from huggingface_hub import hf_hub_download
-                print("[INFO] Auto-repair: Downloading vigyan-3b-quad-master from Hugging Face...", file=sys.stderr)
-                hf_hub_download(
-                    repo_id="shreyansh12183/vigyan-3b-quad-master",
-                    filename="vigyan-3b-quad-master-iq3_m.gguf",
-                    token=hf_token or None,
-                    local_dir=target_dir
-                )
-            except Exception as e:
-                print(f"[WARN] 3B HF auto-repair download error: {e}", file=sys.stderr)
-                return False
-
-    modelfile_path = os.path.join(target_dir, "Modelfile.vigyan-3b")
-    modelfile_content = (
-        f'FROM "{gguf_path}"\n'
-        'TEMPLATE """{{- if .System }}<|im_start|>system\n'
-        "{{ .System }}<|im_end|>\n"
-        '{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}\n'
-        "{{ .Content }}<|im_end|>\n"
-        '{{ end }}<|im_start|>assistant\n'
-        '"""\n'
-        'SYSTEM """You are Vigyan 3B Quad-Master, the sovereign flagship STEM, mathematical proof, physics simulation, and engineering intelligence system architected by Shreyansh Singh. Deliver closed-form mathematical solutions, verified SymPy AST proofs, and exact engineering calculations with 100% offline edge privacy and zero corporate API dependency."""\n'
-        'PARAMETER stop "<|im_start|>"\n'
-        'PARAMETER stop "<|im_end|>"\n'
-        'PARAMETER stop "<|endoftext|>"\n'
-        'PARAMETER stop "</sstream>"\n'
-        'PARAMETER stop "<solution>"\n'
-        'PARAMETER stop "</solution>"\n'
-        'PARAMETER stop "User:"\n'
-        'PARAMETER stop "\\n\\nUser"\n'
-        'PARAMETER stop "Human:"\n'
-        "PARAMETER num_gpu 0\n"
-        "PARAMETER num_thread 4\n"
-        "PARAMETER num_batch 256\n"
-        "PARAMETER num_ctx 4096\n"
-        "PARAMETER repeat_penalty 1.15\n"
-        "PARAMETER repeat_last_n 64\n"
-        "PARAMETER temperature 0.2\n"
-        "PARAMETER top_p 0.95\n"
-        "PARAMETER top_k 40\n"
-    )
-    with open(modelfile_path, "w", encoding="utf-8") as mf:
-        mf.write(modelfile_content)
-
-    try:
-        print("[INFO] Auto-repair: Registering vigyan:3b into Ollama with STEM reasoning parameters...", file=sys.stderr)
-        res = subprocess.run(["ollama", "create", "vigyan:3b", "-f", modelfile_path], capture_output=True, timeout=180)
-        return res.returncode == 0
-    except Exception as e:
-        print(f"[WARN] Ollama 3B registration error: {e}", file=sys.stderr)
-        return False
+MODELS_CATALOG = {m["tag"]: m for m in VERIFIED_EXPERIMENTLAB_MODELS}
 
 
 class ModelDownloadManager:
-    """Resumable chunked model downloader with speed tracking and Ollama auto-registration."""
+    """Resumable chunked model downloader with pause, resume, cancel, speed tracking, and GGUF header verification."""
     def __init__(self):
         self.active_downloads: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
@@ -1241,75 +1220,53 @@ class ModelDownloadManager:
                 return self.active_downloads.get(tag, {"status": "idle"})
             return dict(self.active_downloads)
 
-    def start_download(self, tag: str) -> Dict[str, Any]:
-        info = MODELS_CATALOG.get(tag)
-        if not info:
-            return {"success": False, "error": f"Unknown model: {tag}"}
+    def start_download(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        tag = item.get("filename") or item.get("tag") or item.get("id") or "model.gguf"
+        hf_url = item.get("hf_url") or f"https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/{tag}?download=true"
+        dest_filename = item.get("filename") or f"{tag}.gguf"
+        if not dest_filename.endswith(".gguf"):
+            dest_filename += ".gguf"
 
         with self._lock:
-            if tag in self.active_downloads and self.active_downloads[tag]["status"] in ("downloading", "registering"):
-                return {"success": True, "message": "Already downloading", "status": self.active_downloads[tag]}
+            existing_dl = self.active_downloads.get(tag, {})
+            if existing_dl.get("status") == "downloading":
+                return {"success": True, "message": "Already downloading", "status": existing_dl}
+
             self.active_downloads[tag] = {
                 "tag": tag,
-                "name": info["name"],
+                "name": item.get("name", dest_filename),
+                "filename": dest_filename,
                 "status": "starting",
-                "progress_pct": 0.0,
-                "downloaded_bytes": 0,
-                "total_bytes": info["size_bytes"],
+                "progress_pct": existing_dl.get("progress_pct", 0.0),
+                "downloaded_bytes": existing_dl.get("downloaded_bytes", 0),
+                "total_bytes": item.get("size_bytes", 1_400_000_000),
                 "speed_mbps": 0.0,
-                "error": None
+                "eta_seconds": 0,
+                "eta_formatted": "--:--",
+                "error": None,
+                "item": item
             }
 
-        # 0. Check if model already exists in Ollama
-        try:
-            check_proc = subprocess.run(["ollama", "show", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.8)
-            if check_proc.returncode == 0:
-                with self._lock:
-                    self.active_downloads[tag] = {
-                        "tag": tag,
-                        "name": info["name"],
-                        "status": "ready",
-                        "progress_pct": 100.0,
-                        "downloaded_bytes": info["size_bytes"],
-                        "total_bytes": info["size_bytes"],
-                        "speed_mbps": 0.0,
-                        "error": None
-                    }
-                return {"success": True, "message": f"{tag} is already installed in Ollama", "status": "ready"}
-        except Exception:
-            pass
-
-        # Check local candidate files first (instant local import)
-        for cand in info.get("local_candidates", []):
-            if os.path.isfile(cand) and os.path.getsize(cand) > 100_000_000:
-                def _instant_register():
-                    with self._lock:
-                        self.active_downloads[tag]["status"] = "registering"
-                        self.active_downloads[tag]["progress_pct"] = 100.0
-                    target_dir = os.path.expanduser("~/.vigyan/models")
-                    os.makedirs(target_dir, exist_ok=True)
-                    dest_file = cand
-                    # Register into Ollama directly
-                    modelfile_path = os.path.join(target_dir, f"Modelfile.{tag.replace(':', '_')}")
-                    with open(modelfile_path, "w", encoding="utf-8") as mf:
-                        mf.write(f"FROM {dest_file}\nTEMPLATE \"\"\"{info['template']}\"\"\"\n")
-                        for s in info.get("stop", []):
-                            mf.write(f"PARAMETER stop \"{s}\"\n")
-                    subprocess.run(["ollama", "create", tag, "-f", modelfile_path], check=False)
-                    with self._lock:
-                        self.active_downloads[tag]["status"] = "ready"
-                threading.Thread(target=_instant_register, daemon=True).start()
-                return {"success": True, "message": "Found local weights, registering into Ollama...", "status": "registering"}
-
-        # Background resumable download thread
         def _download_thread():
             target_dir = os.path.expanduser("~/.vigyan/models")
             os.makedirs(target_dir, exist_ok=True)
-            dest_file = os.path.join(target_dir, info["dest_filename"])
+            dest_file = os.path.join(target_dir, dest_filename)
             part_file = dest_file + ".part"
 
+            total_req = item.get("size_bytes", 1_400_000_000)
+            try:
+                import shutil
+                free_disk = shutil.disk_usage(target_dir).free
+                if free_disk < total_req + 200_000_000:
+                    with self._lock:
+                        self.active_downloads[tag]["status"] = "error"
+                        self.active_downloads[tag]["error"] = "Insufficient disk space (requires ~2GB free)"
+                    return
+            except Exception:
+                pass
+
             existing_bytes = os.path.getsize(part_file) if os.path.exists(part_file) else 0
-            headers = {"User-Agent": "Vigyan-Desktop-Sovereign-Downloader/1.0"}
+            headers = {"User-Agent": "Vigyan-Pro-Sovereign-Downloader/5.0"}
             if existing_bytes > 0:
                 headers["Range"] = f"bytes={existing_bytes}-"
 
@@ -1318,12 +1275,12 @@ class ModelDownloadManager:
                     self.active_downloads[tag]["status"] = "downloading"
                     self.active_downloads[tag]["downloaded_bytes"] = existing_bytes
 
-                req = urllib.request.Request(info["hf_url"], headers=headers)
+                req = urllib.request.Request(hf_url, headers=headers)
                 start_time = time.time()
                 bytes_this_session = 0
 
                 with urllib.request.urlopen(req, timeout=30) as resp:
-                    total = info["size_bytes"]
+                    total = total_req
                     cr = resp.headers.get("Content-Range")
                     if cr and "/" in cr:
                         try:
@@ -1337,8 +1294,14 @@ class ModelDownloadManager:
                     with open(part_file, mode) as f:
                         while True:
                             with self._lock:
-                                if self.active_downloads.get(tag, {}).get("status") == "cancelled":
+                                st = self.active_downloads.get(tag, {}).get("status")
+                                if st == "cancelled":
                                     return
+                                if st == "paused":
+                                    self.active_downloads[tag]["speed_mbps"] = 0.0
+                                    self.active_downloads[tag]["eta_formatted"] = "Paused"
+                                    return
+
                             chunk = resp.read(1024 * 256)
                             if not chunk:
                                 break
@@ -1346,47 +1309,342 @@ class ModelDownloadManager:
                             bytes_this_session += len(chunk)
                             current_total = existing_bytes + bytes_this_session
                             elapsed = max(0.1, time.time() - start_time)
-                            speed_mbps = (bytes_this_session / (1024 * 1024)) / elapsed
+                            speed_bytes_sec = bytes_this_session / elapsed
+                            speed_mbps = speed_bytes_sec / (1024 * 1024)
                             pct = min(99.0, round((current_total / max(1, total)) * 100, 1))
+
+                            remaining_bytes = max(0, total - current_total)
+                            eta_sec = int(remaining_bytes / max(1000, speed_bytes_sec))
+                            if eta_sec >= 3600:
+                                eta_fmt = f"{eta_sec // 3600}h {(eta_sec % 3600) // 60}m"
+                            elif eta_sec >= 60:
+                                eta_fmt = f"{eta_sec // 60}m {eta_sec % 60}s"
+                            else:
+                                eta_fmt = f"{eta_sec}s"
 
                             with self._lock:
                                 self.active_downloads[tag]["downloaded_bytes"] = current_total
                                 self.active_downloads[tag]["total_bytes"] = total
                                 self.active_downloads[tag]["progress_pct"] = pct
                                 self.active_downloads[tag]["speed_mbps"] = round(speed_mbps, 1)
+                                self.active_downloads[tag]["eta_seconds"] = eta_sec
+                                self.active_downloads[tag]["eta_formatted"] = eta_fmt
 
-                os.rename(part_file, dest_file)
+                # Check if paused before validation
                 with self._lock:
-                    self.active_downloads[tag]["status"] = "registering"
-                    self.active_downloads[tag]["progress_pct"] = 100.0
+                    if self.active_downloads.get(tag, {}).get("status") in ("paused", "cancelled"):
+                        return
 
-                modelfile_path = os.path.join(target_dir, f"Modelfile.{tag.replace(':', '_')}")
-                with open(modelfile_path, "w", encoding="utf-8") as mf:
-                    mf.write(f"FROM {dest_file}\nTEMPLATE \"\"\"{info['template']}\"\"\"\n")
-                    for s in info.get("stop", []):
-                        mf.write(f"PARAMETER stop \"{s}\"\n")
-                subprocess.run(["ollama", "create", tag, "-f", modelfile_path], check=False)
+                # Validate binary integrity
+                if os.path.getsize(part_file) < 50_000_000:
+                    raise ValueError("Downloaded file is suspiciously small (<50MB); check URL")
+
+                with open(part_file, "rb") as check_f:
+                    magic = check_f.read(4)
+                    if magic != b"GGUF":
+                        raise ValueError(f"Corrupted binary: invalid GGUF magic header ({magic!r})")
+
+                if os.path.exists(dest_file):
+                    os.remove(dest_file)
+                os.rename(part_file, dest_file)
 
                 with self._lock:
                     self.active_downloads[tag]["status"] = "ready"
+                    self.active_downloads[tag]["progress_pct"] = 100.0
+                    self.active_downloads[tag]["speed_mbps"] = 0.0
+                    self.active_downloads[tag]["eta_formatted"] = "Ready"
 
             except Exception as exc:
                 with self._lock:
-                    self.active_downloads[tag]["status"] = "error"
-                    self.active_downloads[tag]["error"] = str(exc)
+                    st = self.active_downloads.get(tag, {}).get("status")
+                    if st not in ("paused", "cancelled"):
+                        self.active_downloads[tag]["status"] = "error"
+                        self.active_downloads[tag]["error"] = str(exc)
 
         threading.Thread(target=_download_thread, daemon=True).start()
         return {"success": True, "message": "Download started", "tag": tag}
 
-    def cancel_download(self, tag: str) -> bool:
+    def pause_download(self, tag: str) -> bool:
         with self._lock:
-            if tag in self.active_downloads:
-                self.active_downloads[tag]["status"] = "cancelled"
-                return True
-            return False
+            for k in (tag, tag.replace(".gguf", ""), tag + ".gguf"):
+                if k in self.active_downloads and self.active_downloads[k]["status"] in ("downloading", "starting"):
+                    self.active_downloads[k]["status"] = "paused"
+                    self.active_downloads[k]["speed_mbps"] = 0.0
+                    self.active_downloads[k]["eta_formatted"] = "Paused"
+                    return True
+        return False
+
+    def resume_download(self, tag: str) -> bool:
+        with self._lock:
+            target_key = None
+            for k in (tag, tag.replace(".gguf", ""), tag + ".gguf"):
+                if k in self.active_downloads and self.active_downloads[k]["status"] == "paused":
+                    target_key = k
+                    break
+            if not target_key:
+                return False
+            item = self.active_downloads[target_key].get("item") or {
+                "filename": self.active_downloads[target_key]["filename"],
+                "name": self.active_downloads[target_key]["name"],
+                "size_bytes": self.active_downloads[target_key]["total_bytes"],
+            }
+        return self.start_download(item).get("success", False)
+
+    def cancel_download(self, tag: str, remove_part: bool = True) -> bool:
+        with self._lock:
+            target_key = None
+            for k in (tag, tag.replace(".gguf", ""), tag + ".gguf"):
+                if k in self.active_downloads:
+                    target_key = k
+                    break
+            if not target_key:
+                return False
+            self.active_downloads[target_key]["status"] = "cancelled"
+            fname = self.active_downloads[target_key].get("filename") or tag
+            if remove_part:
+                part_path = os.path.join(os.path.expanduser("~/.vigyan/models"), fname + ".part")
+                if os.path.exists(part_path):
+                    try:
+                        os.remove(part_path)
+                    except Exception:
+                        pass
+            return True
 
 
 _DOWNLOAD_MGR = ModelDownloadManager()
+
+
+def _format_clean_model_name(filename: str, repo_id: str) -> str:
+    clean = filename.replace(".gguf", "")
+    for ext in [".Q4_K_M", "-q4_k_m", "-q8_0", ".q8_0", "-iq3_m", "-f16", ".f16"]:
+        clean = re.sub(re.escape(ext) + "$", "", clean, flags=re.IGNORECASE)
+    parts = clean.split("-")
+    title_parts = [p.capitalize() for p in parts]
+    return " ".join(title_parts)
+
+
+def _infer_model_domain(filename: str, repo_id: str) -> str:
+    lower = (filename + " " + repo_id).lower()
+    if "quad-master" in lower:
+        return "Flagship STEM, Calculus & Exact CAS"
+    if "stem" in lower:
+        return "Comprehensive STEM & Applied Sciences"
+    if "reason" in lower:
+        return "Deterministic Logic & Multi-Step Reasoning"
+    if "moe" in lower:
+        return "High-Velocity Sparse Mixture-of-Experts"
+    if "math" in lower:
+        return "Doctoral Proofs & Abstract Analysis"
+    if "chem" in lower or "biomed" in lower:
+        return "Bio-Molecular Alignment & Pharmacology"
+    if "vl" in lower or "vision" in lower:
+        return "Vision-Language, Diagrams & Circuit Schematics"
+    if "rtl" in lower or "silicon" in lower:
+        return "Verilog RTL & VLSI Circuit Design"
+    return "Sovereign Engineering Intelligence Engine"
+
+
+def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
+    """Scan all Hugging Face repos under author 'Experimentlab' dynamically."""
+    cache_file = os.path.expanduser("~/.vigyan/models/hf_catalog_cache.json")
+    now = time.time()
+    
+    if not force_refresh and os.path.isfile(cache_file):
+        try:
+            with open(cache_file, "r") as f:
+                data = json.load(f)
+                if now - data.get("timestamp", 0) < 600:
+                    return data.get("models", [])
+        except Exception:
+            pass
+
+    discovered = []
+    seen_filenames = set()
+    try:
+        req = urllib.request.Request(
+            "https://huggingface.co/api/models?author=Experimentlab",
+            headers={"User-Agent": "Vigyan-Pro-Discovery/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            repos = json.loads(r.read())
+
+        for repo in repos:
+            repo_id = repo.get("id")
+            if not repo_id or repo_id.endswith("/README"):
+                continue
+            try:
+                tree_url = f"https://huggingface.co/api/models/{repo_id}/tree/main?recursive=True"
+                treq = urllib.request.Request(tree_url, headers={"User-Agent": "Vigyan-Pro-Discovery/5.0"})
+                with urllib.request.urlopen(treq, timeout=4) as tr:
+                    tree = json.loads(tr.read())
+                    for f in tree:
+                        path = f.get("path", "")
+                        if path.endswith(".gguf") and not os.path.basename(path).startswith("mmproj"):
+                            fname = os.path.basename(path)
+                            if fname in seen_filenames:
+                                continue
+                            seen_filenames.add(fname)
+                            size_bytes = f.get("size", 0)
+                            size_gb = round(size_bytes / (1024 ** 3), 2)
+                            ram_req = max(2.0, round(size_gb * 1.4 + 0.8, 1))
+                            hf_url = f"https://huggingface.co/{repo_id}/resolve/main/{path}?download=true"
+                            
+                            discovered.append({
+                                "id": fname.replace(".gguf", "").lower(),
+                                "name": _format_clean_model_name(fname, repo_id),
+                                "tag": fname.replace(".gguf", "").lower(),
+                                "filename": fname,
+                                "rel_path": path,
+                                "size_bytes": size_bytes,
+                                "size_formatted": f"{size_gb} GB",
+                                "ram_required_gb": ram_req,
+                                "domain": _infer_model_domain(fname, repo_id),
+                                "hf_url": hf_url,
+                                "hf_repo": repo_id
+                            })
+            except Exception:
+                pass
+
+        if discovered:
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+            try:
+                with open(cache_file, "w") as f:
+                    json.dump({"timestamp": now, "models": discovered}, f, indent=2)
+            except Exception:
+                pass
+            return discovered
+    except Exception:
+        pass
+
+    if os.path.isfile(cache_file):
+        try:
+            with open(cache_file, "r") as f:
+                return json.load(f).get("models", [])
+        except Exception:
+            pass
+    return []
+
+
+def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
+    """Dynamically discover models from Experimentlab and local ~/.vigyan/models/."""
+    from llama_supervisor import detect_hardware_profile
+    hw = detect_hardware_profile()
+    avail_ram = hw.get("avail_ram_gb", 4.0)
+    total_ram = hw.get("total_ram_gb", 8.0)
+
+    target_dir = os.path.expanduser("~/.vigyan/models")
+    os.makedirs(target_dir, exist_ok=True)
+
+    local_files = {}
+    try:
+        for entry in os.scandir(target_dir):
+            if entry.is_file() and entry.name.endswith(".gguf") and not entry.name.startswith("mmproj"):
+                local_files[entry.name] = entry.stat().st_size
+        vl_dir = os.path.join(target_dir, "vl4b")
+        if os.path.isdir(vl_dir):
+            for entry in os.scandir(vl_dir):
+                if entry.is_file() and entry.name.endswith(".gguf") and not entry.name.startswith("mmproj"):
+                    local_files[entry.name] = entry.stat().st_size
+    except Exception:
+        pass
+
+    active_path = LLAMA_SUPERVISOR.model_path or ""
+    active_filename = os.path.basename(active_path) if active_path else ""
+
+    dynamic_models = fetch_dynamic_hf_catalog(force_refresh=force_refresh)
+    result_models = []
+    seen_filenames = set()
+
+    for m in dynamic_models:
+        fname = m["filename"]
+        seen_filenames.add(fname)
+        is_installed = fname in local_files
+        is_active = is_installed and (fname == active_filename)
+        actual_size = local_files.get(fname, m["size_bytes"])
+
+        req_ram = m.get("ram_required_gb", 4.0)
+        if avail_ram >= req_ram:
+            comp = "verified"
+            badge = f"Verified for your {total_ram}GB RAM"
+        elif total_ram >= req_ram:
+            comp = "tight"
+            badge = "Tight RAM (Runs on CPU)"
+        else:
+            comp = "incompatible"
+            badge = f"Requires {req_ram}GB RAM"
+
+        item = dict(m)
+        item.update({
+            "is_installed": is_installed,
+            "is_active": is_active,
+            "actual_size_bytes": actual_size,
+            "compatibility": comp,
+            "compatibility_badge": badge,
+        })
+        result_models.append(item)
+
+    for m in VERIFIED_EXPERIMENTLAB_MODELS:
+        fname = m["filename"]
+        if fname not in seen_filenames:
+            seen_filenames.add(fname)
+            is_installed = fname in local_files
+            is_active = is_installed and (fname == active_filename)
+            actual_size = local_files.get(fname, m["size_bytes"])
+
+            req_ram = m.get("ram_required_gb", 4.0)
+            if avail_ram >= req_ram:
+                comp = "verified"
+                badge = f"Verified for your {total_ram}GB RAM"
+            elif total_ram >= req_ram:
+                comp = "tight"
+                badge = "Tight RAM (Runs on CPU)"
+            else:
+                comp = "incompatible"
+                badge = f"Requires {req_ram}GB RAM"
+
+            item = dict(m)
+            item.update({
+                "is_installed": is_installed,
+                "is_active": is_active,
+                "actual_size_bytes": actual_size,
+                "compatibility": comp,
+                "compatibility_badge": badge,
+            })
+            result_models.append(item)
+
+    for fname, size in local_files.items():
+        if fname not in seen_filenames:
+            is_active = (fname == active_filename)
+            size_gb = round(size / (1024 ** 3), 2)
+            result_models.append({
+                "id": fname.replace(".gguf", ""),
+                "name": fname.replace(".gguf", "").replace("-", " ").title(),
+                "tag": fname.replace(".gguf", ""),
+                "filename": fname,
+                "size_bytes": size,
+                "size_formatted": f"{size_gb} GB",
+                "ram_required_gb": max(2.0, round(size_gb * 1.5, 1)),
+                "domain": "Local Custom Model",
+                "hf_url": "",
+                "hf_repo": "local",
+                "is_installed": True,
+                "is_active": is_active,
+                "actual_size_bytes": size,
+                "compatibility": "verified",
+                "compatibility_badge": "Local Custom Engine",
+            })
+
+    installed_count = sum(1 for m in result_models if m.get("is_installed"))
+    rec_model = "vigyan-3b-quad-master-iq3_m.gguf"
+
+    return {
+        "models": result_models,
+        "installed_count": installed_count,
+        "recommended_filename": rec_model,
+        "active_filename": active_filename,
+        "hardware": hw,
+        "downloads": _DOWNLOAD_MGR.get_status(),
+    }
 
 
 
@@ -1877,18 +2135,17 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 return
 
         if self.path.startswith("/api/models/catalog"):
-            tel = get_system_telemetry()
-            ram_gb = tel.get("ram_total_gb", 8.0)
-            rec_tag = "vigyan:3b"
-            payload = {
-                "catalog": MODELS_CATALOG,
-                "models": list(MODELS_CATALOG.values()),
-                "recommended_tag": rec_tag,
-                "system_ram_gb": ram_gb,
-                "downloads": _DOWNLOAD_MGR.get_status()
-            }
+            force = ("refresh=1" in self.path or "refresh=true" in self.path)
+            payload = get_models_catalog(force_refresh=force)
             self._send_cors(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/models/download/status"):
+            payload = _DOWNLOAD_MGR.get_status()
+            self._send_cors(200)
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
+            return
         else:
             # Universal cross-platform static file serving (dist/ priority then src/)
             clean_path = self.path.split("?")[0]
@@ -1956,6 +2213,122 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             body = json.loads(raw)
         except Exception:
             body = {}
+
+        if self.path == "/api/models/download/pause" or self.path.startswith("/api/models/download/pause"):
+            tag = body.get("tag") or body.get("filename")
+            ok = _DOWNLOAD_MGR.pause_download(tag) if tag else False
+            self._send_cors(200 if ok else 400)
+            self.wfile.write(json.dumps({"success": ok, "tag": tag}).encode("utf-8"))
+            return
+
+        if self.path == "/api/models/download/resume" or self.path.startswith("/api/models/download/resume"):
+            tag = body.get("tag") or body.get("filename")
+            ok = _DOWNLOAD_MGR.resume_download(tag) if tag else False
+            self._send_cors(200 if ok else 400)
+            self.wfile.write(json.dumps({"success": ok, "tag": tag}).encode("utf-8"))
+            return
+
+        if self.path == "/api/models/download/cancel" or self.path.startswith("/api/models/download/cancel"):
+            tag = body.get("tag") or body.get("filename")
+            remove_part = body.get("remove_part", True)
+            ok = _DOWNLOAD_MGR.cancel_download(tag, remove_part=remove_part) if tag else False
+            self._send_cors(200 if ok else 400)
+            self.wfile.write(json.dumps({"success": ok, "tag": tag}).encode("utf-8"))
+            return
+
+        if self.path == "/api/models/catalog/refresh" or self.path.startswith("/api/models/catalog/refresh"):
+            payload = get_models_catalog(force_refresh=True)
+            self._send_cors(200)
+            self.wfile.write(json.dumps(payload).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/models/download"):
+            filename = body.get("filename") or body.get("name")
+            target_item = None
+            catalog = get_models_catalog()
+            for m in catalog.get("models", []):
+                if m.get("filename") == filename or m.get("id") == filename or m.get("name") == filename:
+                    target_item = m
+                    break
+            if not target_item:
+                target_item = {
+                    "filename": filename,
+                    "name": filename,
+                    "hf_url": body.get("hf_url") or f"https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/{filename}?download=true",
+                    "size_bytes": body.get("size_bytes", 1_400_000_000)
+                }
+            res = _DOWNLOAD_MGR.start_download(target_item)
+            self._send_cors(200)
+            self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/models/swap"):
+            filename = body.get("filename")
+            models_dir = os.path.expanduser("~/.vigyan/models")
+            target_path = os.path.join(models_dir, filename) if filename else ""
+            if not os.path.isfile(target_path):
+                vl4b_path = os.path.join(models_dir, "vl4b", filename) if filename else ""
+                if os.path.isfile(vl4b_path):
+                    target_path = vl4b_path
+
+            if not os.path.isfile(target_path):
+                self._send_cors(404)
+                self.wfile.write(json.dumps({"success": False, "error": f"Model not found on disk: {filename}"}).encode("utf-8"))
+                return
+
+            try:
+                LLAMA_SUPERVISOR.swap_model(target_path)
+                self._send_cors(200)
+                self.wfile.write(json.dumps({"success": True, "active_model": filename}).encode("utf-8"))
+            except Exception as exc:
+                self._send_cors(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(exc)}).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/models/delete"):
+            filename = body.get("filename")
+            models_dir = os.path.expanduser("~/.vigyan/models")
+            target_path = os.path.join(models_dir, filename) if filename else ""
+            if not os.path.isfile(target_path):
+                vl4b_path = os.path.join(models_dir, "vl4b", filename) if filename else ""
+                if os.path.isfile(vl4b_path):
+                    target_path = vl4b_path
+
+            if not os.path.isfile(target_path):
+                self._send_cors(404)
+                self.wfile.write(json.dumps({"success": False, "error": f"Model file not found on disk: {filename}"}).encode("utf-8"))
+                return
+
+            try:
+                active_model = LLAMA_SUPERVISOR.model_path
+                is_active = active_model and (os.path.basename(active_model) == os.path.basename(target_path))
+                if is_active:
+                    LLAMA_SUPERVISOR.stop()
+
+                reclaimed_bytes = os.path.getsize(target_path)
+                os.remove(target_path)
+
+                next_active = None
+                if is_active:
+                    catalog = get_models_catalog()
+                    installed = [m for m in catalog.get("models", []) if m.get("is_installed")]
+                    if installed:
+                        next_model_file = os.path.join(models_dir, installed[0]["filename"])
+                        if os.path.isfile(next_model_file):
+                            LLAMA_SUPERVISOR.swap_model(next_model_file)
+                            next_active = installed[0]["filename"]
+
+                self._send_cors(200)
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "reclaimed_bytes": reclaimed_bytes,
+                    "reclaimed_formatted": f"{round(reclaimed_bytes / (1024**3), 2)} GB",
+                    "next_active": next_active
+                }).encode("utf-8"))
+            except Exception as exc:
+                self._send_cors(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(exc)}).encode("utf-8"))
+            return
 
         if self.path.startswith("/api/ingest/file"):
             import ingest_engine
@@ -2352,8 +2725,8 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
 
 
 def start_neuro_symbolic_bridge_server(port: int = 8085) -> Optional[int]:
-    """Start embedded Neuro-Symbolic HTTP server on port 8085 (or 8086 if 8085 is in use)."""
-    for candidate_port in (port, 8087, 8088):
+    """Start embedded Neuro-Symbolic HTTP server on port 8085 (hunting up to port+20)."""
+    for candidate_port in range(port, port + 20):
         try:
             server = ThreadingHTTPServer(("127.0.0.1", candidate_port), _NeuroSymbolicHTTPHandler)
             t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -2398,10 +2771,50 @@ def main():
     except Exception:
         pass
 
-    import gi
-    gi.require_version('Gtk', '3.0')
-    gi.require_version('WebKit2', '4.1')
-    from gi.repository import Gtk, WebKit2, Gdk, GdkPixbuf, GLib
+    try:
+        import gi
+        gi.require_version('Gtk', '3.0')
+        gi.require_version('WebKit2', '4.1')
+        from gi.repository import Gtk, WebKit2, Gdk, GdkPixbuf, GLib
+    except Exception as gtk_err:
+        print(f"[Vigyan Pro] WebKitGTK 4.1 runtime unavailable ({gtk_err}). Launching in Frameless App Mode...", file=sys.stderr)
+        _discover_static_hardware()
+        ensure_llama_server()
+        bridge_port = start_neuro_symbolic_bridge_server(8085) or 8085
+        url = f"http://127.0.0.1:{bridge_port}/"
+
+        # Search for Chromium-family browser to run in isolated chromeless app mode
+        for b_name in ("google-chrome", "google-chrome-stable", "chromium", "brave-browser", "brave", "microsoft-edge"):
+            b_path = shutil.which(b_name)
+            if b_path:
+                app_data = os.path.expanduser("~/.cache/vigyan-app-mode")
+                os.makedirs(app_data, exist_ok=True)
+                cmd = [
+                    b_path,
+                    f"--app={url}",
+                    "--window-size=1340,740",
+                    "--class=vigyan-pro",
+                    "--name=Vigyan Pro",
+                    f"--user-data-dir={app_data}",
+                    "--force-dark-mode"
+                ]
+                try:
+                    subprocess.run(cmd)
+                finally:
+                    LLAMA_SUPERVISOR.stop()
+                return
+
+        # Fallback to default browser
+        import webbrowser
+        webbrowser.open(url)
+        try:
+            while True:
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            pass
+        finally:
+            LLAMA_SUPERVISOR.stop()
+        return
 
     # Exit through the GTK main loop so the cleanup after Gtk.main() always runs.
     try:
