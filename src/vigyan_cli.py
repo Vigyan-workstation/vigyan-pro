@@ -489,18 +489,19 @@ def query_local_server(prompt: str, host: str = DEFAULT_HOST, stream: bool = Tru
 
 def print_usage():
     print("""
-Vigyan Pro Sovereign CLI v4.2 [100% Offline • Air-Gapped STEM Workstation]
+Vigyan Pro Sovereign CLI v5.0 [100% Offline • Air-Gapped STEM Workstation]
 Usage:
   vigyan                                Launch interactive scientific REPL
   vigyan run [model]                    Launch REPL with a specific model
-  vigyan models | ls                    List installed & available Hugging Face models
+  vigyan models | ls [--refresh]        List installed & available Hugging Face models
   vigyan pull <model>                   Download model from https://huggingface.co/Experimentlab
   vigyan rm <model>                     Delete local model and reclaim disk space
+  vigyan --version | -v                 Display version specification
   vigyan "<query>"                      One-shot CLI evaluation with streaming answer
   echo "<query>" | vigyan               Piped evaluation for bash scripts and VS Code tasks
 
 Examples:
-  vigyan models
+  vigyan models --refresh
   vigyan pull vigyan-3b-quad-master-iq3_m.gguf
   vigyan "Integrate x^2 * sin(x) dx"
   cat problem.tex | vigyan
@@ -581,6 +582,15 @@ def run_repl(model_path: Optional[str] = None):
 
 def main():
     args = sys.argv[1:]
+
+    # Version flag
+    if args and args[0] in ("--version", "-v", "version"):
+        try:
+            from version import __version__
+        except ImportError:
+            __version__ = "5.0.0"
+        print(f"Vigyan Pro v{__version__} [Sovereign Offline Intelligence]")
+        return
 
     # Help flag
     if args and args[0] in ("--help", "-h", "help"):

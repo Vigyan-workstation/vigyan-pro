@@ -2771,8 +2771,45 @@ def main():
     except Exception:
         pass
 
+    if "--server-only" in sys.argv:
+        _discover_static_hardware()
+        ensure_llama_server()
+        bridge_port = start_neuro_symbolic_bridge_server(8085) or 8085
+        print(f"[Vigyan Pro] Bridge server active at http://127.0.0.1:{bridge_port}/")
+        try:
+            while True:
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            pass
+        finally:
+            LLAMA_SUPERVISOR.stop()
+        return
+
+    if "--browser" in sys.argv:
+        _discover_static_hardware()
+        ensure_llama_server()
+        bridge_port = start_neuro_symbolic_bridge_server(8085) or 8085
+        url = f"http://127.0.0.1:{bridge_port}/"
+        print(f"[Vigyan Pro] Opening {url} in default browser...")
+        import webbrowser
+        webbrowser.open(url)
+        try:
+            while True:
+                time.sleep(1)
+        except (KeyboardInterrupt, SystemExit):
+            pass
+        finally:
+            LLAMA_SUPERVISOR.stop()
+        return
+
     try:
-        import gi
+        try:
+            import gi
+        except ImportError:
+            for _p in ("/usr/lib/python3.14/site-packages", "/usr/lib/python3.13/site-packages", "/usr/lib/python3/dist-packages", "/usr/lib64/python3.14/site-packages"):
+                if os.path.isdir(_p) and _p not in sys.path:
+                    sys.path.append(_p)
+            import gi
         gi.require_version('Gtk', '3.0')
         gi.require_version('WebKit2', '4.1')
         from gi.repository import Gtk, WebKit2, Gdk, GdkPixbuf, GLib
