@@ -318,8 +318,11 @@ def cmd_pull(model_name: str) -> bool:
     # Pre-flight disk space check
     try:
         free_space = shutil.disk_usage(MODELS_DIR).free
-        if free_space < target_info.get("size_bytes", 1_400_000_000) + 200_000_000:
-            print(f"[Error] Insufficient disk space in ~/.vigyan/models/. Needs ~2.0 GB free.", file=sys.stderr)
+        total_req = target_info.get("size_bytes", 1_400_000_000)
+        if free_space < total_req + 100_000_000:
+            req_mb = int(total_req // (1024 * 1024) + 100)
+            free_mb = int(free_space // (1024 * 1024))
+            print(f"[Error] Insufficient disk space in ~/.vigyan/models/. Needs ~{req_mb} MB free, only {free_mb} MB available.", file=sys.stderr)
             return False
     except Exception:
         pass
@@ -336,7 +339,24 @@ def cmd_pull(model_name: str) -> bool:
     bytes_this_session = 0
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        try:
+            resp = urllib.request.urlopen(req, timeout=30)
+        except urllib.error.HTTPError as http_err:
+            if http_err.code == 416 and existing_bytes > 0:
+                print("\n[Notice] Stale download offset detected. Resetting partial file...", file=sys.stderr)
+                if os.path.exists(part_file):
+                    try:
+                        os.remove(part_file)
+                    except Exception:
+                        pass
+                existing_bytes = 0
+                headers.pop("Range", None)
+                req = urllib.request.Request(target_info["hf_url"], headers=headers)
+                resp = urllib.request.urlopen(req, timeout=30)
+            else:
+                raise
+
+        with resp:
             total = target_info.get("size_bytes", 1_400_000_000)
             cr = resp.headers.get("Content-Range")
             if cr and "/" in cr:
@@ -380,15 +400,32 @@ def cmd_pull(model_name: str) -> bool:
                     sys.stdout.flush()
 
         print()
-        # Verify GGUF magic header
+        # Verify binary size and GGUF magic header
+        part_size = os.path.getsize(part_file)
+        if part_size < 2_000_000:
+            raise ValueError(f"Downloaded binary suspiciously small ({part_size} bytes < 2MB); verify URL")
+
         with open(part_file, "rb") as check_f:
             magic = check_f.read(4)
             if magic != b"GGUF":
                 raise ValueError(f"Corrupted binary: invalid GGUF header ({magic!r})")
 
-        if os.path.exists(dest_file):
-            os.remove(dest_file)
-        os.rename(part_file, dest_file)
+        replaced = False
+        for _ in range(5):
+            try:
+                if os.path.exists(dest_file):
+                    try:
+                        os.remove(dest_file)
+                    except Exception:
+                        pass
+                os.replace(part_file, dest_file)
+                replaced = True
+                break
+            except Exception:
+                time.sleep(0.2)
+        if not replaced:
+            os.rename(part_file, dest_file)
+
         print(f"✓ Successfully installed {target_info['filename']} to ~/.vigyan/models/")
         return True
 
@@ -403,15 +440,45 @@ def cmd_pull(model_name: str) -> bool:
 
 def cmd_rm(model_name: str) -> bool:
     """Delete model from local ~/.vigyan/models/."""
-    target_path = find_model_file(model_name)
-    if not target_path or not os.path.isfile(target_path):
+    clean = model_name.strip()
+    target_path = find_model_file(clean)
+    part_path = None
+    if not target_path:
+        fname = clean if clean.endswith(".gguf") else f"{clean}.gguf"
+        candidate_part = os.path.join(MODELS_DIR, fname + ".part")
+        if os.path.isfile(candidate_part):
+            part_path = candidate_part
+    else:
+        part_candidate = target_path + ".part"
+        if os.path.isfile(part_candidate):
+            part_path = part_candidate
+
+    if not target_path and not part_path:
         print(f"[Error] Model '{model_name}' not found in ~/.vigyan/models/.")
         return False
 
-    size_bytes = os.path.getsize(target_path)
-    size_mb = round(size_bytes / (1024 ** 2), 1)
-    os.remove(target_path)
-    print(f"✓ Removed {os.path.basename(target_path)} (Reclaimed {size_mb} MB).")
+    reclaimed_bytes = 0
+    if target_path and os.path.isfile(target_path):
+        reclaimed_bytes += os.path.getsize(target_path)
+        for _ in range(5):
+            try:
+                os.remove(target_path)
+                break
+            except Exception:
+                time.sleep(0.2)
+
+    if part_path and os.path.isfile(part_path):
+        reclaimed_bytes += os.path.getsize(part_path)
+        for _ in range(5):
+            try:
+                os.remove(part_path)
+                break
+            except Exception:
+                time.sleep(0.2)
+
+    size_mb = round(reclaimed_bytes / (1024 ** 2), 1)
+    display_name = os.path.basename(target_path or part_path)
+    print(f"✓ Removed {display_name} (Reclaimed {size_mb} MB).")
     return True
 
 

@@ -13,20 +13,15 @@ if str(SRC) not in sys.path:
 
 import launch_desktop
 import launch_desktop_win
-from ollama_supervisor import OllamaSupervisor
+from llama_supervisor import LlamaServerSupervisor
 
 
 class TestHybridComputeAndNeuroSymbolicStudio(unittest.TestCase):
-    def test_ollama_supervisor_flash_attention_and_kv_env(self):
-        sup = OllamaSupervisor(
-            command=["echo", "serve"],
-            is_healthy=lambda: True,
-            extra_env={"CUSTOM_VAR": "42"},
-        )
-        self.assertEqual(sup._extra_env.get("OLLAMA_FLASH_ATTENTION"), "1")
-        self.assertEqual(sup._extra_env.get("OLLAMA_KV_CACHE_TYPE"), "q8_0")
-        self.assertEqual(sup._extra_env.get("OLLAMA_NUM_PARALLEL"), "1")
-        self.assertEqual(sup._extra_env.get("CUSTOM_VAR"), "42")
+    def test_llama_supervisor_hardware_profile_and_env(self):
+        sup = LlamaServerSupervisor(port=18090, ctx_size=2048, threads=4)
+        self.assertEqual(sup.port, 18090)
+        self.assertEqual(sup.ctx_size, 2048)
+        self.assertEqual(sup.threads, 4)
 
     def test_compute_hybrid_allocation_all_modes_and_edge_cases(self):
         hw_apu = {"physical_cores": 4, "logical_cores": 8, "ram_total_gb": 8.0}

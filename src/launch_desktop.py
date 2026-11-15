@@ -1204,7 +1204,38 @@ VERIFIED_EXPERIMENTLAB_MODELS = [
     }
 ]
 
-MODELS_CATALOG = {m["tag"]: m for m in VERIFIED_EXPERIMENTLAB_MODELS}
+MODELS_CATALOG = {
+    "vigyan:3b": {
+        "id": "vigyan-3b-quad-master-iq3_m",
+        "name": "Vigyan-3B Quad-Master",
+        "tag": "vigyan:3b",
+        "filename": "vigyan-3b-quad-master-iq3_m.gguf",
+        "dest_filename": "vigyan-3b-quad-master-iq3_m.gguf",
+        "size_bytes": 1488894752,
+        "size_formatted": "1.39 GB",
+        "ram_required_gb": 4.0,
+        "domain": "Flagship STEM, Calculus & Exact CAS",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
+        "template": "{{ prompt }}",
+        "stop": ["<|endoftext|>", "<|im_end|>"]
+    },
+    "vigyan:1.5b": {
+        "id": "vigyan-1.5b-quad-master-q4_k_m",
+        "name": "Vigyan-1.5B Quad-Master",
+        "tag": "vigyan:1.5b",
+        "filename": "vigyan-1.5b-quad-master-q4_k_m.gguf",
+        "dest_filename": "vigyan-1.5b-quad-master-q4_k_m.gguf",
+        "size_bytes": 1116000000,
+        "size_formatted": "1.04 GB",
+        "ram_required_gb": 2.5,
+        "domain": "Ultra-Lightweight Exact Analytical Engine",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-1.5b-quad-master/resolve/main/vigyan-1.5b-quad-master-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-1.5b-quad-master",
+        "template": "{{ prompt }}",
+        "stop": ["<|endoftext|>", "<|im_end|>"]
+    }
+}
 
 
 class ModelDownloadManager:
@@ -1216,15 +1247,36 @@ class ModelDownloadManager:
     def get_status(self, tag: Optional[str] = None) -> Dict[str, Any]:
         with self._lock:
             if tag:
-                return self.active_downloads.get(tag, {"status": "idle"})
+                for k in (tag, tag.replace(":", "-"), tag.replace("-", ":")):
+                    if k in self.active_downloads:
+                        return self.active_downloads[k]
+                return {"status": "idle"}
             return dict(self.active_downloads)
 
-    def start_download(self, item: Dict[str, Any]) -> Dict[str, Any]:
+    def start_download(self, item: Any) -> Dict[str, Any]:
+        if isinstance(item, str):
+            clean_str = item.strip()
+            if clean_str in MODELS_CATALOG:
+                item = dict(MODELS_CATALOG[clean_str])
+            else:
+                found = None
+                for m in VERIFIED_EXPERIMENTLAB_MODELS:
+                    if clean_str.lower() in (m["id"].lower(), m["tag"].lower(), m["filename"].lower(), m["name"].lower()):
+                        found = dict(m)
+                        break
+                if found:
+                    item = found
+                elif clean_str.endswith(".gguf"):
+                    item = {"filename": clean_str, "tag": clean_str.replace(".gguf", "")}
+                else:
+                    return {"success": False, "error": f"Unknown model tag: {clean_str}"}
+
         tag = item.get("filename") or item.get("tag") or item.get("id") or "model.gguf"
-        hf_url = item.get("hf_url") or f"https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/{tag}?download=true"
-        dest_filename = item.get("filename") or f"{tag}.gguf"
+        dest_filename = item.get("filename") or item.get("dest_filename") or f"{tag}.gguf"
         if not dest_filename.endswith(".gguf"):
             dest_filename += ".gguf"
+
+        hf_url = item.get("hf_url") or f"https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/{dest_filename}?download=true"
 
         with self._lock:
             existing_dl = self.active_downloads.get(tag, {})
@@ -1256,10 +1308,12 @@ class ModelDownloadManager:
             try:
                 import shutil
                 free_disk = shutil.disk_usage(target_dir).free
-                if free_disk < total_req + 200_000_000:
+                if free_disk < total_req + 100_000_000:
+                    req_mb = int(total_req // (1024 * 1024) + 100)
+                    free_mb = int(free_disk // (1024 * 1024))
                     with self._lock:
                         self.active_downloads[tag]["status"] = "error"
-                        self.active_downloads[tag]["error"] = "Insufficient disk space (requires ~2GB free)"
+                        self.active_downloads[tag]["error"] = f"Insufficient disk space (requires ~{req_mb}MB free, only {free_mb}MB available)"
                     return
             except Exception:
                 pass
@@ -1278,7 +1332,24 @@ class ModelDownloadManager:
                 start_time = time.time()
                 bytes_this_session = 0
 
-                with urllib.request.urlopen(req, timeout=30) as resp:
+                try:
+                    resp = urllib.request.urlopen(req, timeout=30)
+                except urllib.error.HTTPError as http_err:
+                    if http_err.code == 416 and existing_bytes > 0:
+                        logger.warning("HTTP 416 for %s. Resetting stale .part file from byte 0", tag)
+                        if os.path.exists(part_file):
+                            try:
+                                os.remove(part_file)
+                            except Exception:
+                                pass
+                        existing_bytes = 0
+                        headers.pop("Range", None)
+                        req = urllib.request.Request(hf_url, headers=headers)
+                        resp = urllib.request.urlopen(req, timeout=30)
+                    else:
+                        raise
+
+                with resp:
                     total = total_req
                     cr = resp.headers.get("Content-Range")
                     if cr and "/" in cr:
@@ -1335,17 +1406,32 @@ class ModelDownloadManager:
                         return
 
                 # Validate binary integrity
-                if os.path.getsize(part_file) < 50_000_000:
-                    raise ValueError("Downloaded file is suspiciously small (<50MB); check URL")
+                part_size = os.path.getsize(part_file)
+                if part_size < 2_000_000:
+                    raise ValueError(f"Downloaded file is suspiciously small ({part_size} bytes < 2MB); check URL")
 
                 with open(part_file, "rb") as check_f:
                     magic = check_f.read(4)
                     if magic != b"GGUF":
                         raise ValueError(f"Corrupted binary: invalid GGUF magic header ({magic!r})")
 
-                if os.path.exists(dest_file):
-                    os.remove(dest_file)
-                os.rename(part_file, dest_file)
+                # Atomic replace with retry for Windows file locks
+                replaced = False
+                for attempt in range(5):
+                    try:
+                        if os.path.exists(dest_file):
+                            try:
+                                os.remove(dest_file)
+                            except Exception:
+                                pass
+                        os.replace(part_file, dest_file)
+                        replaced = True
+                        break
+                    except Exception:
+                        time.sleep(0.2)
+
+                if not replaced:
+                    os.rename(part_file, dest_file)
 
                 with self._lock:
                     self.active_downloads[tag]["status"] = "ready"
@@ -1398,6 +1484,8 @@ class ModelDownloadManager:
                     break
             if not target_key:
                 return False
+            if self.active_downloads[target_key].get("status") in ("idle", "ready", "completed"):
+                return False
             self.active_downloads[target_key]["status"] = "cancelled"
             fname = self.active_downloads[target_key].get("filename") or tag
             if remove_part:
@@ -1443,23 +1531,10 @@ def _infer_model_domain(filename: str, repo_id: str) -> str:
     return "Sovereign Engineering Intelligence Engine"
 
 
-def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
-    """Scan all public Hugging Face repos under Experimentlab and author accounts dynamically."""
+def _scan_and_cache_hf_repos(cache_file: str) -> List[Dict[str, Any]]:
+    """Internal helper to scan public Hugging Face repos and update cache."""
     import concurrent.futures
-    cache_file = os.path.expanduser("~/.vigyan/models/hf_catalog_cache.json")
     now = time.time()
-    
-    if not force_refresh and os.path.isfile(cache_file):
-        try:
-            with open(cache_file, "r") as f:
-                data = json.load(f)
-                if now - data.get("timestamp", 0) < 600:
-                    cached = data.get("models", [])
-                    if cached:
-                        return cached
-        except Exception:
-            pass
-
     discovered = []
     seen_filenames = set()
     authors = ["Experimentlab", "shreyansh12183"]
@@ -1474,7 +1549,6 @@ def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]
             with urllib.request.urlopen(req, timeout=5) as r:
                 r_list = json.loads(r.read())
                 for repo in r_list:
-                    # STRICT GUARD: Never include or probe private repositories
                     if repo.get("private", False):
                         continue
                     repo_id = repo.get("id")
@@ -1498,7 +1572,7 @@ def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]
                         size_gb = round(size_bytes / (1024 ** 3), 2)
                         ram_req = max(2.0, round(size_gb * 1.4 + 0.8, 1))
                         hf_url = f"https://huggingface.co/{repo_id}/resolve/main/{path}?download=true"
-                        
+
                         repo_discovered.append({
                             "id": fname.replace(".gguf", "").lower(),
                             "name": _format_clean_model_name(fname, repo_id),
@@ -1531,7 +1605,6 @@ def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]
                     pass
 
     if discovered:
-        # Sort so flagship and compact models appear at top
         discovered.sort(key=lambda m: (
             0 if "3b-quad-master" in m["filename"] else
             1 if "2b-stem" in m["filename"] else
@@ -1549,13 +1622,32 @@ def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]
             pass
         return discovered
 
-    if os.path.isfile(cache_file):
-        try:
-            with open(cache_file, "r") as f:
-                return json.load(f).get("models", [])
-        except Exception:
-            pass
     return []
+
+
+def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
+    """Scan all public Hugging Face repos under Experimentlab and author accounts dynamically."""
+    cache_file = os.path.expanduser("~/.vigyan/models/hf_catalog_cache.json")
+    now = time.time()
+
+    if not force_refresh:
+        if os.path.isfile(cache_file):
+            try:
+                with open(cache_file, "r") as f:
+                    data = json.load(f)
+                    if now - data.get("timestamp", 0) < 600:
+                        cached = data.get("models", [])
+                        if cached:
+                            return cached
+            except Exception:
+                pass
+        # Return verified catalog immediately and refresh in background
+        threading.Thread(target=lambda: _scan_and_cache_hf_repos(cache_file), daemon=True).start()
+        return list(VERIFIED_EXPERIMENTLAB_MODELS)
+
+    # Explicit force refresh requested by user
+    scanned = _scan_and_cache_hf_repos(cache_file)
+    return scanned if scanned else list(VERIFIED_EXPERIMENTLAB_MODELS)
 
 
 def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
@@ -1670,8 +1762,23 @@ def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
     installed_count = sum(1 for m in result_models if m.get("is_installed"))
     rec_model = "vigyan-3b-quad-master-iq3_m.gguf"
 
+    legacy_catalog = {
+        m.get("tag", m["filename"]): {
+            **m,
+            "dest_filename": m["filename"],
+        }
+        for m in result_models
+    }
+    for m in result_models:
+        tag = m.get("tag", "")
+        if "-" in tag:
+            colon_tag = tag.replace("-", ":", 1)
+            legacy_catalog[colon_tag] = {**m, "dest_filename": m["filename"]}
+
     return {
         "models": result_models,
+        "catalog": legacy_catalog,
+        "system_ram_gb": hw.get("total_ram_gb", 8.0),
         "installed_count": installed_count,
         "recommended_filename": rec_model,
         "active_filename": active_filename,
@@ -2414,13 +2521,29 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 self.wfile.write(json.dumps({"success": False, "error": f"Model not found on disk: {filename}"}).encode("utf-8"))
                 return
 
+            prev_model = LLAMA_SUPERVISOR.model_path
             try:
                 LLAMA_SUPERVISOR.swap_model(target_path)
                 self._send_cors(200)
                 self.wfile.write(json.dumps({"success": True, "active_model": filename}).encode("utf-8"))
             except Exception as exc:
+                logger.error("Failed to swap model to %s: %s. Reverting to previous model...", filename, exc)
+                reverted = False
+                if prev_model and os.path.isfile(prev_model) and prev_model != target_path:
+                    try:
+                        LLAMA_SUPERVISOR.swap_model(prev_model)
+                        reverted = True
+                    except Exception:
+                        pass
                 self._send_cors(500)
-                self.wfile.write(json.dumps({"success": False, "error": str(exc)}).encode("utf-8"))
+                err_msg = f"Failed to activate {filename}: {exc}"
+                if reverted:
+                    err_msg += f" (Reverted to {os.path.basename(prev_model)})"
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": err_msg,
+                    "reverted_to": os.path.basename(prev_model) if reverted else None
+                }).encode("utf-8"))
             return
 
         if self.path.startswith("/api/models/delete"):
@@ -2432,29 +2555,62 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 if os.path.isfile(vl4b_path):
                     target_path = vl4b_path
 
-            if not os.path.isfile(target_path):
+            part_path = target_path + ".part" if target_path else ""
+
+            if not os.path.isfile(target_path) and not (part_path and os.path.isfile(part_path)):
                 self._send_cors(404)
                 self.wfile.write(json.dumps({"success": False, "error": f"Model file not found on disk: {filename}"}).encode("utf-8"))
                 return
 
             try:
+                # Cancel any active download in manager
+                _DOWNLOAD_MGR.cancel_download(filename, remove_part=True)
+
                 active_model = LLAMA_SUPERVISOR.model_path
                 is_active = active_model and (os.path.basename(active_model) == os.path.basename(target_path))
                 if is_active:
                     LLAMA_SUPERVISOR.stop()
+                    time.sleep(0.3)
 
-                reclaimed_bytes = os.path.getsize(target_path)
-                os.remove(target_path)
+                reclaimed_bytes = 0
+                if os.path.isfile(target_path):
+                    reclaimed_bytes += os.path.getsize(target_path)
+                    for _ in range(5):
+                        try:
+                            os.remove(target_path)
+                            break
+                        except Exception:
+                            time.sleep(0.2)
+
+                if part_path and os.path.isfile(part_path):
+                    reclaimed_bytes += os.path.getsize(part_path)
+                    for _ in range(5):
+                        try:
+                            os.remove(part_path)
+                            break
+                        except Exception:
+                            time.sleep(0.2)
 
                 next_active = None
                 if is_active:
                     catalog = get_models_catalog()
-                    installed = [m for m in catalog.get("models", []) if m.get("is_installed")]
+                    installed = [
+                        m for m in catalog.get("models", [])
+                        if m.get("is_installed") and m.get("filename") != filename
+                    ]
                     if installed:
+                        installed.sort(key=lambda m: (
+                            0 if "3b-quad-master" in m.get("filename", "") else
+                            1 if "2b-stem" in m.get("filename", "") else
+                            2 if "1.5b" in m.get("filename", "") else 3
+                        ))
                         next_model_file = os.path.join(models_dir, installed[0]["filename"])
                         if os.path.isfile(next_model_file):
-                            LLAMA_SUPERVISOR.swap_model(next_model_file)
-                            next_active = installed[0]["filename"]
+                            try:
+                                LLAMA_SUPERVISOR.swap_model(next_model_file)
+                                next_active = installed[0]["filename"]
+                            except Exception as swap_err:
+                                logger.warning("Failover swap failed: %s", swap_err)
 
                 self._send_cors(200)
                 self.wfile.write(json.dumps({

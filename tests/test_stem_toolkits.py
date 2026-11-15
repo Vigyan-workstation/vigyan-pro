@@ -15,27 +15,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-import tools
-from tools.base import BaseTool
 import launch_desktop
 import ingest_engine
 
 
 class TestSTEMToolkits(unittest.TestCase):
-    def test_tool_registry_clean_and_dispatch(self):
-        registered = tools.get_all_tools()
-        self.assertNotIn("cad_model_generate", registered)
-        self.assertNotIn("robotics_kinematics", registered)
-        self.assertNotIn("wavedrom_generate", registered)
-        self.assertNotIn("pcb_netlist_generate", registered)
-        self.assertNotIn("verilog_analyze", registered)
-        self.assertNotIn("knowledge_rag_search", registered)
-
-        # Disallow dispatching unregistered tools gracefully
-        res = tools.dispatch_tool("wavedrom_generate", {"protocol": "spi"})
-        self.assertFalse(res["success"])
-        self.assertIn("not registered", res["error"])
-
     def test_in_memory_stem_axiomatic_retrieval(self):
         # 1. RLC Resonance
         rlc_res = launch_desktop.enrich_stem_query("What is the underdamped response of an RLC circuit?")

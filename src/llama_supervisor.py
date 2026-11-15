@@ -404,6 +404,14 @@ class LlamaServerSupervisor:
         return self._port
 
     @property
+    def ctx_size(self) -> int:
+        return self._ctx_size
+
+    @property
+    def threads(self) -> int:
+        return self._threads
+
+    @property
     def pid(self) -> Optional[int]:
         """PID of the supervised child process, or None."""
         return self._process.pid if self._process is not None else None
