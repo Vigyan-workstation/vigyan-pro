@@ -240,13 +240,15 @@ cp -r "$SCRIPT_DIR/src" "$WIN_STAGE/"
 cp -r "$SCRIPT_DIR/assets" "$WIN_STAGE/"
 mkdir -p "$WIN_STAGE/bin"
 
-if [ -f "$SCRIPT_DIR/bin/llama-server.exe" ]; then
+if [ -f "$HOME/.vigyan/cache/llama_win.zip" ]; then
+    echo "==> Bundling native Windows x64 llama-server & runtime DLLs..."
+    unzip -q -o "$HOME/.vigyan/cache/llama_win.zip" -d "$WIN_STAGE/bin/"
+elif [ -f "/tmp/llama_win.zip" ]; then
+    echo "==> Bundling native Windows x64 llama-server & runtime DLLs..."
+    unzip -q -o "/tmp/llama_win.zip" -d "$WIN_STAGE/bin/"
+elif [ -f "$SCRIPT_DIR/bin/llama-server.exe" ]; then
     cp "$SCRIPT_DIR/bin/llama-server.exe" "$WIN_STAGE/bin/"
-elif [ -f "$HOME/.local/bin/llama-server.exe" ]; then
-    cp "$HOME/.local/bin/llama-server.exe" "$WIN_STAGE/bin/"
-elif [ -n "$LLAMA_SERVER_SRC" ]; then
-    cp -L "$LLAMA_SERVER_SRC" "$WIN_STAGE/bin/llama-server"
-    cp -L "$LLAMA_SERVER_SRC" "$WIN_STAGE/bin/llama-server.exe" 2>/dev/null || true
+    cp "$SCRIPT_DIR/bin/"*.dll "$WIN_STAGE/bin/" 2>/dev/null || true
 fi
 
 if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
@@ -298,10 +300,23 @@ cp -r "$SCRIPT_DIR/src" "$MAC_STAGE/"
 cp -r "$SCRIPT_DIR/assets" "$MAC_STAGE/"
 mkdir -p "$MAC_STAGE/bin"
 
-if [ -f "$SCRIPT_DIR/bin/llama-server-mac" ]; then
+if [ -f "$HOME/.vigyan/cache/llama_mac.tar.gz" ]; then
+    echo "==> Bundling native macOS Apple Silicon/Universal llama-server & dylibs..."
+    mkdir -p /tmp/mac_extract
+    tar -zxf "$HOME/.vigyan/cache/llama_mac.tar.gz" -C /tmp/mac_extract 2>/dev/null || true
+    cp -R /tmp/mac_extract/llama-*/* "$MAC_STAGE/bin/" 2>/dev/null || true
+    chmod +x "$MAC_STAGE/bin/llama-server" 2>/dev/null || true
+    rm -rf /tmp/mac_extract
+elif [ -f "/tmp/llama_mac.tar.gz" ]; then
+    echo "==> Bundling native macOS Apple Silicon/Universal llama-server & dylibs..."
+    mkdir -p /tmp/mac_extract
+    tar -zxf "/tmp/llama_mac.tar.gz" -C /tmp/mac_extract 2>/dev/null || true
+    cp -R /tmp/mac_extract/llama-*/* "$MAC_STAGE/bin/" 2>/dev/null || true
+    chmod +x "$MAC_STAGE/bin/llama-server" 2>/dev/null || true
+    rm -rf /tmp/mac_extract
+elif [ -f "$SCRIPT_DIR/bin/llama-server-mac" ]; then
     cp "$SCRIPT_DIR/bin/llama-server-mac" "$MAC_STAGE/bin/llama-server"
-elif [ -n "$LLAMA_SERVER_SRC" ]; then
-    cp -L "$LLAMA_SERVER_SRC" "$MAC_STAGE/bin/llama-server"
+    cp "$SCRIPT_DIR/bin/"*.dylib "$MAC_STAGE/bin/" 2>/dev/null || true
 fi
 
 if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then

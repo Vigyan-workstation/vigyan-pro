@@ -152,6 +152,66 @@ def find_llama_server_binary() -> Optional[str]:
         if found:
             return os.path.abspath(found)
 
+    # 7. Graceful auto-provisioning fallback on fresh host installations
+    return auto_provision_llama_server()
+
+
+def auto_provision_llama_server() -> Optional[str]:
+    """If llama-server binary is missing on host, automatically download and extract
+    the official lightweight llama-server engine for the host OS to ~/.vigyan/bin/."""
+    target_dir = os.path.expanduser("~/.vigyan/bin")
+    os.makedirs(target_dir, exist_ok=True)
+    is_win = sys.platform == "win32"
+    is_mac = sys.platform == "darwin"
+    is_linux = sys.platform.startswith("linux")
+
+    bin_name = "llama-server.exe" if is_win else "llama-server"
+    target_bin = os.path.join(target_dir, bin_name)
+    if os.path.isfile(target_bin) and (is_win or os.access(target_bin, os.X_OK)):
+        return target_bin
+
+    if is_win:
+        url = "https://github.com/ggml-org/llama.cpp/releases/download/b12411/llama-b12411-bin-win-cpu-x64.zip"
+        is_zip = True
+    elif is_mac:
+        import platform
+        arch = "arm64" if platform.machine() in ("arm64", "aarch64") else "x64"
+        url = f"https://github.com/ggml-org/llama.cpp/releases/download/b12411/llama-b12411-bin-macos-{arch}.tar.gz"
+        is_zip = False
+    elif is_linux:
+        url = "https://github.com/ggml-org/llama.cpp/releases/download/b12411/llama-b12411-bin-ubuntu-x64.tar.gz"
+        is_zip = False
+    else:
+        return None
+
+    try:
+        print(f"[Vigyan Pro] Sovereign engine '{bin_name}' not found locally. Provisioning native engine for {sys.platform}...")
+        tmp_archive = os.path.join(target_dir, "engine_download.tmp")
+        req = urllib.request.Request(url, headers={"User-Agent": "Vigyan-Pro-Bootstrap/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp, open(tmp_archive, "wb") as f:
+            shutil.copyfileobj(resp, f)
+
+        if is_zip:
+            import zipfile
+            with zipfile.ZipFile(tmp_archive, "r") as z:
+                z.extractall(target_dir)
+        else:
+            import tarfile
+            with tarfile.open(tmp_archive, "r:gz") as tar:
+                tar.extractall(target_dir)
+
+        try:
+            os.remove(tmp_archive)
+        except Exception:
+            pass
+
+        if os.path.isfile(target_bin):
+            if not is_win:
+                os.chmod(target_bin, 0o755)
+            print(f"[Vigyan Pro] Successfully provisioned native engine: {target_bin}")
+            return target_bin
+    except Exception as exc:
+        print(f"[Vigyan Pro] Auto-provision notice: {exc}")
     return None
 
 
