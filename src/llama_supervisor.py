@@ -26,10 +26,9 @@ logger = logging.getLogger(__name__)
 
 # Whitelist of strictly authorized production models
 ALLOWED_SOVEREIGN_MODELS = {
-    "vigyan-3b-quad-master-iq3_m.gguf",     # Daily Driver (3B)
-    "vigyan-vl-4b-iq3_m.gguf",              # Multimodal Vision (4B)
-    "vigyan-7b-quad-master-q4_k_m.gguf",     # Doctoral STEM (7B)
-    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"  # Deep R1 Reasoning (14B)
+    "vigyan-3b-quad-master-iq3_m.gguf",        # Daily STEM (3B)
+    "vigyan-7b-quad-master-q4_k_m.gguf",        # Doctoral STEM (7B)
+    "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf"  # Deep Reasoning (14B)
 }
 
 _LIBC = None
@@ -277,10 +276,8 @@ def find_model_path(preferred_path: Optional[str] = None) -> Optional[str]:
         os.path.join(project_root, "models", "vigyan-3b-quad-master-iq3_m.gguf"),
         os.path.join(base_dir, "models", "vigyan-3b-quad-master-iq3_m.gguf"),
         os.path.expanduser("~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"),
-        os.path.expanduser("~/.vigyan/models/vl4b/vigyan-vl-4b-iq3_m.gguf"),
-        os.path.expanduser("~/.vigyan/models/vigyan-vl-4b-iq3_m.gguf"),
         os.path.expanduser("~/.vigyan/models/vigyan-7b-quad-master-q4_k_m.gguf"),
-        os.path.expanduser("~/.vigyan/models/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"),
+        os.path.expanduser("~/.vigyan/models/DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf"),
         "/opt/vigyan-pro/models/vigyan-3b-quad-master-iq3_m.gguf",
     ]
 

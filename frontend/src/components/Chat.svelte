@@ -50,69 +50,12 @@
 
   let input = $state("");
   let isStreaming = $state(false);
-  let activeAttachment = $state<ActiveAttachment | null>(null);
-  let fileInputEl: HTMLInputElement | null = $state(null);
   let abortController: AbortController | null = null;
   let scrollEl: HTMLElement | null = null;
   let textareaEl: HTMLTextAreaElement | null = $state(null);
 
-  const isVisionModel = $derived(
-    (model || "").toLowerCase().includes("vl") ||
-    (model || "").toLowerCase().includes("vision") ||
-    (model || "").toLowerCase().includes("4b")
-  );
-
-  function processImageFile(file: File) {
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        activeAttachment = {
-          name: file.name,
-          size: file.size,
-          type: "image",
-          dataUrl: result,
-        };
-        if (onSelectModel && model !== "vigyan:4b" && model !== "vigyan-vl-4b") {
-          onSelectModel("vigyan:4b");
-        }
-      }
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function handleFileSelect(e: Event) {
-    const target = e.target as HTMLInputElement;
-    if (!target.files || target.files.length === 0) return;
-    processImageFile(target.files[0]);
-    target.value = "";
-  }
-
-  function removeAttachedImage() {
-    activeAttachment = null;
-  }
-
-  function handlePaste(e: ClipboardEvent) {
-    if (!e.clipboardData?.items) return;
-    for (const item of Array.from(e.clipboardData.items)) {
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) {
-          processImageFile(file);
-          e.preventDefault();
-          break;
-        }
-      }
-    }
-  }
-
   onMount(() => {
     scrollToBottom();
-    window.addEventListener("paste", handlePaste);
-    return () => {
-      window.removeEventListener("paste", handlePaste);
-    };
   });
 
   function autoResize() {
@@ -206,10 +149,8 @@
 
   async function send(text: string) {
     const trimmed = text.trim();
-    if ((!trimmed && !activeAttachment) || isStreaming) return;
+    if (!trimmed || isStreaming) return;
 
-    const attachmentToSend = activeAttachment ? { ...activeAttachment } : null;
-    activeAttachment = null;
     input = "";
     if (textareaEl) {
       textareaEl.style.height = "auto";
@@ -220,13 +161,7 @@
     chatStore.messages.push({
       id: uid(),
       role: "user",
-      content: trimmed || "Analyze this image in detail.",
-      attachment: attachmentToSend ? {
-        name: attachmentToSend.name,
-        size: attachmentToSend.size,
-        type: "image",
-        dataUrl: attachmentToSend.dataUrl,
-      } : undefined,
+      content: trimmed,
       thinking: "",
       thinkingDone: false,
       streaming: false,
@@ -252,26 +187,16 @@
       .map((m) => ({
         role: m.role as "user" | "assistant" | "system",
         content: m.content,
-        attachment: m.attachment ? {
-          name: m.attachment.name,
-          type: m.attachment.type,
-          data: m.attachment.dataUrl || "",
-        } : undefined,
       }));
 
     abortController = new AbortController();
 
     const userMsgObj = {
       role: "user" as const,
-      content: trimmed || "Analyze this image in detail.",
-      attachment: attachmentToSend ? {
-        name: attachmentToSend.name,
-        type: attachmentToSend.type,
-        data: attachmentToSend.dataUrl,
-      } : undefined,
+      content: trimmed,
     };
 
-    const targetModel = attachmentToSend ? "vigyan:4b" : (model || DEFAULT_MODEL);
+    const targetModel = model || DEFAULT_MODEL;
 
     await streamChat(
       [...history, userMsgObj],
@@ -566,71 +491,13 @@
           </div>
         {/if}
 
-        <!-- Vision Mode Prominence Capsule -->
-        {#if isVisionModel && !activeAttachment}
-          <div class="w-full mb-2 bg-white/[0.04] border border-white/10 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs text-neutral-300 backdrop-blur-md animate-fade-in">
-            <div class="flex items-center gap-2.5">
-              <span class="w-2 h-2 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.7)] animate-pulse"></span>
-              <span class="font-medium text-white">Vision Mode Active</span>
-              <span class="text-neutral-400 text-[11px] hidden sm:inline">— Drop, paste, or attach circuits, schematics & diagrams</span>
-            </div>
-            <button
-              type="button"
-              onclick={() => fileInputEl?.click()}
-              class="text-[11px] font-semibold text-black bg-white px-3 py-1 rounded-full hover:bg-neutral-200 transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
-            >
-              <span>+ Attach Image</span>
-            </button>
-          </div>
-        {/if}
-
-        <!-- Active Image Attachment Preview Capsule -->
-        {#if activeAttachment}
-          <div class="w-full mb-2 bg-[#090d16]/95 border border-sky-500/30 rounded-xl px-3 py-2 flex items-center justify-between gap-3 shadow-lg backdrop-blur-md animate-fade-in">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <img src={activeAttachment.dataUrl} alt="Attached Preview" class="w-8 h-8 rounded-lg object-cover border border-white/10 flex-shrink-0" />
-              <div class="flex flex-col min-w-0">
-                <span class="text-xs text-white font-medium truncate">{activeAttachment.name}</span>
-                <span class="text-[10px] font-mono text-sky-400">Vigyan-VL-4B Multimodal Activated</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onclick={removeAttachedImage}
-              class="w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-all cursor-pointer text-xs"
-              title="Remove attached image"
-            >
-              ✕
-            </button>
-          </div>
-        {/if}
-
         <div class="w-full flex items-center gap-2 bg-[#06080e]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-3.5 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.85)] focus-within:border-[#38bdf8]/40 transition-all">
-          <!-- Attachment Button -->
-          <button
-            type="button"
-            onclick={() => fileInputEl?.click()}
-            class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer {isVisionModel ? 'text-white bg-white/15 border border-white/20 shadow-sm' : 'text-neutral-400 hover:text-white hover:bg-white/10'}"
-            title={isVisionModel ? "Attach schematic or diagram (Vision Mode active)" : "Attach schematic, circuit, or diagram (or paste with Ctrl+V)"}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4">
-              <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.373L8.552 18.32a1.5 1.5 0 0 1-2.122-2.122l8.84-8.84" />
-            </svg>
-          </button>
-          <input
-            bind:this={fileInputEl}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            onchange={handleFileSelect}
-            class="hidden"
-          />
-
           <textarea
             bind:this={textareaEl}
             bind:value={input}
             oninput={autoResize}
             onkeydown={handleKeydown}
-            placeholder={activeAttachment ? "Ask a question about this diagram, circuit, or image…" : "Ask a scientific question, derive a proof, analyze a circuit…"}
+            placeholder="Ask a scientific question, derive a proof, evaluate calculus…"
             rows={1}
             disabled={isStreaming}
             class="flex-1 bg-transparent text-[#ffffff] placeholder-[#6b7280] outline-none resize-none leading-relaxed disabled:opacity-50 max-h-36 overflow-y-auto text-[14px]"
@@ -648,7 +515,7 @@
           {:else}
             <button
               onclick={() => send(input)}
-              disabled={!input.trim() && !activeAttachment}
+              disabled={!input.trim()}
               class="flex-shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all shadow-md font-bold cursor-pointer"
               title="Send (Enter)"
             >

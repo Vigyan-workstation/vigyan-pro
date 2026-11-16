@@ -1063,36 +1063,35 @@ def get_hf_auth_token() -> Optional[str]:
 
 
 def select_cascade_model(requested_model: str, query: str = "", has_image: bool = False) -> Dict[str, Any]:
-    """Sovereign Vigyan AI execution router.
-    Flagship Vigyan-3B Quad-Master IQ3_M is the primary sovereign engine,
-    with Vigyan AI 1.5B Quad-Master available for ultra-fast edge inference,
-    and Vigyan-VL-4B for multimodal vision reasoning.
+    """Sovereign Vigyan AI pure STEM execution router.
+    Routes between:
+    - 3B Daily: Vigyan-3B Quad-Master (Fast STEM, Calculus & Exact Symbolic Mathematics)
+    - 7B Doctoral: Vigyan-7B Quad-Master (Doctoral Proofs, Complex Engineering & Physical Science)
+    - 14B Reasoning: DeepSeek-R1 14B Reasoning (Deep Chain-of-Thought & Frontier Reasoning)
     """
     req = (requested_model or "").strip().lower()
 
-    if has_image or req in ("vigyan:4b", "4b", "vigyan-vl-4b", "vl4b"):
+    if any(k in req for k in ("14b", "deepseek", "r1")):
         return {
-            "tier": 4,
-            "model": "vigyan:4b",
+            "tier": 3,
+            "model": "deepseek:14b",
             "downgraded": False,
-            "reason": "Vigyan-VL-4B Multimodal Vision Engine (Circuit Schematics & Diagrams)"
+            "reason": "DeepSeek-R1 14B Reasoning Engine (Deep Chain-of-Thought & Quantum Physics)"
         }
 
-    # 1. Explicit 1.5B request
-    if req in ("vigyan:1.5b", "1.5b"):
+    if any(k in req for k in ("7b", "doctoral")):
         return {
-            "tier": 1,
-            "model": "vigyan:1.5b",
+            "tier": 2,
+            "model": "vigyan:7b",
             "downgraded": False,
-            "reason": "Vigyan AI 1.5B Quad Master (Ultra-fast edge inference)"
+            "reason": "Vigyan-7B Quad-Master Doctoral Engine (Advanced Derivations & Engineering)"
         }
 
-    # 2. Flagship Vigyan-3B Quad-Master (57.50% GSM8K certified)
     return {
-        "tier": 2,
+        "tier": 1,
         "model": "vigyan:3b",
         "downgraded": False,
-        "reason": "Vigyan 3B Quad-Master Sovereign Engine (57.50% GSM8K Certified, 22-28 tok/s CPU inference)"
+        "reason": "Vigyan-3B Quad-Master Sovereign Engine (Fast STEM & Symbolic Calculus)"
     }
 
 
@@ -1129,10 +1128,9 @@ def _build_model_candidates(filename: str) -> List[str]:
 
 
 ALLOWED_SOVEREIGN_MODELS = {
-    "vigyan-3b-quad-master-iq3_m.gguf",     # Daily Driver (3B)
-    "vigyan-vl-4b-iq3_m.gguf",              # Multimodal Vision (4B)
-    "vigyan-7b-quad-master-q4_k_m.gguf",     # Doctoral STEM (7B)
-    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"  # Deep R1 Reasoning (14B)
+    "vigyan-3b-quad-master-iq3_m.gguf",        # Daily STEM (3B)
+    "vigyan-7b-quad-master-q4_k_m.gguf",        # Doctoral STEM (7B)
+    "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf"  # Deep Reasoning (14B)
 }
 
 SOVEREIGN_PRODUCTION_MODELS = [
@@ -1140,33 +1138,15 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "id": "vigyan-3b-quad-master-iq3_m",
         "name": "Vigyan-3B Quad-Master",
         "tag": "vigyan-3b",
-        "short_label": "3B Daily Driver",
+        "short_label": "3B Daily",
         "filename": "vigyan-3b-quad-master-iq3_m.gguf",
         "dest_filename": "vigyan-3b-quad-master-iq3_m.gguf",
-        "size_bytes": 1488894752,
+        "size_bytes": 1496924256,
         "size_formatted": "1.39 GB",
-        "ram_required_gb": 4.0,
+        "ram_required_gb": 3.5,
         "domain": "Fast STEM, Calculus & Exact Symbolic Mathematics",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
         "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
-        "template": "{{ prompt }}",
-        "stop": ["<|endoftext|>", "<|im_end|>"]
-    },
-    {
-        "id": "vigyan-vl-4b-iq3_m",
-        "name": "Vigyan-VL-4B Multimodal",
-        "tag": "vigyan:4b",
-        "short_label": "4B Vision",
-        "filename": "vigyan-vl-4b-iq3_m.gguf",
-        "dest_filename": "vigyan-vl-4b-iq3_m.gguf",
-        "size_bytes": 1962897120,
-        "size_formatted": "1.83 GB",
-        "ram_required_gb": 5.0,
-        "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
-        "mmproj_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
-        "mmproj_filename": "mmproj-vigyan-vl-4b-f16.gguf",
         "template": "{{ prompt }}",
         "stop": ["<|endoftext|>", "<|im_end|>"]
     },
@@ -1187,18 +1167,18 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "stop": ["<|endoftext|>", "<|im_end|>"]
     },
     {
-        "id": "vigyan-r1-14b-health-semi-quantum",
-        "name": "Vigyan-R1-14B Reasoning",
-        "tag": "vigyan-r1-14b",
-        "short_label": "14B Frontier",
-        "filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-        "dest_filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-        "size_bytes": 6917000000,
+        "id": "deepseek-r1-14b-iq3_m",
+        "name": "DeepSeek-R1 14B Reasoning",
+        "tag": "deepseek:14b",
+        "short_label": "14B Reasoning",
+        "filename": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+        "dest_filename": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+        "size_bytes": 6916537760,
         "size_formatted": "6.44 GB",
         "ram_required_gb": 10.0,
         "domain": "Frontier Step-by-Step Chain-of-Thought & Quantum Physics",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf/resolve/main/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf",
+        "hf_url": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf?download=true",
+        "hf_repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
         "template": "{{ prompt }}",
         "stop": ["<|endoftext|>", "<|im_end|>"]
     }
@@ -1210,12 +1190,13 @@ MODELS_CATALOG = {
     "vigyan:3b": SOVEREIGN_PRODUCTION_MODELS[0],
     "vigyan-3b-quad-master-iq3_m": SOVEREIGN_PRODUCTION_MODELS[0],
     "vigyan-3b": SOVEREIGN_PRODUCTION_MODELS[0],
-    "vigyan:4b": SOVEREIGN_PRODUCTION_MODELS[1],
-    "vigyan-vl-4b-iq3_m": SOVEREIGN_PRODUCTION_MODELS[1],
-    "vigyan:7b": SOVEREIGN_PRODUCTION_MODELS[2],
-    "vigyan-7b-quad-master-q4_k_m": SOVEREIGN_PRODUCTION_MODELS[2],
-    "vigyan:14b": SOVEREIGN_PRODUCTION_MODELS[3],
-    "vigyan-r1-14b-health-semi-quantum-iq3_m": SOVEREIGN_PRODUCTION_MODELS[3],
+    "vigyan:7b": SOVEREIGN_PRODUCTION_MODELS[1],
+    "vigyan-7b-quad-master-q4_k_m": SOVEREIGN_PRODUCTION_MODELS[1],
+    "vigyan-7b": SOVEREIGN_PRODUCTION_MODELS[1],
+    "deepseek:14b": SOVEREIGN_PRODUCTION_MODELS[2],
+    "deepseek-r1-14b": SOVEREIGN_PRODUCTION_MODELS[2],
+    "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf": SOVEREIGN_PRODUCTION_MODELS[2],
+    "deepseek-r1-14b-iq3_m": SOVEREIGN_PRODUCTION_MODELS[2],
 }
 
 
@@ -2226,7 +2207,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 self.wfile.write(b'{"error":"Forbidden: Invalid or missing X-Vigyan-Token"}')
                 return
 
+        # DoS Protection: Limit payload length to 5 MB
         length = int(self.headers.get("Content-Length", "0"))
+        if length > 5 * 1024 * 1024:
+            self._send_cors(413)
+            self.wfile.write(b'{"error":"Payload Too Large: maximum allowed body size is 5 MB"}')
+            return
         raw = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
         try:
             body = json.loads(raw)
@@ -2272,7 +2258,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             return
 
         if self.path.startswith("/api/models/download"):
-            filename = body.get("filename") or body.get("name")
+            raw_filename = body.get("filename") or body.get("name")
+            if not raw_filename or not isinstance(raw_filename, str):
+                self._send_cors(400)
+                self.wfile.write(json.dumps({"success": False, "error": "Invalid model filename"}).encode("utf-8"))
+                return
+            filename = os.path.basename(raw_filename.strip())
             target_item = None
             catalog = get_models_catalog()
             for m in catalog.get("models", []):
@@ -2295,7 +2286,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             return
 
         if self.path.startswith("/api/models/swap"):
-            filename = body.get("filename")
+            raw_filename = body.get("filename")
+            if not raw_filename or not isinstance(raw_filename, str):
+                self._send_cors(400)
+                self.wfile.write(json.dumps({"success": False, "error": "Invalid model filename"}).encode("utf-8"))
+                return
+            filename = os.path.basename(raw_filename.strip())
             models_dir = os.path.expanduser("~/.vigyan/models")
             target_path = os.path.join(models_dir, filename) if filename else ""
             if not os.path.isfile(target_path):
@@ -2383,7 +2379,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             return
 
         if self.path.startswith("/api/models/delete"):
-            filename = body.get("filename")
+            raw_filename = body.get("filename")
+            if not raw_filename or not isinstance(raw_filename, str):
+                self._send_cors(400)
+                self.wfile.write(json.dumps({"success": False, "error": "Invalid model filename"}).encode("utf-8"))
+                return
+            filename = os.path.basename(raw_filename.strip())
             models_dir = os.path.expanduser("~/.vigyan/models")
             target_path = os.path.join(models_dir, filename) if filename else ""
             if not os.path.isfile(target_path):
@@ -2573,31 +2574,18 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 sys_prompt += f"\n[SymPy Verified Grounding]: {s.get('expression')} = {s.get('result')}"
 
             # Sovereign Offline Engine with RAM Governor
-            cascade = select_cascade_model(requested_model, user_query, has_image=has_image)
+            cascade = select_cascade_model(requested_model, user_query, has_image=False)
             active_model = cascade["model"]
             _emit("cascade_tier", cascade)
             if cascade.get("downgraded"):
                 _emit("tier_downgrade", cascade)
                 _emit("think", f"[RAM Guard]: System routed to {active_model} Sovereign Engine.\n")
 
-            # Multimodal Vision Routing & Auto-Swap
-            if has_image:
-                current_model_path = (LLAMA_SUPERVISOR.model_path or "").lower()
-                current_is_vl = "vl" in os.path.basename(current_model_path)
-                if not current_is_vl:
-                    vl_candidates = [
-                        os.path.expanduser("~/.vigyan/models/vigyan-vl-4b-iq3_m.gguf"),
-                        os.path.expanduser("~/.vigyan/models/vl4b/vigyan-vl-4b-iq3_m.gguf"),
-                        os.path.join(os.getcwd(), "models", "vigyan-vl-4b-iq3_m.gguf"),
-                    ]
-                    found_vl = next((p for p in vl_candidates if os.path.isfile(p)), None)
-                    if found_vl:
-                        _emit("think", "[Vision Router]: Swapping engine to Vigyan-VL-4B for image and schematic analysis...\n")
-                        LLAMA_SUPERVISOR.swap_model(found_vl)
-                    else:
-                        _emit("token", "**Notice**: Image and schematic reasoning requires the **Vigyan-VL-4B Multimodal** engine.\n\nPlease open the **Models** tab and click Download on **Vigyan-VL-4B**, or run `vigyan pull 4b` in your terminal.\n")
-                        _emit("done", {})
-                        return
+            # Check if any model is installed or active
+            if not LLAMA_SUPERVISOR.model_path:
+                _emit("token", "No local engine is currently active.\n\nPlease open the **Model Vault** (Cmd+Shift+M or click 'Intelligence Models') to download **Vigyan-3B Quad-Master** (1.39 GB), **Vigyan-7B**, or **DeepSeek-14B**.\n")
+                _emit("done", {})
+                return
 
             try:
                 user_cfg = load_user_config()
@@ -2912,9 +2900,52 @@ LLAMA_SUPERVISOR = LlamaServerSupervisor(
 )
 
 
+def _ensure_user_desktop_icons():
+    """Installs user-level desktop entry and hicolor icon so the Linux taskbar & dock always display the official V logo."""
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        src_icon = os.path.join(base_dir, "..", "assets", "micro_logo_v.png")
+        if not os.path.exists(src_icon):
+            src_icon = os.path.join(base_dir, "assets", "micro_logo_v.png")
+        if not os.path.exists(src_icon):
+            return
+
+        icon_dir = os.path.expanduser("~/.local/share/icons/hicolor/256x256/apps")
+        os.makedirs(icon_dir, exist_ok=True)
+        dest_icon = os.path.join(icon_dir, "vigyan-pro.png")
+        if not os.path.exists(dest_icon):
+            shutil.copyfile(src_icon, dest_icon)
+
+        apps_dir = os.path.expanduser("~/.local/share/applications")
+        os.makedirs(apps_dir, exist_ok=True)
+        dest_desktop = os.path.join(apps_dir, "vigyan-pro.desktop")
+        
+        launch_script = os.path.abspath(os.path.join(base_dir, "..", "launch.sh"))
+        desktop_content = f"""[Desktop Entry]
+Type=Application
+Name=Vigyan Pro
+Comment=Sovereign Offline AI Studio & STEM Computational Engine
+Exec="{launch_script}"
+Icon=vigyan-pro
+Terminal=false
+Categories=Science;Math;Development;Education;
+StartupWMClass=vigyan-pro
+"""
+        with open(dest_desktop, "w", encoding="utf-8") as f:
+            f.write(desktop_content)
+        try:
+            os.chmod(dest_desktop, 0o755)
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug(f"Desktop icon registration notice: {e}")
+
+
 def ensure_llama_server() -> None:
     """Make sure the embedded llama-server micro-daemon is running."""
     try:
+        if not LLAMA_SUPERVISOR.model_path:
+            return  # Clean fresh install: will start once a model is downloaded/selected
         if not LLAMA_SUPERVISOR.is_healthy():
             LLAMA_SUPERVISOR.start()
     except Exception as exc:
@@ -3040,7 +3071,19 @@ def main():
     ensure_llama_server()
     bridge_port = start_neuro_symbolic_bridge_server(8085) or 8085
 
+    _ensure_user_desktop_icons()
+    try:
+        from gi.repository import GLib
+        GLib.set_prgname("vigyan-pro")
+        GLib.set_application_name("Vigyan Pro")
+    except Exception:
+        pass
+
     win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
+    try:
+        win.set_wmclass("vigyan-pro", "Vigyan Pro")
+    except Exception:
+        pass
     win.set_title("Vigyan Pro")
     win.set_role("vigyan-pro")
     win.set_default_size(1340, 740)

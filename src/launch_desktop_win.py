@@ -16,6 +16,13 @@ except ImportError:
 
 WIN_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
 
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("tech.vigyan.pro")
+    except Exception:
+        pass
+
 
 def get_windows_telemetry(mode: str = "auto") -> dict:
     """Detect Windows GPU (NVIDIA SMI or WMI VideoController), CPU physical cores, RAM, and battery."""

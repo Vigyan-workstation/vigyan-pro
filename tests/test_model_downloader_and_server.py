@@ -31,17 +31,21 @@ def test_models_catalog_integrity():
     assert len(MODELS_CATALOG) >= 1
 
 
-def test_select_cascade_model_unified_3b():
-    """Verify select_cascade_model routes to vigyan:3b flagship engine (or 1.5b if explicitly requested)."""
-    for test_req in ("vigyan:7b", "7b", "frontier", "vigyan:3b", "default", ""):
+def test_select_cascade_model_routing():
+    """Verify select_cascade_model routes appropriately to 3B, 7B, and 14B engines."""
+    for test_req in ("vigyan:3b", "3b", "default", ""):
         res = select_cascade_model(test_req, "Solve laplacian eigenfunction")
         assert res["model"] == "vigyan:3b"
         assert res["downgraded"] is False
-        assert "57.50% GSM8K" in res["reason"]
+        assert "3B" in res["reason"]
 
-    # Explicit 1.5B request
-    res_15 = select_cascade_model("vigyan:1.5b", "Fast query")
-    assert res_15["model"] == "vigyan:1.5b"
+    # Explicit 7B request
+    res_7b = select_cascade_model("vigyan:7b", "Doctoral proof")
+    assert res_7b["model"] == "vigyan:7b"
+
+    # Explicit 14B request
+    res_14b = select_cascade_model("deepseek:14b", "Frontier reasoning")
+    assert res_14b["model"] == "deepseek:14b"
 
     for tag, info in MODELS_CATALOG.items():
         assert info["size_bytes"] > 1_000_000_000  # >= 1 GB
@@ -110,17 +114,16 @@ def test_http_bridge_static_serving_and_catalog():
         assert "telemetry" in data
 
 
-def test_steve_jobs_four_models_whitelist():
-    """Verify strictly the 4 authorized sovereign production models in ALLOWED_SOVEREIGN_MODELS."""
+def test_pure_stem_three_models_whitelist():
+    """Verify strictly the 3 authorized sovereign production models in ALLOWED_SOVEREIGN_MODELS."""
     from launch_desktop import ALLOWED_SOVEREIGN_MODELS as BACKEND_ALLOWED
     from llama_supervisor import ALLOWED_SOVEREIGN_MODELS as SUPERVISOR_ALLOWED
     from vigyan_cli import ALLOWED_SOVEREIGN_MODELS as CLI_ALLOWED, MODEL_ALIASES, cmd_pull
 
     expected_models = {
         "vigyan-3b-quad-master-iq3_m.gguf",
-        "vigyan-vl-4b-iq3_m.gguf",
         "vigyan-7b-quad-master-q4_k_m.gguf",
-        "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+        "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
     }
 
     assert BACKEND_ALLOWED == expected_models
@@ -129,9 +132,8 @@ def test_steve_jobs_four_models_whitelist():
 
     # Verify canonical aliases
     assert MODEL_ALIASES["3b"] == "vigyan-3b-quad-master-iq3_m.gguf"
-    assert MODEL_ALIASES["4b"] == "vigyan-vl-4b-iq3_m.gguf"
     assert MODEL_ALIASES["7b"] == "vigyan-7b-quad-master-q4_k_m.gguf"
-    assert MODEL_ALIASES["14b"] == "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"
+    assert MODEL_ALIASES["14b"] == "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf"
 
     # Verify unauthorized model pull rejection
     assert cmd_pull("unauthorized_model_xyz.gguf") is False
@@ -155,20 +157,22 @@ def test_hf_token_discovery():
             os.environ.pop("HF_TOKEN", None)
 
 
-def test_multimodal_vision_routing():
-    """Verify select_cascade_model automatically routes to Vigyan-VL-4B when has_image is True."""
-    # When has_image is True, route to vigyan:4b
-    res_img = select_cascade_model("auto", "Analyze this schematic", has_image=True)
-    assert res_img["model"] == "vigyan:4b"
-    assert res_img["tier"] == 4
+def test_pure_stem_model_routing():
+    """Verify select_cascade_model routes to 3B, 7B, or 14B based on requirements."""
+    # When 14B requested
+    res_14b = select_cascade_model("deepseek:14b", "Solve quantum field equation")
+    assert res_14b["model"] == "deepseek:14b"
+    assert res_14b["tier"] == 3
 
-    # When explicit 4b request
-    res_4b = select_cascade_model("vigyan:4b", "What is this component?")
-    assert res_4b["model"] == "vigyan:4b"
+    # When 7B requested
+    res_7b = select_cascade_model("vigyan:7b", "Prove topological theorem")
+    assert res_7b["model"] == "vigyan:7b"
+    assert res_7b["tier"] == 2
 
-    # When text-only query without image, route to flagship 3B
-    res_text = select_cascade_model("auto", "Calculate integral", has_image=False)
-    assert res_text["model"] == "vigyan:3b"
+    # Default query routes to 3B Daily
+    res_default = select_cascade_model("auto", "Calculate integral")
+    assert res_default["model"] == "vigyan:3b"
+    assert res_default["tier"] == 1
 
 
 def test_compress_conversation_history_multimodal_safe():

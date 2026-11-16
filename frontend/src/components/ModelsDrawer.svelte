@@ -30,7 +30,7 @@
   }
 
   interface CuratedCard {
-    key: "3b" | "4b" | "7b" | "14b";
+    key: "3b" | "7b" | "14b";
     title: string;
     subtitle: string;
     sizeFormatted: string;
@@ -81,33 +81,23 @@
     }, 3500);
   }
 
-  // 4 Steve Jobs Curated Cards
+  // 3 Steve Jobs Curated Cards: 3B Quad-Master, 7B Quad-Master, 14B DeepSeek
   const cards = $derived<CuratedCard[]>([
     {
       key: "3b",
-      title: "Daily STEM",
-      subtitle: "Instant math, physics, calculus & symbolic code",
-      sizeFormatted: "1.4 GB",
+      title: "Vigyan-3B Quad-Master",
+      subtitle: "Fast math, physics, calculus & exact symbolic code",
+      sizeFormatted: "1.39 GB",
       ramRequiredGb: 4.0,
       filename: "vigyan-3b-quad-master-iq3_m.gguf",
       isInstalled: false,
       isActive: false,
     },
     {
-      key: "4b",
-      title: "Vision & Circuits",
-      subtitle: "Understands diagrams, formulas, schematics & photos",
-      sizeFormatted: "1.8 GB",
-      ramRequiredGb: 5.0,
-      filename: "vigyan-vl-4b-iq3_m.gguf",
-      isInstalled: false,
-      isActive: false,
-    },
-    {
       key: "7b",
-      title: "Doctoral STEM",
-      subtitle: "Advanced derivations, simulations & scientific research",
-      sizeFormatted: "4.1 GB",
+      title: "Vigyan-7B Quad-Master",
+      subtitle: "Doctoral proofs, complex engineering & physical science",
+      sizeFormatted: "4.16 GB",
       ramRequiredGb: 8.0,
       filename: "vigyan-7b-quad-master-q4_k_m.gguf",
       isInstalled: false,
@@ -115,11 +105,11 @@
     },
     {
       key: "14b",
-      title: "Deep Reasoning",
-      subtitle: "Frontier step-by-step thinking for deep problem solving",
-      sizeFormatted: "7.3 GB",
-      ramRequiredGb: 14.0,
-      filename: "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+      title: "DeepSeek-R1 14B Reasoning",
+      subtitle: "DeepSeek-R1 Distill Qwen 14B IQ3 deep step-by-step reasoning",
+      sizeFormatted: "6.44 GB",
+      ramRequiredGb: 10.0,
+      filename: "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
       isInstalled: false,
       isActive: false,
     },

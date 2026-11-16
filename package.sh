@@ -350,6 +350,9 @@ chmod +x "$MAC_STAGE/Vigyan-Pro.command"
 APP_BUNDLE="$MAC_STAGE/Vigyan Pro.app"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
+if [ -f "$SCRIPT_DIR/assets/icons/AppIcon.icns" ]; then
+    cp "$SCRIPT_DIR/assets/icons/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
+fi
 
 cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -366,6 +369,8 @@ cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
     <key>NSHighResolutionCapable</key>

@@ -193,19 +193,18 @@
         </svg>
       </div>
       <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
-      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.5</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.6</span>
     </div>
 
-    <!-- Center: Steve Jobs 4-Model Segmented Switcher & Live Engine Status -->
+    <!-- Center: Steve Jobs 3-Model Segmented Switcher & Live Engine Status -->
     <div class="hidden sm:flex items-center gap-2.5">
       <nav class="flex items-center p-0.5 rounded-full bg-white/[0.04] border border-white/[0.08]" aria-label="Sovereign model switcher">
         {#each [
           { id: "3b", label: "3B Daily", fname: "vigyan-3b-quad-master-iq3_m.gguf" },
-          { id: "4b", label: "4B Vision", fname: "vigyan-vl-4b-iq3_m.gguf" },
           { id: "7b", label: "7B Doctoral", fname: "vigyan-7b-quad-master-q4_k_m.gguf" },
-          { id: "14b", label: "14B Frontier", fname: "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf" }
+          { id: "14b", label: "14B Reasoning", fname: "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf" }
         ] as seg}
-          {@const isActive = activeModelName.includes(seg.id) || (seg.id === "3b" && (!activeModelName || (!activeModelName.includes("4b") && !activeModelName.includes("7b") && !activeModelName.includes("14b"))))}
+          {@const isActive = Boolean(activeModelName && (activeModelName.toLowerCase().includes(seg.id) || activeModelName.toLowerCase().includes(seg.fname.toLowerCase())))}
           <button
             onclick={() => handleSegmentClick(seg.fname)}
             class="px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-all cursor-pointer {isActive
@@ -235,7 +234,7 @@
           <span
             class="w-1.5 h-1.5 rounded-full {ollamaConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"
           ></span>
-          <span>{ollamaConnected ? 'Offline' : 'Connecting'}</span>
+          <span>{ollamaConnected ? (activeModelName ? 'Offline' : 'No Model') : 'Connecting'}</span>
         </div>
       {/if}
     </div>

@@ -26,10 +26,9 @@ DEFAULT_HOST = "http://127.0.0.1:8086"
 MODELS_DIR = os.path.expanduser("~/.vigyan/models")
 
 ALLOWED_SOVEREIGN_MODELS = {
-    "vigyan-3b-quad-master-iq3_m.gguf",     # Daily Driver (3B)
-    "vigyan-vl-4b-iq3_m.gguf",              # Multimodal Vision (4B)
-    "vigyan-7b-quad-master-q4_k_m.gguf",     # Doctoral STEM (7B)
-    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"  # Deep R1 Reasoning (14B)
+    "vigyan-3b-quad-master-iq3_m.gguf",        # Daily STEM (3B)
+    "vigyan-7b-quad-master-q4_k_m.gguf",        # Doctoral STEM (7B)
+    "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf"  # Deep Reasoning (14B)
 }
 
 SOVEREIGN_PRODUCTION_MODELS = [
@@ -37,29 +36,14 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "id": "vigyan-3b-quad-master-iq3_m",
         "name": "Vigyan-3B Quad-Master",
         "tag": "vigyan:3b",
-        "short_label": "3B Daily Driver",
+        "short_label": "3B Daily",
         "filename": "vigyan-3b-quad-master-iq3_m.gguf",
-        "size_bytes": 1488894752,
+        "size_bytes": 1496924256,
         "size_formatted": "1.39 GB",
-        "ram_required_gb": 4.0,
-        "domain": "Flagship STEM, Calculus & Exact Symbolic CAS",
+        "ram_required_gb": 3.5,
+        "domain": "Fast STEM, Calculus & Exact Symbolic Mathematics",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
         "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
-    },
-    {
-        "id": "vigyan-vl-4b-iq3_m",
-        "name": "Vigyan-VL-4B Multimodal",
-        "tag": "vigyan:4b",
-        "short_label": "4B Vision",
-        "filename": "vigyan-vl-4b-iq3_m.gguf",
-        "size_bytes": 1962897120,
-        "size_formatted": "1.83 GB",
-        "ram_required_gb": 5.0,
-        "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
-        "mmproj_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
-        "mmproj_filename": "mmproj-vigyan-vl-4b-f16.gguf",
     },
     {
         "id": "vigyan-7b-quad-master-q4_k_m",
@@ -75,17 +59,17 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "hf_repo": "shreyansh12183/vigyan-olmo2-7b-quad-master",
     },
     {
-        "id": "vigyan-r1-14b-health-semi-quantum",
-        "name": "Vigyan-R1-14B Reasoning",
-        "tag": "vigyan:14b",
-        "short_label": "14B Frontier",
-        "filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-        "size_bytes": 6917000000,
+        "id": "deepseek-r1-14b-iq3_m",
+        "name": "DeepSeek-R1 14B Reasoning",
+        "tag": "deepseek:14b",
+        "short_label": "14B Reasoning",
+        "filename": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+        "size_bytes": 6916537760,
         "size_formatted": "6.44 GB",
         "ram_required_gb": 10.0,
         "domain": "Frontier Step-by-Step Chain-of-Thought & Quantum Physics",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf/resolve/main/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf",
+        "hf_url": "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf?download=true",
+        "hf_repo": "bartowski/DeepSeek-R1-Distill-Qwen-14B-GGUF",
     }
 ]
 
@@ -96,17 +80,14 @@ MODEL_ALIASES = {
     "3b": "vigyan-3b-quad-master-iq3_m.gguf",
     "vigyan:3b": "vigyan-3b-quad-master-iq3_m.gguf",
     "vigyan-3b": "vigyan-3b-quad-master-iq3_m.gguf",
-    "4b": "vigyan-vl-4b-iq3_m.gguf",
-    "vigyan:4b": "vigyan-vl-4b-iq3_m.gguf",
-    "vigyan-4b": "vigyan-vl-4b-iq3_m.gguf",
-    "vigyan-vl-4b": "vigyan-vl-4b-iq3_m.gguf",
     "7b": "vigyan-7b-quad-master-q4_k_m.gguf",
     "vigyan:7b": "vigyan-7b-quad-master-q4_k_m.gguf",
     "vigyan-7b": "vigyan-7b-quad-master-q4_k_m.gguf",
-    "14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-    "vigyan:14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-    "vigyan-14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-    "vigyan-r1-14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+    "14b": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+    "deepseek:14b": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+    "deepseek-14b": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+    "r1": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
+    "deepseek": "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf",
 }
 
 
