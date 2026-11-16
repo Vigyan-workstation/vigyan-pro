@@ -163,7 +163,7 @@ def cmd_models(refresh: bool = False):
     local = get_local_models()
 
     print("┌────────────────────────────────────────────────────────────────────────────────────────┐")
-    print("│  VIGYAN SOVEREIGN MATRIX • 4 Authorized Scientific Engines                             │")
+    print("│  VIGYAN SOVEREIGN MATRIX • 3 Authorized Scientific Engines                             │")
     print(f"│  Host: {total_ram:.1f} GB RAM ({avail_ram:.1f} GB available) • Compute: {tier:<38} │")
     print("├─────────────┬─────────────┬──────────────────────────┬──────────┬──────────────┬───────┤")
     print(f"│ {'STATUS':<11} │ {'ALIAS':<11} │ {'MODEL NAME':<24} │ {'SIZE':<8} │ {'MEMORY':<12} │ {'TIER':<5} │")
@@ -171,16 +171,14 @@ def cmd_models(refresh: bool = False):
 
     tier_labels = {
         "vigyan-3b-quad-master-iq3_m.gguf": "Daily",
-        "vigyan-vl-4b-iq3_m.gguf": "Vision",
         "vigyan-7b-quad-master-q4_k_m.gguf": "Doct.",
-        "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf": "Front."
+        "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf": "Reason"
     }
 
     alias_display = {
         "vigyan-3b-quad-master-iq3_m.gguf": "vigyan:3b",
-        "vigyan-vl-4b-iq3_m.gguf": "vigyan:4b",
         "vigyan-7b-quad-master-q4_k_m.gguf": "vigyan:7b",
-        "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf": "vigyan:14b"
+        "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf": "deepseek:14b"
     }
 
     seen = set()
@@ -554,15 +552,14 @@ def ensure_first_run_interactive() -> Optional[str]:
     print("├────────────────────────────────────────────────────────────────────────┤")
     print("│  Select a sovereign engine to download:                                │")
     print("│    [1] 3B Daily Driver  (1.39 GB) - STEM, Calculus & CAS [Recommended] │")
-    print("│    [2] 4B Vision        (1.83 GB) - Circuit Schematics & Diagrams      │")
-    print("│    [3] 7B Doctoral      (4.16 GB) - Advanced Physics & Engineering     │")
-    print("│    [4] 14B Frontier     (6.44 GB) - Deep Chain-of-Thought Reasoning    │")
-    print("│    [5] View Model Matrix                                               │")
+    print("│    [2] 7B Doctoral      (4.16 GB) - Advanced Physics & Engineering     │")
+    print("│    [3] 14B DeepSeek     (6.44 GB) - Deep Chain-of-Thought Reasoning    │")
+    print("│    [4] View Model Matrix                                               │")
     print("│    [q] Quit                                                            │")
     print("└────────────────────────────────────────────────────────────────────────┘")
 
     try:
-        choice = input("Enter selection [1-5]: ").strip().lower()
+        choice = input("Enter selection [1-4]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print()
         sys.exit(0)
@@ -571,15 +568,12 @@ def ensure_first_run_interactive() -> Optional[str]:
         if cmd_pull("3b"):
             return os.path.join(MODELS_DIR, "vigyan-3b-quad-master-iq3_m.gguf")
     elif choice == "2":
-        if cmd_pull("4b"):
-            return os.path.join(MODELS_DIR, "vigyan-vl-4b-iq3_m.gguf")
-    elif choice == "3":
         if cmd_pull("7b"):
             return os.path.join(MODELS_DIR, "vigyan-7b-quad-master-q4_k_m.gguf")
-    elif choice == "4":
+    elif choice == "3":
         if cmd_pull("14b"):
-            return os.path.join(MODELS_DIR, "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf")
-    elif choice == "5":
+            return os.path.join(MODELS_DIR, "DeepSeek-R1-Distill-Qwen-14B-IQ3_M.gguf")
+    elif choice == "4":
         cmd_models()
         sys.exit(0)
     else:
@@ -649,28 +643,31 @@ def query_local_server(prompt: str, host: str = DEFAULT_HOST, stream: bool = Tru
 
 def print_usage():
     print("""
-Vigyan Pro Sovereign CLI v5.0 [100% Offline • Air-Gapped STEM Workstation]
+Vigyan Pro Sovereign CLI v5.0.6 [100% Offline • Air-Gapped STEM Workstation]
 Usage:
   vigyan                                Launch interactive scientific REPL
-  vigyan run [3b|4b|7b|14b]             Launch REPL with a specific model
-  vigyan models | ls                    List 4 authorized models with hardware compatibility
-  vigyan pull <3b|4b|7b|14b>            Download model directly to ~/.vigyan/models/
-  vigyan rm <3b|4b|7b|14b>              Delete local model and reclaim disk space
+  vigyan run [3b|7b|14b]                Launch REPL with a specific model
+  vigyan models | ls                    List 3 authorized models with hardware compatibility
+  vigyan pull <3b|7b|14b>               Download model directly to ~/.vigyan/models/
+  vigyan rm <3b|7b|14b>                 Delete local model and reclaim disk space
+  vigyan serve [--port 8086]            Start OpenAI-compatible API server for VS Code
+  vigyan purge | uninstall             Clean uninstall and disk space reclamation
   vigyan --version | -v                 Display version specification
   vigyan "<query>"                      One-shot CLI evaluation with streaming answer
   echo "<query>" | vigyan               Piped evaluation for bash scripts and VS Code tasks
+  cat file.py | vigyan "<query>"        Analyze piped code with instructions
 
 Authorized Sovereign Models:
-  3b   • Vigyan-3B Quad-Master    (1.39 GB)  Flagship STEM & Symbolic Algebra
-  4b   • Vigyan-VL-4B Multimodal  (1.83 GB)  Circuit Schematics & Diagrams
-  7b   • Vigyan-7B Quad-Master    (4.16 GB)  Doctoral Physics & Engineering
-  14b  • Vigyan-R1-14B Reasoning  (6.44 GB)  Frontier Step-by-Step Chain-of-Thought
+  3b   • Vigyan-3B Quad-Master    (1.39 GB)  Fast Daily STEM, Calculus & Exact Symbolic CAS
+  7b   • Vigyan-7B Quad-Master    (4.16 GB)  Doctoral Physics, Proofs & Engineering
+  14b  • DeepSeek-R1 14B          (6.44 GB)  Frontier Step-by-Step Chain-of-Thought
 
 Examples:
   vigyan models
   vigyan pull 3b
-  vigyan run 3b
   vigyan "Solve d^2y/dx^2 + 4y = 0"
+  cat main.py | vigyan "Explain any numerical instability"
+  vigyan serve --port 8086
 """)
 
 
@@ -749,6 +746,125 @@ def run_repl(model_path: Optional[str] = None):
                 print("[Error] Could not connect to local inference engine.", file=sys.stderr)
 
 
+
+def cmd_serve(model_name: Optional[str] = None, host: str = "127.0.0.1", port: int = 8086):
+    """Start sovereign OpenAI-compatible HTTP inference server in foreground for VS Code / tools."""
+    actual_model = (find_model_file(model_name) if model_name else None) or ensure_first_run_interactive()
+    if not actual_model:
+        print("[Error] No model found to serve. Run 'vigyan pull 3b' first.", file=sys.stderr)
+        return False
+
+    from llama_supervisor import LlamaServerSupervisor
+    cfg = load_cli_config()
+    threads = cfg.get("cpu_threads")
+    ctx_size = cfg.get("context_window", 2048)
+
+    sup = LlamaServerSupervisor(
+        model_path=actual_model,
+        host=host,
+        port=port,
+        threads=threads,
+        ctx_size=ctx_size,
+        die_with_parent=True
+    )
+    print("┌────────────────────────────────────────────────────────────────────────┐")
+    print("│  VIGYAN SOVEREIGN INFERENCE SERVER                                     │")
+    print(f"│  OpenAI-Compatible Endpoint: http://{host}:{port}/v1                     │")
+    print(f"│  Active Engine: {os.path.basename(actual_model):<54} │")
+    print("│  Ready for VS Code (Continue, Cline, Roo Code) and STEM Toolchains     │")
+    print("│  Press Ctrl+C to terminate.                                            │")
+    print("└────────────────────────────────────────────────────────────────────────┘")
+
+    if not sup.is_healthy():
+        sup.start()
+        sup.wait_until_ready(timeout=15.0)
+
+    try:
+        while True:
+            time.sleep(1.0)
+            if not sup.is_healthy():
+                sup.check()
+    except KeyboardInterrupt:
+        print("\nStopping Vigyan inference server...", file=sys.stderr)
+        sup.stop()
+        print("✓ Server stopped cleanly.")
+        return True
+
+
+def cmd_uninstall(yes: bool = False):
+    """Cleanly uninstall vigyan binary, shell configuration, and optionally reclaim disk space."""
+    print("┌────────────────────────────────────────────────────────────────────────┐")
+    print("│  VIGYAN SOVEREIGN UNINSTALLER                                          │")
+    print("│  Clean removal of CLI binary, PATH environment, and cached weights.    │")
+    print("└────────────────────────────────────────────────────────────────────────┘")
+
+    if not yes:
+        try:
+            confirm = input("Are you sure you want to uninstall Vigyan CLI? [y/N]: ").strip().lower()
+            if confirm not in ("y", "yes"):
+                print("Uninstall cancelled.")
+                return
+        except (KeyboardInterrupt, EOFError):
+            print("\nUninstall cancelled.")
+            return
+
+    # 1. Remove binary candidates
+    bin_candidates = [
+        os.path.expanduser("~/.local/bin/vigyan"),
+        os.path.expanduser("~/bin/vigyan"),
+        "/usr/local/bin/vigyan",
+        os.path.expandvars(r"%LOCALAPPDATA%\vigyan\bin\vigyan.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\vigyan\bin\vigyan.cmd"),
+    ]
+    removed_bins = 0
+    for b in bin_candidates:
+        if os.path.isfile(b):
+            try:
+                os.remove(b)
+                removed_bins += 1
+                print(f"✓ Removed binary: {b}")
+            except Exception as e:
+                print(f"[Warning] Could not remove {b}: {e}", file=sys.stderr)
+
+    # 2. Clean shell profile PATH exports
+    shell_rcs = [
+        os.path.expanduser("~/.bashrc"),
+        os.path.expanduser("~/.zshrc"),
+        os.path.expanduser("~/.profile"),
+    ]
+    for rc in shell_rcs:
+        if os.path.isfile(rc):
+            try:
+                with open(rc, "r", encoding="utf-8") as f:
+                    content = f.read()
+                cleaned = "\n".join(
+                    line for line in content.splitlines()
+                    if "# Vigyan CLI PATH" not in line and "vigyan" not in line.lower()
+                )
+                if cleaned != content:
+                    with open(rc, "w", encoding="utf-8") as f:
+                        f.write(cleaned)
+                    print(f"✓ Cleaned PATH export from {rc}")
+            except Exception:
+                pass
+
+    # 3. Optional Model Reclaim
+    purge_models = False
+    if yes:
+        purge_models = True
+    else:
+        try:
+            m_confirm = input("\nDo you also want to delete all downloaded model weights (~/.vigyan/models/) to reclaim disk space? [y/N]: ").strip().lower()
+            purge_models = m_confirm in ("y", "yes")
+        except (KeyboardInterrupt, EOFError):
+            pass
+
+    if purge_models:
+        cmd_rm("--all")
+
+    print("\n✓ Vigyan CLI uninstallation complete. System is clean.")
+
+
 def main():
     args = sys.argv[1:]
 
@@ -757,7 +873,7 @@ def main():
         try:
             from version import __version__
         except Exception:
-            __version__ = "5.0.2"
+            __version__ = "5.0.6"
         print(f"Vigyan Pro v{__version__} [Sovereign Offline Intelligence]")
         return
 
@@ -775,7 +891,7 @@ def main():
     # Subcommand: pull / download
     if args and args[0] in ("pull", "download"):
         if len(args) < 2:
-            print("Usage: vigyan pull <model_name>")
+            print("Usage: vigyan pull <3b|7b|14b>")
             sys.exit(1)
         cmd_pull(args[1])
         return
@@ -783,14 +899,33 @@ def main():
     # Subcommand: rm / delete
     if args and args[0] in ("rm", "delete", "remove"):
         if len(args) < 2:
-            print("Usage: vigyan rm <model_name | --all>")
+            print("Usage: vigyan rm <3b|7b|14b|--all>")
             sys.exit(1)
         cmd_rm(args[1])
         return
 
-    # Subcommand: purge
-    if args and args[0] in ("purge", "clean"):
-        cmd_rm("--all")
+    # Subcommand: serve
+    if args and args[0] == "serve":
+        port = 8086
+        model_arg = None
+        for i, a in enumerate(args[1:], start=1):
+            if a in ("--port", "-p") and i + 1 < len(args):
+                try:
+                    port = int(args[i + 1])
+                except ValueError:
+                    pass
+            elif not a.startswith("-") and not model_arg:
+                model_arg = a
+        cmd_serve(model_name=model_arg, port=port)
+        return
+
+    # Subcommand: purge / uninstall
+    if args and args[0] in ("purge", "uninstall", "clean"):
+        yes_flag = any(f in args for f in ("-y", "--yes"))
+        if args[0] == "uninstall":
+            cmd_uninstall(yes=yes_flag)
+        else:
+            cmd_rm("--all")
         return
 
     # Subcommand: run
@@ -800,25 +935,40 @@ def main():
         run_repl(target_path)
         return
 
-    # One-shot or piped prompt
-    prompt_text = " ".join(args).strip()
-    if not prompt_text:
-        if not sys.stdin.isatty():
-            prompt_text = sys.stdin.read().strip()
-        else:
-            run_repl()
-            return
+    # Handle Stdin Pipe + Prompt Integration
+    # e.g.: cat file.py | vigyan "Explain this code"
+    piped_data = ""
+    if not sys.stdin.isatty():
+        try:
+            piped_data = sys.stdin.read().strip()
+        except Exception:
+            piped_data = ""
 
-    if prompt_text:
-        model_path = ensure_first_run_interactive()
-        if not model_path:
-            return
-        sup = start_supervisor_for_model(model_path)
-        if not query_local_server(prompt_text):
-            if sup and not sup.is_healthy():
-                sup.start()
-                sup.wait_until_ready(timeout=8.0)
-            query_local_server(prompt_text)
+    # Parse remaining prompt flags
+    prompt_words = [a for a in args if not a.startswith("--raw") and not a.startswith("-r")]
+    prompt_text = " ".join(prompt_words).strip()
+
+    if piped_data:
+        if prompt_text:
+            combined_prompt = f"{piped_data}\n\n[User Instruction]: {prompt_text}"
+        else:
+            combined_prompt = f"{piped_data}\n\n[User Instruction]: Analyze the above code or mathematical data in detail."
+    else:
+        combined_prompt = prompt_text
+
+    if not combined_prompt:
+        run_repl()
+        return
+
+    model_path = ensure_first_run_interactive()
+    if not model_path:
+        return
+    sup = start_supervisor_for_model(model_path)
+    if not query_local_server(combined_prompt):
+        if sup and not sup.is_healthy():
+            sup.start()
+            sup.wait_until_ready(timeout=8.0)
+        query_local_server(combined_prompt)
 
 
 if __name__ == "__main__":
