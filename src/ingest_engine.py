@@ -91,25 +91,28 @@ def analyze_ingested_content(filename: str, raw_text: str) -> Dict[str, Any]:
         if m not in detected_metrics:
             detected_metrics.append(m.strip())
 
-    # 3. Determine natural 1-click engineering actions
+    # 3. Determine natural 1-click sovereign STEM actions
     clean_lower = clean_text.lower()
     suggested_actions: List[str] = []
 
-    if dim_3d or any(w in clean_lower for w in ("dimension", "enclosure", "box", "mount", "wall", "thickness", "case", "housing")):
+    if dim_3d or any(w in clean_lower for w in ("dimension", "length", "width", "height", "thickness", "geometry", "enclosure", "box", "case", "housing")):
         if dim_3d:
             w, l, h = dim_3d[0]
-            suggested_actions.append(f"Synthesize 3D CAD Enclosure ({w}x{l}x{h}mm)")
+            suggested_actions.append(f"Verify Dimensions ({w}x{l}x{h}mm)")
         else:
-            suggested_actions.append("Synthesize 3D CAD Enclosure")
+            suggested_actions.append("Verify Dimensions")
 
     if any(w in clean_lower for w in ("pin", "voltage", "circuit", "vcc", "gnd", "resistor", "capacitor", "555", "ic", "led")):
-        suggested_actions.append("Generate KiCad PCB Netlist")
+        suggested_actions.append("Verify Circuit Formulations (SymPy CAS)")
 
-    if any(w in clean_lower for w in ("gear", "teeth", "module", "pitch", "spur")):
-        suggested_actions.append("Synthesize 3D Parametric Gear")
+    if any(w in clean_lower for w in ("integral", "derivative", "equation", "proof", "solve", "matrix", "calculus", "formula")):
+        suggested_actions.append("Verify Analytical Derivation (SymPy CAS)")
+
+    if any(w in clean_lower for w in ("plot", "curve", "function", "graph", "sin", "cos", "exp", "frequency", "response")):
+        suggested_actions.append("Plot Mathematical Function")
 
     if not suggested_actions:
-        suggested_actions = ["Synthesize 3D CAD Enclosure", "Evaluate Mathematical Proof"]
+        suggested_actions = ["Verify Analytical Derivation (SymPy CAS)", "Plot Mathematical Function"]
 
     # 4. Formulate executive human summary
     if clean_text:

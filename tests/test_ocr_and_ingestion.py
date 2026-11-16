@@ -42,7 +42,7 @@ class TestOCRandIngestion(unittest.TestCase):
         
         # Check that 1-click action buttons were generated
         actions = res["suggested_actions"]
-        self.assertTrue(any("3D" in a or "CAD" in a or "Enclosure" in a for a in actions))
+        self.assertTrue(any("Dimensions" in a for a in actions))
 
     def test_plain_text_and_metrics_analysis(self):
         doc = (
@@ -58,7 +58,7 @@ class TestOCRandIngestion(unittest.TestCase):
         self.assertTrue(any("65" in m and "30" in m and "12" in m for m in metrics))
         
         actions = res["suggested_actions"]
-        self.assertIn("Synthesize 3D CAD Enclosure (65x30x12mm)", actions)
+        self.assertIn("Verify Dimensions (65x30x12mm)", actions)
 
     def test_pcb_electronics_detection(self):
         doc = (
@@ -69,7 +69,7 @@ class TestOCRandIngestion(unittest.TestCase):
         res = ingest_engine.analyze_ingested_content("555_timer.txt", doc)
         self.assertTrue(res["success"])
         actions = res["suggested_actions"]
-        self.assertIn("Generate KiCad PCB Netlist", actions)
+        self.assertIn("Verify Circuit Formulations (SymPy CAS)", actions)
 
 
 if __name__ == "__main__":

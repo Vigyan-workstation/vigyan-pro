@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ModelsDrawer.svelte — Steve Jobs 4-Model Purity Vault (v5.0.4)
+  // ModelsDrawer.svelte — Steve Jobs 4-Model Purity Vault (v5.0.5)
   // 70% Decluttering: Pure 4 plain-English cards with Auto-Heal & Instant Activation.
   // Directly connects to Experimentlab public models and local ~/.vigyan/models/
 

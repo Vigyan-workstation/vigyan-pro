@@ -193,7 +193,7 @@
         </svg>
       </div>
       <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
-      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.4</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.5</span>
     </div>
 
     <!-- Center: Steve Jobs 4-Model Segmented Switcher & Live Engine Status -->

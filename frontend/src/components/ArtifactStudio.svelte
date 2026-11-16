@@ -72,12 +72,24 @@ Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  function exportPdf() {
+    const prevTab = artifactStore.activeTab;
+    if (prevTab !== "derivation") {
+      artifactStore.activeTab = "derivation";
+      setTimeout(() => {
+        window.print();
+      }, 50);
+    } else {
+      window.print();
+    }
+  }
 </script>
 
-<div class="h-full w-full flex flex-col bg-[#02050a] text-[#f3f4f6] select-text">
+<div class="artifact-studio-root h-full w-full flex flex-col bg-[#02050a] text-[#f3f4f6] select-text">
 
   <!-- Executive Header Deck -->
-  <div class="h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-white/[0.08] bg-[#040812]/90 backdrop-blur-md select-none">
+  <div class="artifact-header-deck h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-white/[0.08] bg-[#040812]/90 backdrop-blur-md select-none">
     <!-- Left: Identity & Tabs -->
     <div class="flex items-center gap-3 min-w-0">
       <div class="flex items-center gap-2">
@@ -123,6 +135,19 @@ Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically
 
     <!-- Right: Actions & Close -->
     <div class="flex items-center gap-1.5 flex-shrink-0">
+      <!-- 1-Click Export PDF Button -->
+      <button
+        type="button"
+        onclick={exportPdf}
+        class="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1.5 bg-white/[0.06] hover:bg-white/[0.12] text-white border border-white/10 active:scale-95"
+        title="Export publication PDF (Print)"
+      >
+        <svg class="w-3.5 h-3.5 text-rose-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 003 3.5v13A1.5 1.5 0 004.5 18h11a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0011.378 2H4.5zm4.75 6.75a.75.75 0 011.5 0v3.94l1.72-1.72a.75.75 0 111.06 1.06l-3 3a.75.75 0 01-1.06 0l-3-3a.75.75 0 111.06-1.06l1.72 1.72V8.75z" clip-rule="evenodd" />
+        </svg>
+        <span>Export PDF</span>
+      </button>
+
       <button
         type="button"
         onclick={copyOverleaf}
@@ -168,9 +193,18 @@ Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically
 
     {#if artifactStore.activeTab === "derivation"}
       <!-- Derivation View: Full-width KaTeX typography -->
-      <div class="max-w-3xl mx-auto space-y-4">
+      <div class="max-w-3xl mx-auto space-y-4 printable-artifact">
+        <!-- Publication Header (visible when printing) -->
+        <div class="print-header hidden mb-6 pb-4 border-b border-gray-200">
+          <div class="text-2xl font-bold text-gray-900">{artifact.title}</div>
+          <div class="text-xs text-gray-500 mt-1 flex items-center justify-between">
+            <span>Vigyan Sovereign Scientific Workstation · Pure CAS Certified</span>
+            <span>Residual: {artifact.sympyResidual || "0.000e+00"}</span>
+          </div>
+        </div>
+
         <!-- Verification Banner -->
-        <div class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-xs">
+        <div class="screen-only flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] text-xs">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-[#10b981]"></span>
             <span class="font-medium text-[#10b981]">SymPy CAS Certified</span>
@@ -180,7 +214,7 @@ Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically
         </div>
 
         <!-- Rendered KaTeX Body -->
-        <div class="prose prose-invert max-w-none text-sm text-[#e2e8f0] font-sans leading-7">
+        <div class="prose prose-invert max-w-none text-sm text-[#e2e8f0] font-sans leading-7 printable-body">
           {@html renderMath(artifact.content)}
         </div>
       </div>
@@ -222,3 +256,67 @@ Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically
 
   </div>
 </div>
+
+<style>
+  @media print {
+    :global(body),
+    :global(html) {
+      background: #ffffff !important;
+      color: #111827 !important;
+    }
+    :global(header),
+    :global(aside),
+    :global(nav),
+    :global(button),
+    :global(.dock-container),
+    .artifact-header-deck,
+    .screen-only {
+      display: none !important;
+    }
+    .print-header {
+      display: block !important;
+    }
+    .artifact-studio-root {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      background: #ffffff !important;
+      color: #111827 !important;
+      overflow: visible !important;
+    }
+    .printable-artifact {
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      color: #111827 !important;
+    }
+    .printable-body {
+      color: #111827 !important;
+    }
+    .printable-body :global(p),
+    .printable-body :global(h1),
+    .printable-body :global(h2),
+    .printable-body :global(h3),
+    .printable-body :global(li),
+    .printable-body :global(td),
+    .printable-body :global(th),
+    .printable-body :global(strong) {
+      color: #111827 !important;
+    }
+    .printable-body :global(.katex) {
+      color: #000000 !important;
+      font-size: 1.05em !important;
+    }
+    .printable-body :global(.katex-display) {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin: 1em 0 !important;
+    }
+    @page {
+      size: A4;
+      margin: 2cm 1.5cm;
+    }
+  }
+</style>
