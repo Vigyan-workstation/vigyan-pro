@@ -21,8 +21,12 @@ import subprocess
 import urllib.request
 import urllib.parse
 import secrets
+import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Dict, Any, List, Optional
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger("vigyan.desktop")
 
 # Sovereign session security token (ephemeral, single-session only)
 _SESSION_TOKEN = secrets.token_hex(32)
@@ -1280,8 +1284,40 @@ class ModelDownloadManager:
             os.makedirs(target_dir, exist_ok=True)
             dest_file = os.path.join(target_dir, dest_filename)
             part_file = dest_file + ".part"
-
             total_req = item.get("size_bytes", 1_400_000_000)
+
+            # Auto-Heal Check 1: If model already exists on disk and is a valid GGUF file
+            if os.path.isfile(dest_file) and os.path.getsize(dest_file) >= 2_000_000:
+                try:
+                    with open(dest_file, "rb") as cf:
+                        if cf.read(4) == b"GGUF":
+                            logger.info("Auto-Heal: %s already verified and complete on disk", dest_filename)
+                            with self._lock:
+                                self.active_downloads[tag]["status"] = "ready"
+                                self.active_downloads[tag]["progress_pct"] = 100.0
+                                self.active_downloads[tag]["speed_mbps"] = 0.0
+                                self.active_downloads[tag]["eta_formatted"] = "Ready"
+                            return
+                except Exception:
+                    pass
+
+            # Auto-Heal Check 2: If .part file already downloaded and verified
+            if os.path.isfile(part_file) and os.path.getsize(part_file) >= 2_000_000:
+                try:
+                    p_sz = os.path.getsize(part_file)
+                    with open(part_file, "rb") as cf:
+                        if cf.read(4) == b"GGUF" and p_sz >= total_req - 2048:
+                            logger.info("Auto-Heal: Finalizing completed %s (%d bytes)", dest_filename, p_sz)
+                            os.replace(part_file, dest_file)
+                            with self._lock:
+                                self.active_downloads[tag]["status"] = "ready"
+                                self.active_downloads[tag]["progress_pct"] = 100.0
+                                self.active_downloads[tag]["speed_mbps"] = 0.0
+                                self.active_downloads[tag]["eta_formatted"] = "Ready"
+                            return
+                except Exception:
+                    pass
+
             try:
                 import shutil
                 free_disk = shutil.disk_usage(target_dir).free
@@ -1316,6 +1352,22 @@ class ModelDownloadManager:
                     resp = urllib.request.urlopen(req, timeout=30)
                 except urllib.error.HTTPError as http_err:
                     if http_err.code == 416 and existing_bytes > 0:
+                        # Auto-heal on 416: check if the existing file is complete and valid
+                        if os.path.isfile(part_file) and os.path.getsize(part_file) >= 2_000_000:
+                            try:
+                                with open(part_file, "rb") as cf:
+                                    if cf.read(4) == b"GGUF" and existing_bytes >= total_req - 2048:
+                                        logger.info("HTTP 416 Auto-Heal: %s is complete (%d bytes). Finalizing.", dest_filename, existing_bytes)
+                                        os.replace(part_file, dest_file)
+                                        with self._lock:
+                                            self.active_downloads[tag]["status"] = "ready"
+                                            self.active_downloads[tag]["progress_pct"] = 100.0
+                                            self.active_downloads[tag]["speed_mbps"] = 0.0
+                                            self.active_downloads[tag]["eta_formatted"] = "Ready"
+                                        return
+                            except Exception as heal_err:
+                                logger.warning("Could not finalize 416 file: %s", heal_err)
+
                         logger.warning("HTTP 416 for %s. Resetting stale .part file from byte 0", tag)
                         if os.path.exists(part_file):
                             try:
@@ -1439,7 +1491,7 @@ class ModelDownloadManager:
                     vl_dir = os.path.join(target_dir, "vl4b")
                     os.makedirs(vl_dir, exist_ok=True)
                     target_mmproj = os.path.join(vl_dir, mmproj_filename)
-                    if not os.path.isfile(target_mmproj):
+                    if not (os.path.isfile(target_mmproj) and os.path.getsize(target_mmproj) > 100_000_000):
                         try:
                             logger.info("Downloading companion vision projector: %s", mmproj_filename)
                             mmproj_req = urllib.request.Request(mmproj_url, headers={"User-Agent": "Vigyan-Pro-Sovereign-Downloader/5.0"})
@@ -1454,6 +1506,8 @@ class ModelDownloadManager:
                             os.replace(target_mmproj + ".part", target_mmproj)
                         except Exception as mmproj_err:
                             logger.warning("Companion mmproj download error: %s", mmproj_err)
+                    else:
+                        logger.info("Companion vision projector %s already present (%d bytes)", mmproj_filename, os.path.getsize(target_mmproj))
 
                 if was_active and LLAMA_SUPERVISOR:
                     try:
@@ -1468,6 +1522,7 @@ class ModelDownloadManager:
                     self.active_downloads[tag]["eta_formatted"] = "Ready"
 
             except Exception as exc:
+                logger.exception("Download thread failure for %s: %s", tag, exc)
                 with self._lock:
                     st = self.active_downloads.get(tag, {}).get("status")
                     if st not in ("paused", "cancelled"):

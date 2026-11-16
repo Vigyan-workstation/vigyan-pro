@@ -1,6 +1,6 @@
 <script lang="ts">
-  // ModelsDrawer.svelte — Steve Jobs 4-Model Purity Vault (v5.0.3)
-  // 70% Decluttering: Pure 4 plain-English cards with zero raw .gguf filenames or RAM math algebra.
+  // ModelsDrawer.svelte — Steve Jobs 4-Model Purity Vault (v5.0.4)
+  // 70% Decluttering: Pure 4 plain-English cards with Auto-Heal & Instant Activation.
   // Directly connects to Experimentlab public models and local ~/.vigyan/models/
 
   import { onMount, onDestroy } from "svelte";
@@ -42,11 +42,31 @@
     downloadInfo?: DownloadInfo;
   }
 
-  let rawModels = $state<any[]>([]);
+  function getCachedCatalog(): any[] {
+    try {
+      if (typeof window !== "undefined") {
+        const c = localStorage.getItem("vigyan_models_catalog");
+        if (c) return JSON.parse(c);
+      }
+    } catch {}
+    return [];
+  }
+
+  function getCachedActiveFilename(): string {
+    try {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("vigyan_active_filename") || "";
+      }
+    } catch {}
+    return "";
+  }
+
+  let rawModels = $state<any[]>(getCachedCatalog());
   let downloads = $state<Record<string, DownloadInfo>>({});
-  let activeFilename = $state<string>("");
+  let activeFilename = $state<string>(getCachedActiveFilename());
   let hardware = $state<{ total_ram_gb?: number }>({ total_ram_gb: 7.0 });
 
+  let startingKey = $state<string | null>(null);
   let swappingKey = $state<string | null>(null);
   let confirmDeleteKey = $state<string | null>(null);
   let statusMessage = $state<{ text: string; error?: boolean } | null>(null);
@@ -58,7 +78,7 @@
     if (statusTimer) clearTimeout(statusTimer);
     statusTimer = setTimeout(() => {
       statusMessage = null;
-    }, 3200);
+    }, 3500);
   }
 
   // 4 Steve Jobs Curated Cards
@@ -105,7 +125,10 @@
     },
   ].map(card => {
     const raw = rawModels.find(m => m.filename === card.filename);
-    const dl = downloads[card.filename] || (raw ? downloads[raw.tag] : undefined);
+    const dl = downloads[card.filename] ||
+               downloads[card.filename.replace(".gguf", "")] ||
+               downloads[card.key] ||
+               (raw ? (downloads[raw.tag] || downloads[raw.id]) : undefined);
     const isInst = raw ? Boolean(raw.is_installed) : false;
     const isAct = raw ? Boolean(raw.is_active) : (activeFilename === card.filename);
     return {
@@ -129,6 +152,10 @@
         const data = await res.json();
         rawModels = data.models || [];
         activeFilename = data.active_filename || "";
+        try {
+          localStorage.setItem("vigyan_models_catalog", JSON.stringify(rawModels));
+          localStorage.setItem("vigyan_active_filename", activeFilename);
+        } catch {}
         if (data.hardware) {
           hardware = data.hardware;
         }
@@ -169,6 +196,7 @@
 
         const hasFinished = Object.values(data).some((d: any) => d && d.status === "ready");
         if (hasFinished) {
+          startingKey = null;
           await fetchCatalog();
         }
       }
@@ -176,13 +204,14 @@
   }
 
   async function handleDownload(card: CuratedCard) {
+    startingKey = card.key;
     try {
       const host = getAgentHost();
       const token = getVigyanToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["X-Vigyan-Token"] = token;
 
-      showStatus(`Starting download for ${card.title}…`);
+      showStatus(`Connecting download for ${card.title}…`);
       const res = await fetch(`${host}/api/models/download`, {
         method: "POST",
         headers,
@@ -190,12 +219,21 @@
       });
 
       if (res.ok) {
-        pollDownloads();
+        const data = await res.json().catch(() => ({}));
+        if (data.status === "ready" || data.message?.includes("verified")) {
+          showStatus(`${card.title} is verified and ready!`);
+          startingKey = null;
+          await fetchCatalog();
+        } else {
+          pollDownloads();
+        }
       } else {
         const err = await res.json().catch(() => ({}));
+        startingKey = null;
         showStatus(err.error || "Could not start download", true);
       }
     } catch {
+      startingKey = null;
       showStatus("Network connection error", true);
     }
   }
@@ -270,7 +308,7 @@
     if (open) {
       fetchCatalog();
       if (!pollInterval) {
-        pollInterval = setInterval(pollDownloads, 1200);
+        pollInterval = setInterval(pollDownloads, 1000);
       }
     } else {
       if (pollInterval) {
@@ -331,7 +369,9 @@
   <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
     {#each cards as card}
       {@const dl = card.downloadInfo}
+      {@const isStarting = startingKey === card.key || (dl && dl.status === "starting")}
       {@const isDownloading = dl && (dl.status === "downloading" || dl.status === "starting")}
+      {@const isError = dl && dl.status === "error"}
       {@const isOverRam = card.ramRequiredGb > (hardware.total_ram_gb || 7.0)}
 
       <div class="p-4 rounded-2xl border transition-all duration-200 {card.isActive
@@ -359,13 +399,13 @@
         {#if isDownloading}
           <div class="mt-3.5 space-y-1.5 pt-3 border-t border-white/[0.06]">
             <div class="flex items-center justify-between text-[11px] font-mono text-neutral-400">
-              <span class="text-white font-medium">{dl?.status === "starting" ? "Connecting…" : `${dl?.progress_pct || 0}%`}</span>
+              <span class="text-white font-medium">{isStarting ? "Connecting to Hugging Face…" : `${dl?.progress_pct?.toFixed(1) || 0}%`}</span>
               <span>{dl?.speed_mbps ? `${dl.speed_mbps.toFixed(1)} MB/s` : ""}</span>
             </div>
             <div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div
                 class="h-full bg-white rounded-full transition-all duration-300"
-                style="width: {dl?.progress_pct || 5}%"
+                style="width: {Math.max(5, dl?.progress_pct || 5)}%"
               ></div>
             </div>
           </div>
@@ -373,7 +413,12 @@
 
         <!-- Card Bottom: Action Controls -->
         <div class="mt-3.5 pt-3 border-t border-white/[0.06] flex items-center justify-end gap-2">
-          {#if isDownloading}
+          {#if isStarting}
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-white text-xs font-mono">
+              <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+              <span>Connecting…</span>
+            </div>
+          {:else if isDownloading}
             <span class="text-xs text-neutral-400 font-mono">Downloading…</span>
           {:else if card.isInstalled}
             <!-- Delete button -->
@@ -397,6 +442,19 @@
                 {swappingKey === card.key ? "Activating…" : "Use"}
               </button>
             {/if}
+          {:else if isError}
+            <!-- Tactile Error & 1-Click Retry Badge -->
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono text-rose-300 bg-rose-950/40 border border-rose-500/25 px-2.5 py-1 rounded-lg" title={dl?.error || "Download error"}>
+                {dl?.error ? (dl.error.length > 25 ? dl.error.slice(0, 22) + '…' : dl.error) : 'Interrupted'}
+              </span>
+              <button
+                onclick={() => handleDownload(card)}
+                class="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-400 text-white transition-all cursor-pointer shadow-sm"
+              >
+                Retry ↺
+              </button>
+            </div>
           {:else if isOverRam}
             <!-- Steve Jobs hardware guidance for low-RAM laptops -->
             <div class="flex items-center gap-2">

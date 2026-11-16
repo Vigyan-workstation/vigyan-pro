@@ -369,7 +369,7 @@
   <div class="px-6 py-4 border-t border-white/[0.08] bg-[#040608] flex items-center justify-between text-[11px] text-neutral-400 flex-shrink-0">
     <div class="flex items-center gap-2">
       <span class="font-medium text-white">Vigyan Pro</span>
-      <span class="bg-white/10 px-2 py-0.5 rounded-full text-[10px] text-white">v5.0.3</span>
+      <span class="bg-white/10 px-2 py-0.5 rounded-full text-[10px] text-white">v5.0.4</span>
     </div>
     <span>100% Offline • Zero Cloud Egress</span>
   </div>
