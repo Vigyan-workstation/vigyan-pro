@@ -16,6 +16,15 @@
   // Default compilable Overleaf template if none explicitly provided
   let fullLatex = $derived.by(() => {
     if (artifact.latexSource) return artifact.latexSource;
+
+    let body = artifact.content
+      .replace(/```[a-z]*\n?/g, "")
+      .replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "");
+    body = body.replace(/^###\s+(.+)$/gm, "\\subsubsection{$1}");
+    body = body.replace(/^##\s+(.+)$/gm, "\\subsection{$1}");
+    body = body.replace(/^#\s+(.+)$/gm, "\\section{$1}");
+    body = body.trim();
+
     return `\\documentclass[11pt,a4paper]{article}
 \\usepackage[margin=1in]{geometry}
 \\usepackage{amsmath,amssymb,amsfonts}
@@ -36,7 +45,7 @@ Analytical derivation and symbolic verification certified by Vigyan AST Engine.
 \\end{abstract}
 
 \\section{Derivation and Governing Formulations}
-${artifact.content.replace(/```[a-z]*\n?/g, "").replace(/<\/?(?:code|pre|solution|sstream|latex|math)>/gi, "").replace(/#/g, "%").trim()}
+${body}
 
 \\section{SymPy Verification Metrics}
 Residual Error: \\texttt{${artifact.sympyResidual || "0.000e+00"}} (Analytically Exact)

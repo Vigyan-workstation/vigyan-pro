@@ -84,11 +84,16 @@ def launch_mac():
     ]
     browser_exe = next((p for p in chrome_paths if os.path.exists(p)), None)
     if browser_exe:
+        user_data = os.path.expanduser("~/.vigyan/chrome_profile")
+        os.makedirs(user_data, exist_ok=True)
         cmd = [
             browser_exe,
             f"--app={target_url}",
+            f"--user-data-dir={user_data}",
             "--window-size=1340,780",
-            "--force-dark-mode"
+            "--force-dark-mode",
+            "--no-first-run",
+            "--no-default-browser-check"
         ]
         try:
             proc = subprocess.Popen(cmd)

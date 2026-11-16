@@ -24,6 +24,22 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Whitelist of strictly authorized production models
+ALLOWED_SOVEREIGN_MODELS = {
+    "vigyan-3b-quad-master-iq3_m.gguf",     # Daily Driver (3B)
+    "vigyan-vl-4b-iq3_m.gguf",              # Multimodal Vision (4B)
+    "vigyan-7b-quad-master-q4_k_m.gguf",     # Doctoral STEM (7B)
+    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"  # Deep R1 Reasoning (14B)
+}
+
+_LIBC = None
+if sys.platform.startswith("linux"):
+    try:
+        import ctypes
+        _LIBC = ctypes.CDLL("libc.so.6")
+    except Exception:
+        _LIBC = None
+
 
 def find_available_port(start_port: int = 8086, max_attempts: int = 20) -> int:
     """Find an available TCP port on loopback starting from start_port."""
@@ -55,6 +71,13 @@ def detect_hardware_profile() -> dict:
 
     # Apple Silicon Metal detection
     if sys.platform == "darwin" and platform.machine() == "arm64":
+        p_cores = cores
+        try:
+            res = subprocess.run(["sysctl", "-n", "hw.perflevel0.physicalcpu"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=1)
+            if res.returncode == 0 and res.stdout.strip():
+                p_cores = int(res.stdout.strip())
+        except Exception:
+            pass
         return {
             "tier": "apple_silicon",
             "device": "Apple Silicon Metal",
@@ -62,7 +85,7 @@ def detect_hardware_profile() -> dict:
             "avail_ram_gb": avail_ram,
             "vram_gb": total_ram,
             "recommended_ngl": 99,
-            "threads": max(1, cores),
+            "threads": max(1, p_cores),
             "context_size": 4096 if total_ram >= 16 else 2048,
         }
 
@@ -188,22 +211,32 @@ def auto_provision_llama_server() -> Optional[str]:
         print(f"[Vigyan Pro] Sovereign engine '{bin_name}' not found locally. Provisioning native engine for {sys.platform}...")
         tmp_archive = os.path.join(target_dir, "engine_download.tmp")
         req = urllib.request.Request(url, headers={"User-Agent": "Vigyan-Pro-Bootstrap/5.0"})
-        with urllib.request.urlopen(req, timeout=30) as resp, open(tmp_archive, "wb") as f:
+        with urllib.request.urlopen(req, timeout=45) as resp, open(tmp_archive, "wb") as f:
             shutil.copyfileobj(resp, f)
 
-        if is_zip:
-            import zipfile
-            with zipfile.ZipFile(tmp_archive, "r") as z:
-                z.extractall(target_dir)
-        else:
-            import tarfile
-            with tarfile.open(tmp_archive, "r:gz") as tar:
-                tar.extractall(target_dir)
-
+        extract_tmp = os.path.join(target_dir, "_extract_tmp")
+        os.makedirs(extract_tmp, exist_ok=True)
         try:
-            os.remove(tmp_archive)
-        except Exception:
-            pass
+            if is_zip:
+                import zipfile
+                with zipfile.ZipFile(tmp_archive, "r") as z:
+                    z.extractall(extract_tmp)
+            else:
+                import tarfile
+                with tarfile.open(tmp_archive, "r:gz") as tar:
+                    if hasattr(tarfile, "data_filter"):
+                        tar.extractall(extract_tmp, filter="data")
+                    else:
+                        tar.extractall(extract_tmp)
+
+            # Flatten all extracted files (handles nested llama-b*/ folders) into target_dir
+            for root, dirs, files in os.walk(extract_tmp):
+                for f_name in files:
+                    src_f = os.path.join(root, f_name)
+                    dst_f = os.path.join(target_dir, f_name)
+                    shutil.move(src_f, dst_f)
+        finally:
+            shutil.rmtree(extract_tmp, ignore_errors=True)
 
         if os.path.isfile(target_bin):
             if not is_win:
@@ -212,23 +245,30 @@ def auto_provision_llama_server() -> Optional[str]:
             return target_bin
     except Exception as exc:
         print(f"[Vigyan Pro] Auto-provision notice: {exc}")
+    finally:
+        if os.path.isfile(tmp_archive):
+            try:
+                os.remove(tmp_archive)
+            except Exception:
+                pass
     return None
 
 
 def find_model_path(preferred_path: Optional[str] = None) -> Optional[str]:
     """Discover bundled or local sovereign model weights:
 
-    1. preferred_path argument or VIGYAN_MODEL_PATH env
-    2. models/vigyan-3b-quad-master-iq3_m.gguf (bundled)
-    3. ~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf
-    4. /opt/vigyan-pro/models/vigyan-3b-quad-master-iq3_m.gguf
+    1. preferred_path argument (explicit caller request)
+    2. VIGYAN_MODEL_PATH env
+    3. models/vigyan-3b-quad-master-iq3_m.gguf (bundled)
+    4. ~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf
+    5. /opt/vigyan-pro/models/vigyan-3b-quad-master-iq3_m.gguf
     """
+    if preferred_path and os.path.isfile(os.path.expanduser(preferred_path)):
+        return os.path.abspath(os.path.expanduser(preferred_path))
+
     env_override = os.environ.get("VIGYAN_MODEL_PATH")
     if env_override and os.path.isfile(os.path.expanduser(env_override)):
         return os.path.abspath(os.path.expanduser(env_override))
-
-    if preferred_path and os.path.isfile(os.path.expanduser(preferred_path)):
-        return os.path.abspath(os.path.expanduser(preferred_path))
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(base_dir, ".."))
@@ -238,9 +278,10 @@ def find_model_path(preferred_path: Optional[str] = None) -> Optional[str]:
         os.path.join(base_dir, "models", "vigyan-3b-quad-master-iq3_m.gguf"),
         os.path.expanduser("~/.vigyan/models/vigyan-3b-quad-master-iq3_m.gguf"),
         os.path.expanduser("~/.vigyan/models/vl4b/vigyan-vl-4b-iq3_m.gguf"),
+        os.path.expanduser("~/.vigyan/models/vigyan-vl-4b-iq3_m.gguf"),
+        os.path.expanduser("~/.vigyan/models/vigyan-7b-quad-master-q4_k_m.gguf"),
+        os.path.expanduser("~/.vigyan/models/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"),
         "/opt/vigyan-pro/models/vigyan-3b-quad-master-iq3_m.gguf",
-        # Fallbacks for alternate quantized artifacts if 3b quad master is absent
-        os.path.expanduser("~/.vigyan/models/vigyan-1.5b-quad-master-q4_k_m.gguf"),
     ]
 
     for cand in candidates:
@@ -253,15 +294,16 @@ def find_model_path(preferred_path: Optional[str] = None) -> Optional[str]:
 def find_mmproj_path(model_path: Optional[str] = None, preferred_path: Optional[str] = None) -> Optional[str]:
     """Discover multimodal projector GGUF weights for vision-language models only:
 
-    1. preferred_path argument or VIGYAN_MMPROJ_PATH env
-    2. Alongside model_path: mmproj-vigyan-vl-4b-f16.gguf or mmproj-*.gguf (only if model is VL)
+    1. preferred_path argument (explicit caller request)
+    2. VIGYAN_MMPROJ_PATH env
+    3. Alongside model_path: mmproj-vigyan-vl-4b-f16.gguf or mmproj-*.gguf (only if model is VL)
     """
+    if preferred_path and os.path.isfile(os.path.expanduser(preferred_path)):
+        return os.path.abspath(os.path.expanduser(preferred_path))
+
     env_override = os.environ.get("VIGYAN_MMPROJ_PATH")
     if env_override and os.path.isfile(os.path.expanduser(env_override)):
         return os.path.abspath(os.path.expanduser(env_override))
-
-    if preferred_path and os.path.isfile(os.path.expanduser(preferred_path)):
-        return os.path.abspath(os.path.expanduser(preferred_path))
 
     # A multimodal projector is strictly for vision-language models
     if not model_path:
@@ -330,13 +372,12 @@ def _linux_preexec() -> None:
             os.nice(5)
         except Exception:
             pass
-        try:
-            import ctypes
-            libc = ctypes.CDLL("libc.so.6")
-            PR_SET_PDEATHSIG = 1
-            libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
-        except Exception:
-            pass
+        if _LIBC is not None:
+            try:
+                PR_SET_PDEATHSIG = 1
+                _LIBC.prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
+            except Exception:
+                pass
 
 
 class LlamaServerSupervisor:
@@ -550,18 +591,27 @@ class LlamaServerSupervisor:
         if self._extra_env:
             child_env.update(self._extra_env)
 
-        # Ensure LD_LIBRARY_PATH includes the directory of the binary for companion shared libraries
+        # Ensure companion shared libraries and DLLs are discoverable
         real_bin = self.server_bin
         if real_bin:
             bin_dir = os.path.dirname(os.path.realpath(real_bin))
-            cur_ld = child_env.get("LD_LIBRARY_PATH", "")
-            child_env["LD_LIBRARY_PATH"] = f"{bin_dir}:{cur_ld}" if cur_ld else bin_dir
+            if sys.platform == "win32":
+                cur_p = child_env.get("PATH", "")
+                child_env["PATH"] = f"{bin_dir};{cur_p}" if cur_p else bin_dir
+            elif sys.platform == "darwin":
+                cur_dy = child_env.get("DYLD_LIBRARY_PATH", "")
+                child_env["DYLD_LIBRARY_PATH"] = f"{bin_dir}:{cur_dy}" if cur_dy else bin_dir
+            else:
+                cur_ld = child_env.get("LD_LIBRARY_PATH", "")
+                child_env["LD_LIBRARY_PATH"] = f"{bin_dir}:{cur_ld}" if cur_ld else bin_dir
             child_env["GGML_BACKEND_PATH"] = bin_dir
 
         preexec = _linux_preexec if (self._die_with_parent and sys.platform.startswith("linux")) else None
         creationflags = 0
         if sys.platform == "win32":
-            creationflags = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000)
+            CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            BELOW_NORMAL_PRIORITY_CLASS = getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000)
+            creationflags = CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS
 
         self._process = subprocess.Popen(
             command,
@@ -605,7 +655,12 @@ class LlamaServerSupervisor:
         if process is None or process.poll() is None:
             return False
 
+        return_code = process.returncode
         self._process = None  # poll() reaped the dead process
+
+        if return_code in (-9, 137):
+            logger.warning("llama-server exited with signal %s (SIGKILL / OOM).", return_code)
+
         if self._restarts >= self._max_restarts:
             logger.error("llama-server exited again; giving up after %d restarts", self._restarts)
             return False
@@ -663,10 +718,25 @@ class LlamaServerSupervisor:
         """Hot-swap the active model by restarting llama-server (<400ms via mmap).
 
         Re-tunes thread count, context size, and GPU layer offload for the target model.
+        Includes Memory Sentinel safety check to prevent host OOM lockups.
         """
         target = os.path.abspath(os.path.expanduser(new_model_path))
         if not os.path.isfile(target):
             raise FileNotFoundError(f"GGUF model weights not found at: {target}")
+
+        # Memory Sentinel Check: ensure low-RAM hosts don't crash from loading giant models
+        try:
+            size_gb = os.path.getsize(target) / (1024 ** 3)
+            avail_ram = get_available_memory_gb()
+            hw = detect_hardware_profile()
+            if hw.get("tier") == "cpu_budget" and size_gb > (avail_ram + 0.5) and size_gb > 5.0:
+                logger.warning(
+                    "Memory Sentinel blocked swap: model size %.2f GB exceeds available RAM %.2f GB.",
+                    size_gb, avail_ram
+                )
+                return False
+        except Exception:
+            pass
 
         logger.info("Hot-swapping llama-server to new model weights: %s", target)
         self.stop()

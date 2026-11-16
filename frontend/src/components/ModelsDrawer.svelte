@@ -78,14 +78,10 @@
 
   function getModelTitle(m: ModelItem): string {
     const raw = (m.name || m.filename || "").replace(/\.gguf$/i, "").toLowerCase();
-    if (raw.includes("3b-quad-master")) return "Vigyan-3B Quad-Master";
-    if (raw.includes("1.5b-4x-moe") || raw.includes("1.5b-moe")) return "Vigyan-1.5B (4x MoE)";
-    if (raw.includes("2b-stem")) return "Vigyan-2B STEM Reasoner";
-    if (raw.includes("2b-reasoning")) return "Vigyan-2B Logic Reasoner";
-    if (raw.includes("7b-stem") || raw.includes("4th-gen-7b") || raw.includes("gen-4-7b")) return "Vigyan-7B STEM Engine";
-    if (raw.includes("silicon-rtl") || raw.includes("silicon-eda")) return "OLMo2-7B Silicon RTL & EDA";
-    if (raw.includes("biomed-chem")) return "OLMo2-7B BioMed & Chem";
+    if (raw.includes("3b")) return "Vigyan-3B Quad-Master";
     if (raw.includes("vl-4b") || raw.includes("vl4b")) return "Vigyan-VL-4B Multimodal";
+    if (raw.includes("7b")) return "Vigyan-7B Quad-Master";
+    if (raw.includes("14b") || raw.includes("r1")) return "Vigyan-R1-14B Reasoning";
     if (m.name && !m.name.toLowerCase().endsWith(".gguf") && m.name !== m.filename) {
       return m.name;
     }
@@ -96,10 +92,23 @@
   }
 
   function getModelSubtitle(m: ModelItem): string {
-    if (m.domain && m.domain.trim()) return m.domain;
-    if (/quad-master/i.test(m.filename)) return "Flagship Offline STEM Reasoner with CAS";
-    if (/7b/i.test(m.filename)) return "Deep Analytical Synthesis & Extended Proofs";
-    return "Local Sovereign Intelligence Engine";
+    const raw = (m.name || m.filename || "").toLowerCase();
+    if (raw.includes("3b")) return "Daily Driver: Fast STEM, Calculus & Exact Symbolic Mathematics";
+    if (raw.includes("vl-4b") || raw.includes("vl4b")) return "Vision-Language: Circuit Schematics, Waveforms & Diagrams";
+    if (raw.includes("7b")) return "Doctoral Proofs, Complex Engineering & Physical Science";
+    if (raw.includes("14b") || raw.includes("r1")) return "Frontier Step-by-Step Chain-of-Thought & Quantum Physics";
+    return m.domain || "Sovereign Physical Intelligence Engine";
+  }
+
+  function selectFlagship() {
+    const flagship = models.find(m => m.filename.includes("3b"));
+    if (flagship) {
+      if (flagship.is_installed) {
+        handleSwap(flagship);
+      } else {
+        handleDownload(flagship);
+      }
+    }
   }
 
   export async function downloadFlagship() {
@@ -762,13 +771,21 @@
                     <span>Active Engine</span>
                   </button>
                 {:else if isRamExceeded(m)}
-                  <button
-                    disabled
-                    class="px-3 py-1.5 rounded-lg text-xs font-mono bg-rose-950/30 border border-rose-500/30 text-rose-300 cursor-not-allowed"
-                    title="Exceeds host RAM: {m.ram_required_gb.toFixed(1)} GB required vs {hardware.total_ram_gb?.toFixed(1) || '7.0'} GB available"
-                  >
-                    RAM Exceeded
-                  </button>
+                  <div class="flex items-center gap-1.5">
+                    <span
+                      class="px-2 py-1 rounded text-[10px] font-mono bg-amber-950/40 border border-amber-500/25 text-amber-300"
+                      title="Exceeds host RAM: {m.ram_required_gb.toFixed(1)} GB required vs {hardware.total_ram_gb?.toFixed(1) || '7.0'} GB available"
+                    >
+                      Requires 16GB+ RAM
+                    </span>
+                    <button
+                      onclick={selectFlagship}
+                      class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer"
+                      title="Activate recommended 3B model"
+                    >
+                      Use 3B ›
+                    </button>
+                  </div>
                 {:else}
                   <button
                     onclick={() => handleSwap(m)}
@@ -808,17 +825,17 @@
                   {/if}
                 </button>
               {:else if isRamExceeded(m)}
-                <!-- RAM Safety Lockout for uninstalled models -->
+                <!-- RAM Safety Lockout for uninstalled models with Steve Jobs graceful guidance -->
                 <div class="flex items-center gap-2">
-                  <span class="text-[10px] font-mono text-rose-400/90 bg-rose-950/40 border border-rose-500/20 px-2 py-1 rounded" title="This model exceeds total system RAM and would cause the system to freeze.">
-                    Requires {m.ram_required_gb.toFixed(1)} GB RAM (Host: {hardware.total_ram_gb?.toFixed(1) || '7.0'} GB)
+                  <span class="text-[10px] font-mono text-amber-300/90 bg-amber-950/40 border border-amber-500/25 px-2 py-1 rounded" title="This model requires 16GB+ RAM. Recommended: Vigyan-3B Quad-Master.">
+                    Requires 16GB+ RAM
                   </span>
                   <button
-                    disabled
-                    class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-white/5 border border-white/10 text-neutral-500 cursor-not-allowed"
-                    title="Disabled: Insufficient host RAM"
+                    onclick={selectFlagship}
+                    class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1"
+                    title="Install recommended 3B model"
                   >
-                    Locked
+                    Use Recommended 3B ›
                   </button>
                 </div>
               {:else}

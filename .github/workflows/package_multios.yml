@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release Version (e.g. 3.3.1)'
+        description: 'Release Version (e.g. 5.0.0)'
         required: true
-        default: '3.3.1'
+        default: '5.0.0'
   push:
     tags:
       - 'v*'
@@ -51,11 +51,12 @@ jobs:
         run: |
           mkdir -p bin
 
-          # 1. Windows x64 binary
+          # 1. Windows x64 binary + companion DLLs
           echo "Fetching Windows x64 llama-server..."
           curl -sL https://github.com/ggml-org/llama.cpp/releases/download/b12034/llama-b12034-bin-win-cpu-x64.zip -o win_llama.zip
           unzip -q -o win_llama.zip -d win_llama_tmp
           find win_llama_tmp -name "llama-server.exe" -exec cp {} bin/llama-server.exe \;
+          find win_llama_tmp -name "*.dll" -exec cp {} bin/ \;
           rm -rf win_llama.zip win_llama_tmp
 
           # 2. macOS arm64 binary

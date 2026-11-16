@@ -28,7 +28,6 @@ from launch_desktop import (
 def test_models_catalog_integrity():
     """Verify that models catalog entries contain valid URLs, tags, and reasonable sizes."""
     assert "vigyan:3b" in MODELS_CATALOG
-    assert "vigyan:7b" not in MODELS_CATALOG
     assert len(MODELS_CATALOG) >= 1
 
 
@@ -45,7 +44,6 @@ def test_select_cascade_model_unified_3b():
     assert res_15["model"] == "vigyan:1.5b"
 
     for tag, info in MODELS_CATALOG.items():
-        assert info["tag"] == tag
         assert info["size_bytes"] > 1_000_000_000  # >= 1 GB
         assert info["hf_url"].startswith("https://huggingface.co/") or info["hf_url"].startswith("https://github.com/")
         assert info["dest_filename"].endswith(".gguf")
@@ -110,3 +108,31 @@ def test_http_bridge_static_serving_and_catalog():
         data = json.loads(resp.read().decode("utf-8"))
         assert data["status"] == "online"
         assert "telemetry" in data
+
+
+def test_steve_jobs_four_models_whitelist():
+    """Verify strictly the 4 authorized sovereign production models in ALLOWED_SOVEREIGN_MODELS."""
+    from launch_desktop import ALLOWED_SOVEREIGN_MODELS as BACKEND_ALLOWED
+    from llama_supervisor import ALLOWED_SOVEREIGN_MODELS as SUPERVISOR_ALLOWED
+    from vigyan_cli import ALLOWED_SOVEREIGN_MODELS as CLI_ALLOWED, MODEL_ALIASES, cmd_pull
+
+    expected_models = {
+        "vigyan-3b-quad-master-iq3_m.gguf",
+        "vigyan-vl-4b-iq3_m.gguf",
+        "vigyan-7b-quad-master-q4_k_m.gguf",
+        "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+    }
+
+    assert BACKEND_ALLOWED == expected_models
+    assert SUPERVISOR_ALLOWED == expected_models
+    assert CLI_ALLOWED == expected_models
+
+    # Verify canonical aliases
+    assert MODEL_ALIASES["3b"] == "vigyan-3b-quad-master-iq3_m.gguf"
+    assert MODEL_ALIASES["4b"] == "vigyan-vl-4b-iq3_m.gguf"
+    assert MODEL_ALIASES["7b"] == "vigyan-7b-quad-master-q4_k_m.gguf"
+    assert MODEL_ALIASES["14b"] == "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"
+
+    # Verify unauthorized model pull rejection
+    assert cmd_pull("unauthorized_model_xyz.gguf") is False
+

@@ -95,7 +95,10 @@
     try {
       if (key === "temperature") localStorage.setItem("vigyan_pref_temperature", String(value));
       if (key === "cpu_threads") localStorage.setItem("vigyan_pref_threads", String(value));
-      if (key === "context_window") localStorage.setItem("vigyan_pref_ctx", String(value));
+      if (key === "context_window") {
+        localStorage.setItem("vigyan_pref_ctx", String(value));
+        localStorage.setItem("vigyan_context_budget", String(value));
+      }
       if (key === "font_size") {
         localStorage.setItem("vigyan_pref_font_size", value);
         if (onFontSizeChange) onFontSizeChange(value);
@@ -279,7 +282,7 @@
         <!-- CPU Threading Clamp -->
         <div class="space-y-1.5 pt-2 border-t border-white/10">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-neutral-300 font-medium">CPU Compute Threads</span>
+            <label for="threads-slider" class="text-xs text-neutral-300 font-medium">CPU Compute Threads</label>
             <span class="text-xs font-mono text-white font-semibold">{cpuThreads} of {maxThreads} cores</span>
           </div>
           <p class="text-[10px] text-neutral-500 leading-normal">
@@ -287,7 +290,7 @@
           </p>
           <div class="flex items-center gap-2 pt-1">
             <input
-              id="temp-slider"
+              id="threads-slider"
               type="range"
               min="1"
               max={maxThreads}

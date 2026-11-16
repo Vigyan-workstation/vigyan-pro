@@ -5,8 +5,14 @@
 /* ─── Global Reset ─────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ClearType Protection on standard-DPI displays; antialiased on high-DPI screens */
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+  *, *::before, *::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
 html, body {

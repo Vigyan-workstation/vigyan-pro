@@ -128,6 +128,13 @@
 
   onMount(() => {
     if (isPlot) setTimeout(renderPlot, 60);
+    return () => {
+      if (plotEl && (window as any).Plotly) {
+        try {
+          (window as any).Plotly.purge(plotEl);
+        } catch {}
+      }
+    };
   });
 
   $effect(() => {

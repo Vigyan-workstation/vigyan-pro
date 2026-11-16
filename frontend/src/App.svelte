@@ -56,6 +56,30 @@
     } catch (e) {}
   }
 
+  async function handleSegmentClick(fname: string) {
+    try {
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["X-Vigyan-Token"] = token;
+      const res = await fetch(`${host}/api/models/swap`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ filename: fname })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        activeModelName = data.active_model || fname;
+        model = activeModelName;
+      } else {
+        // Model not installed or RAM exceeded: open drawer to let user download or view guidance
+        modelsOpen = true;
+      }
+    } catch {
+      modelsOpen = true;
+    }
+  }
+
   async function handleCancelDownload(dl: any) {
     try {
       const host = getAgentHost();
@@ -76,12 +100,19 @@
       if (isMeta && e.key.toLowerCase() === "k") {
         e.preventDefault();
         chatStore.clear();
-      } else if (isMeta && e.key.toLowerCase() === "m") {
+      } else if (isMeta && (e.key.toLowerCase() === "o" || (e.shiftKey && e.key.toLowerCase() === "m"))) {
         e.preventDefault();
         modelsOpen = !modelsOpen;
       } else if (isMeta && e.key === ",") {
         e.preventDefault();
         settingsOpen = !settingsOpen;
+      } else if (isMeta && e.key.toLowerCase() === "w") {
+        if (modelsOpen || settingsOpen || artifactStore.activeArtifact) {
+          e.preventDefault();
+          if (modelsOpen) modelsOpen = false;
+          if (settingsOpen) settingsOpen = false;
+          if (artifactStore.activeArtifact) artifactStore.closeArtifact();
+        }
       } else if (e.key === "Escape") {
         if (modelsOpen) modelsOpen = false;
         if (settingsOpen) settingsOpen = false;
@@ -156,41 +187,49 @@
       <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0</span>
     </div>
 
-    <!-- Center: Whisper-Quiet Status Capsule (Clickable to open Models Drawer) -->
-    <button
-      onclick={() => (modelsOpen = !modelsOpen)}
-      class="hidden sm:flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.07] text-[11px] text-[#9ca3af] hover:text-white select-none transition-all cursor-pointer shadow-sm"
-      title={activeDownload
-        ? `${activeDownload.status === 'paused' ? 'Paused' : 'Downloading'} ${activeDownload.name || activeDownload.filename}: ${activeDownload.progress_pct.toFixed(0)}% • Click to open models`
-        : ollamaConnected
-        ? `Sovereign Engine Active • ${activeModelName || 'Vigyan'} • ${ramUsedGb}G / ${ramTotalGb}G RAM (${ramPercent}%) • Click to manage models (Cmd+M)`
-        : "Connecting to local engine… Click to open Models (Cmd+M)"}
-    >
+    <!-- Center: Steve Jobs 4-Model Segmented Switcher & Live Engine Status -->
+    <div class="hidden sm:flex items-center gap-2.5">
+      <nav class="flex items-center p-0.5 rounded-full bg-white/[0.04] border border-white/[0.08]" aria-label="Sovereign model switcher">
+        {#each [
+          { id: "3b", label: "3B Daily", fname: "vigyan-3b-quad-master-iq3_m.gguf" },
+          { id: "4b", label: "4B Vision", fname: "vigyan-vl-4b-iq3_m.gguf" },
+          { id: "7b", label: "7B Doctoral", fname: "vigyan-7b-quad-master-q4_k_m.gguf" },
+          { id: "14b", label: "14B Frontier", fname: "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf" }
+        ] as seg}
+          {@const isActive = activeModelName.includes(seg.id) || (seg.id === "3b" && (!activeModelName || (!activeModelName.includes("4b") && !activeModelName.includes("7b") && !activeModelName.includes("14b"))))}
+          <button
+            onclick={() => handleSegmentClick(seg.fname)}
+            class="px-2.5 py-0.5 rounded-full text-[11px] font-mono transition-all cursor-pointer {isActive
+              ? 'bg-white/15 text-white font-medium shadow-sm'
+              : 'text-neutral-400 hover:text-white hover:bg-white/[0.05]'}"
+            title="Switch to {seg.label} (Click to activate or download)"
+          >
+            {seg.label}
+          </button>
+        {/each}
+      </nav>
+
       {#if activeDownload && (activeDownload.status === "downloading" || activeDownload.status === "starting")}
-        <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
-        <span class="font-mono text-sky-400 font-medium">
-          ⬇ {activeDownload.progress_pct.toFixed(0)}%
-        </span>
-        <span class="text-neutral-400 truncate max-w-[140px]">
-          ({activeDownload.speed_mbps.toFixed(1)} MB/s{activeDownload.eta_formatted ? ` • ${activeDownload.eta_formatted}` : ''})
-        </span>
-      {:else if activeDownload && activeDownload.status === "paused"}
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-        <span class="font-mono text-amber-400 font-medium">
-          ⏸ Paused ({activeDownload.progress_pct.toFixed(0)}%)
-        </span>
+        <button
+          onclick={() => (modelsOpen = true)}
+          class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/25 text-[10px] font-mono text-sky-400 cursor-pointer animate-pulse"
+          title="Downloading {activeDownload.name || activeDownload.filename}: {activeDownload.progress_pct.toFixed(0)}%"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+          <span>⬇ {activeDownload.progress_pct.toFixed(0)}%</span>
+        </button>
       {:else}
-        <span
-          class="w-1.5 h-1.5 rounded-full transition-all duration-300 {ollamaConnected
-            ? 'bg-[#10b981] shadow-[0_0_6px_#10b981]'
-            : 'bg-[#f59e0b] shadow-[0_0_6px_#f59e0b] animate-pulse'}"
-        ></span>
-        <span class="font-medium tracking-wide text-[#cbd5e1] truncate max-w-[200px]">
-          {ollamaConnected ? (activeModelName ? activeModelName.replace(/\.gguf$/i, '') : "Offline & Grounded") : "Connecting…"}
-        </span>
+        <div
+          class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono text-neutral-500"
+          title="RAM: {ramUsedGb}G / {ramTotalGb}G ({ramPercent}%)"
+        >
+          <span
+            class="w-1.5 h-1.5 rounded-full {ollamaConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}"
+          ></span>
+          <span>{ollamaConnected ? 'Offline' : 'Connecting'}</span>
+        </div>
       {/if}
-      <span class="text-[9px] font-mono text-neutral-500 ml-0.5">▼</span>
-    </button>
+    </div>
 
     <!-- Right: Frictionless Executive Actions -->
     <div class="flex items-center gap-1.5">
@@ -208,7 +247,7 @@
       <button
         onclick={() => (modelsOpen = !modelsOpen)}
         class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono text-[#9ca3af] hover:text-white hover:bg-white/[0.05] transition-all cursor-pointer border border-transparent"
-        title="Intelligence Models (Cmd+M)"
+        title="Intelligence Models (Cmd+Shift+M or Cmd+O)"
       >
         <svg class="w-3.5 h-3.5 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>

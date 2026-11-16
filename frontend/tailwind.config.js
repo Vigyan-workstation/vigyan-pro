@@ -22,6 +22,7 @@ export default {
           "-apple-system",
           "BlinkMacSystemFont",
           '"SF Pro Text"',
+          '"Segoe UI Variable Text"',
           '"Segoe UI"',
           "Inter",
           "system-ui",

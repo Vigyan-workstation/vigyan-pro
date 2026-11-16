@@ -19,6 +19,8 @@ try:
 except ImportError:
     psutil = None
 
+WIN_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+
 
 def get_windows_telemetry(mode: str = "auto") -> dict:
     """Detect Windows GPU (NVIDIA SMI or WMI VideoController), CPU physical cores, RAM, and battery."""
@@ -58,7 +60,8 @@ def get_windows_telemetry(mode: str = "auto") -> dict:
     try:
         res = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=0.35
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=0.35,
+            creationflags=WIN_NO_WINDOW
         )
         if res.returncode == 0 and res.stdout.strip():
             parts = [p.strip() for p in res.stdout.strip().splitlines()[0].split(",")]
@@ -77,7 +80,8 @@ def get_windows_telemetry(mode: str = "auto") -> dict:
             # 1. Try modern PowerShell CIM query (works on Windows 10 and Windows 11 24H2)
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -Property Name,AdapterRAM | ConvertTo-Csv -NoTypeInformation"],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.0
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.0,
+                creationflags=WIN_NO_WINDOW
             )
             if res.returncode == 0 and res.stdout.strip():
                 for line in res.stdout.splitlines():
@@ -99,7 +103,8 @@ def get_windows_telemetry(mode: str = "auto") -> dict:
                 # 2. Legacy WMIC fallback
                 res = subprocess.run(
                     ["wmic", "path", "win32_VideoController", "get", "Name,AdapterRAM", "/format:csv"],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=0.6
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=0.6,
+                    creationflags=WIN_NO_WINDOW
                 )
                 if res.returncode == 0:
                     for line in res.stdout.splitlines():
@@ -227,6 +232,11 @@ def launch_webview2():
         f"--app={target_url}",
         f"--user-data-dir={edge_profile_dir}",
         "--window-size=1340,760",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-features=Translate,msEdgeSidebarV2,PrivacySandboxSettings4",
+        "--disable-infobars",
+        "--app-auto-launched",
         "--enable-features=OverlayScrollbar",
         "--force-dark-mode"
     ]

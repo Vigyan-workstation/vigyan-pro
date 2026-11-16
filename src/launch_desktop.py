@@ -1081,136 +1081,92 @@ def _build_model_candidates(filename: str) -> List[str]:
     return cands
 
 
-VERIFIED_EXPERIMENTLAB_MODELS = [
+ALLOWED_SOVEREIGN_MODELS = {
+    "vigyan-3b-quad-master-iq3_m.gguf",     # Daily Driver (3B)
+    "vigyan-vl-4b-iq3_m.gguf",              # Multimodal Vision (4B)
+    "vigyan-7b-quad-master-q4_k_m.gguf",     # Doctoral STEM (7B)
+    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"  # Deep R1 Reasoning (14B)
+}
+
+SOVEREIGN_PRODUCTION_MODELS = [
     {
         "id": "vigyan-3b-quad-master-iq3_m",
         "name": "Vigyan-3B Quad-Master",
         "tag": "vigyan-3b",
-        "filename": "vigyan-3b-quad-master-iq3_m.gguf",
-        "size_bytes": 1488894752,
-        "size_formatted": "1.39 GB",
-        "ram_required_gb": 4.0,
-        "domain": "Flagship STEM, Calculus & Exact CAS",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
-    },
-    {
-        "id": "vigyan-2b-stem-q4_k_m",
-        "name": "Vigyan-2B STEM Reasoner",
-        "tag": "vigyan-2b-stem",
-        "filename": "vigyan-2b-stem-q4_k_m.gguf",
-        "size_bytes": 1170000000,
-        "size_formatted": "1.09 GB",
-        "ram_required_gb": 3.0,
-        "domain": "Fast Real Analysis & Theorem Prover",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-stem-q4_k_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
-    },
-    {
-        "id": "vigyan-2b-reasoning-q4_k_m",
-        "name": "Vigyan-2B Reasoning",
-        "tag": "vigyan-2b-reasoning",
-        "filename": "vigyan-2b-reasoning-q4_k_m.gguf",
-        "size_bytes": 1170000000,
-        "size_formatted": "1.09 GB",
-        "ram_required_gb": 3.0,
-        "domain": "Deterministic Logic & Multi-Step Reasoning",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-reasoning-q4_k_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
-    },
-    {
-        "id": "vigyan-1.5b-4x-moe",
-        "name": "Vigyan-1.5B 4x-MoE",
-        "tag": "vigyan-1.5b-moe",
-        "filename": "vigyan-1.5b-4x-moe.Q4_K_M.gguf",
-        "size_bytes": 3920000000,
-        "size_formatted": "3.65 GB",
-        "ram_required_gb": 4.5,
-        "domain": "High-Velocity Top-2 MoE Calculus",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-1.5B-4x-MoE/resolve/main/vigyan-1.5b-4x-moe.Q4_K_M.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-1.5B-4x-MoE",
-    },
-    {
-        "id": "vigyan-7b-stem-q4_k_m",
-        "name": "Vigyan-7B STEM Instruct",
-        "tag": "vigyan-7b-stem",
-        "filename": "vigyan-7b-stem-q4_k_m.gguf",
-        "size_bytes": 4467000000,
-        "size_formatted": "4.16 GB",
-        "ram_required_gb": 8.0,
-        "domain": "Comprehensive Science & Physical Engineering",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-7b-stem-q4_k_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
-    },
-    {
-        "id": "vigyan-7b-quad-master-q4_k_m",
-        "name": "Vigyan-7B Quad-Master",
-        "tag": "vigyan-7b-quad",
-        "filename": "vigyan-7b-quad-master-q4_k_m.gguf",
-        "size_bytes": 4467000000,
-        "size_formatted": "4.16 GB",
-        "ram_required_gb": 8.0,
-        "domain": "Doctoral Proofs & Advanced Symbolic Algebra",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-olmo2-7b-quad-master/resolve/main/vigyan-7b-quad-master-q4_k_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-olmo2-7b-quad-master",
-    },
-    {
-        "id": "vigyan-r1-14b-health-semi-quantum",
-        "name": "Vigyan-R1-14B Biomedical Quantum",
-        "tag": "vigyan-r1-14b",
-        "filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
-        "size_bytes": 6917000000,
-        "size_formatted": "6.44 GB",
-        "ram_required_gb": 10.0,
-        "domain": "Biomedical, Molecular Dynamics & Quantum Circuits",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf/resolve/main/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf",
-    },
-    {
-        "id": "vigyan-125m-q4_k_m",
-        "name": "Vigyan-125M Canary Reasoner",
-        "tag": "vigyan-125m",
-        "filename": "vigyan-125m-q4_k_m.gguf",
-        "size_bytes": 150000000,
-        "size_formatted": "0.14 GB",
-        "ram_required_gb": 1.0,
-        "domain": "Ultra-Fast Micro-Edge Canary Model",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-125m-158bit-gguf/resolve/main/vigyan-125m-q4_k_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-125m-158bit-gguf",
-    }
-]
-
-MODELS_CATALOG = {
-    "vigyan:3b": {
-        "id": "vigyan-3b-quad-master-iq3_m",
-        "name": "Vigyan-3B Quad-Master",
-        "tag": "vigyan:3b",
+        "short_label": "3B Daily Driver",
         "filename": "vigyan-3b-quad-master-iq3_m.gguf",
         "dest_filename": "vigyan-3b-quad-master-iq3_m.gguf",
         "size_bytes": 1488894752,
         "size_formatted": "1.39 GB",
         "ram_required_gb": 4.0,
-        "domain": "Flagship STEM, Calculus & Exact CAS",
+        "domain": "Fast STEM, Calculus & Exact Symbolic Mathematics",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
         "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
         "template": "{{ prompt }}",
         "stop": ["<|endoftext|>", "<|im_end|>"]
     },
-    "vigyan:1.5b": {
-        "id": "vigyan-1.5b-4x-moe",
-        "name": "Vigyan-1.5B 4x-MoE",
-        "tag": "vigyan:1.5b",
-        "filename": "vigyan-1.5b-4x-moe.Q4_K_M.gguf",
-        "dest_filename": "vigyan-1.5b-4x-moe.Q4_K_M.gguf",
-        "size_bytes": 3920000000,
-        "size_formatted": "3.65 GB",
-        "ram_required_gb": 4.5,
-        "domain": "High-Velocity Top-2 MoE Calculus",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-1.5B-4x-MoE/resolve/main/vigyan-1.5b-4x-moe.Q4_K_M.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-1.5B-4x-MoE",
+    {
+        "id": "vigyan-vl-4b-iq3_m",
+        "name": "Vigyan-VL-4B Multimodal",
+        "tag": "vigyan-vl-4b",
+        "short_label": "4B Vision",
+        "filename": "vigyan-vl-4b-iq3_m.gguf",
+        "dest_filename": "vigyan-vl-4b-iq3_m.gguf",
+        "size_bytes": 2980000000,
+        "size_formatted": "2.78 GB",
+        "ram_required_gb": 5.0,
+        "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
+        "template": "{{ prompt }}",
+        "stop": ["<|endoftext|>", "<|im_end|>"]
+    },
+    {
+        "id": "vigyan-7b-quad-master-q4_k_m",
+        "name": "Vigyan-7B Quad-Master",
+        "tag": "vigyan-7b-quad",
+        "short_label": "7B Doctoral",
+        "filename": "vigyan-7b-quad-master-q4_k_m.gguf",
+        "dest_filename": "vigyan-7b-quad-master-q4_k_m.gguf",
+        "size_bytes": 4467000000,
+        "size_formatted": "4.16 GB",
+        "ram_required_gb": 8.0,
+        "domain": "Doctoral Proofs, Complex Engineering & Physical Science",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-olmo2-7b-quad-master/resolve/main/vigyan-7b-quad-master-q4_k_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-olmo2-7b-quad-master",
+        "template": "{{ prompt }}",
+        "stop": ["<|endoftext|>", "<|im_end|>"]
+    },
+    {
+        "id": "vigyan-r1-14b-health-semi-quantum",
+        "name": "Vigyan-R1-14B Reasoning",
+        "tag": "vigyan-r1-14b",
+        "short_label": "14B Frontier",
+        "filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+        "dest_filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+        "size_bytes": 6917000000,
+        "size_formatted": "6.44 GB",
+        "ram_required_gb": 10.0,
+        "domain": "Frontier Step-by-Step Chain-of-Thought & Quantum Physics",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf/resolve/main/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf",
         "template": "{{ prompt }}",
         "stop": ["<|endoftext|>", "<|im_end|>"]
     }
+]
+
+VERIFIED_EXPERIMENTLAB_MODELS = SOVEREIGN_PRODUCTION_MODELS
+
+MODELS_CATALOG = {
+    "vigyan:3b": SOVEREIGN_PRODUCTION_MODELS[0],
+    "vigyan-3b-quad-master-iq3_m": SOVEREIGN_PRODUCTION_MODELS[0],
+    "vigyan-3b": SOVEREIGN_PRODUCTION_MODELS[0],
+    "vigyan:4b": SOVEREIGN_PRODUCTION_MODELS[1],
+    "vigyan-vl-4b-iq3_m": SOVEREIGN_PRODUCTION_MODELS[1],
+    "vigyan:7b": SOVEREIGN_PRODUCTION_MODELS[2],
+    "vigyan-7b-quad-master-q4_k_m": SOVEREIGN_PRODUCTION_MODELS[2],
+    "vigyan:14b": SOVEREIGN_PRODUCTION_MODELS[3],
+    "vigyan-r1-14b-health-semi-quantum-iq3_m": SOVEREIGN_PRODUCTION_MODELS[3],
 }
 
 
@@ -1336,6 +1292,10 @@ class ModelDownloadManager:
                     elif resp.headers.get("Content-Length") and existing_bytes == 0:
                         total = int(resp.headers.get("Content-Length"))
 
+                    # If server returned HTTP 200 instead of 206 Partial Content, reset from offset 0
+                    if getattr(resp, "status", 200) == 200 and existing_bytes > 0:
+                        existing_bytes = 0
+
                     mode = "ab" if existing_bytes > 0 else "wb"
                     with open(part_file, mode) as f:
                         while True:
@@ -1389,9 +1349,24 @@ class ModelDownloadManager:
                 with open(part_file, "rb") as check_f:
                     magic = check_f.read(4)
                     if magic != b"GGUF":
+                        if os.path.exists(part_file):
+                            try:
+                                os.remove(part_file)
+                            except Exception:
+                                pass
                         raise ValueError(f"Corrupted binary: invalid GGUF magic header ({magic!r})")
 
                 # Atomic replace with retry for Windows file locks
+                from llama_supervisor import LLAMA_SUPERVISOR
+                was_active = False
+                if LLAMA_SUPERVISOR and LLAMA_SUPERVISOR.is_alive():
+                    try:
+                        if os.path.abspath(LLAMA_SUPERVISOR.model_path or "") == os.path.abspath(dest_file):
+                            LLAMA_SUPERVISOR.stop()
+                            was_active = True
+                    except Exception:
+                        pass
+
                 replaced = False
                 for attempt in range(5):
                     try:
@@ -1408,6 +1383,12 @@ class ModelDownloadManager:
 
                 if not replaced:
                     os.rename(part_file, dest_file)
+
+                if was_active and LLAMA_SUPERVISOR:
+                    try:
+                        LLAMA_SUPERVISOR.start()
+                    except Exception:
+                        pass
 
                 with self._lock:
                     self.active_downloads[tag]["status"] = "ready"
@@ -1602,32 +1583,12 @@ def _scan_and_cache_hf_repos(cache_file: str) -> List[Dict[str, Any]]:
 
 
 def fetch_dynamic_hf_catalog(force_refresh: bool = False) -> List[Dict[str, Any]]:
-    """Scan all public Hugging Face repos under Experimentlab and author accounts dynamically."""
-    cache_file = os.path.expanduser("~/.vigyan/models/hf_catalog_cache.json")
-    now = time.time()
-
-    if not force_refresh:
-        if os.path.isfile(cache_file):
-            try:
-                with open(cache_file, "r") as f:
-                    data = json.load(f)
-                    if now - data.get("timestamp", 0) < 600:
-                        cached = data.get("models", [])
-                        if cached:
-                            return cached
-            except Exception:
-                pass
-        # Return verified catalog immediately and refresh in background
-        threading.Thread(target=lambda: _scan_and_cache_hf_repos(cache_file), daemon=True).start()
-        return list(VERIFIED_EXPERIMENTLAB_MODELS)
-
-    # Explicit force refresh requested by user
-    scanned = _scan_and_cache_hf_repos(cache_file)
-    return scanned if scanned else list(VERIFIED_EXPERIMENTLAB_MODELS)
+    """Return strictly the authorized sovereign production models (100% offline)."""
+    return list(SOVEREIGN_PRODUCTION_MODELS)
 
 
 def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
-    """Dynamically discover models from Experimentlab and local ~/.vigyan/models/."""
+    """Dynamically discover models from the authorized production registry and local ~/.vigyan/models/."""
     from llama_supervisor import detect_hardware_profile
     hw = detect_hardware_profile()
     avail_ram = hw.get("avail_ram_gb", 4.0)
@@ -1652,11 +1613,10 @@ def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
     active_path = LLAMA_SUPERVISOR.model_path or ""
     active_filename = os.path.basename(active_path) if active_path else ""
 
-    dynamic_models = fetch_dynamic_hf_catalog(force_refresh=force_refresh)
     result_models = []
     seen_filenames = set()
 
-    for m in dynamic_models:
+    for m in SOVEREIGN_PRODUCTION_MODELS:
         fname = m["filename"]
         seen_filenames.add(fname)
         is_installed = fname in local_files
@@ -1684,37 +1644,8 @@ def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
         })
         result_models.append(item)
 
-    for m in VERIFIED_EXPERIMENTLAB_MODELS:
-        fname = m["filename"]
-        if fname not in seen_filenames:
-            seen_filenames.add(fname)
-            is_installed = fname in local_files
-            is_active = is_installed and (fname == active_filename)
-            actual_size = local_files.get(fname, m["size_bytes"])
-
-            req_ram = m.get("ram_required_gb", 4.0)
-            if avail_ram >= req_ram:
-                comp = "verified"
-                badge = f"Verified for your {total_ram}GB RAM"
-            elif total_ram >= req_ram:
-                comp = "tight"
-                badge = "Tight RAM (Runs on CPU)"
-            else:
-                comp = "incompatible"
-                badge = f"Requires {req_ram}GB RAM"
-
-            item = dict(m)
-            item.update({
-                "is_installed": is_installed,
-                "is_active": is_active,
-                "actual_size_bytes": actual_size,
-                "compatibility": comp,
-                "compatibility_badge": badge,
-            })
-            result_models.append(item)
-
     for fname, size in local_files.items():
-        if fname not in seen_filenames:
+        if fname in ALLOWED_SOVEREIGN_MODELS and fname not in seen_filenames:
             is_active = (fname == active_filename)
             size_gb = round(size / (1024 ** 3), 2)
             result_models.append({
@@ -1725,7 +1656,7 @@ def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
                 "size_bytes": size,
                 "size_formatted": f"{size_gb} GB",
                 "ram_required_gb": max(2.0, round(size_gb * 1.5, 1)),
-                "domain": "Local Custom Model",
+                "domain": "Local Sovereign Engine",
                 "hf_url": "",
                 "hf_repo": "local",
                 "is_installed": True,
@@ -1750,6 +1681,11 @@ def get_models_catalog(force_refresh: bool = False) -> Dict[str, Any]:
         if "-" in tag:
             colon_tag = tag.replace("-", ":", 1)
             legacy_catalog[colon_tag] = {**m, "dest_filename": m["filename"]}
+
+    # Guarantee canonical alias tags (vigyan:3b, vigyan:4b, vigyan:7b, vigyan:14b) are always present
+    for canon_tag, canon_item in MODELS_CATALOG.items():
+        if canon_tag not in legacy_catalog:
+            legacy_catalog[canon_tag] = dict(canon_item)
 
     return {
         "models": result_models,
@@ -2280,6 +2216,7 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
         pass  # Keep console clean
 
     def _check_auth(self) -> bool:
+        import hmac
         token = self.headers.get("X-Vigyan-Token", "")
         if not token:
             auth = self.headers.get("Authorization", "")
@@ -2289,13 +2226,13 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
             from urllib.parse import parse_qs, urlparse
             qs = parse_qs(urlparse(self.path).query)
             token = qs.get("token", [""])[0]
-        return token == _SESSION_TOKEN
+        return bool(token and hmac.compare_digest(token, _SESSION_TOKEN))
 
     def _send_cors(self, status=200, content_type="application/json"):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         origin = self.headers.get("Origin", "")
-        if origin.startswith("http://127.0.0.1:") or origin.startswith("http://localhost:") or origin == "null" or not origin:
+        if origin.startswith("http://127.0.0.1:") or origin.startswith("http://localhost:") or not origin:
             self.send_header("Access-Control-Allow-Origin", origin if origin else "http://127.0.0.1")
             self.send_header("Access-Control-Allow-Credentials", "true")
         else:
@@ -2468,9 +2405,12 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             target_item = None
             catalog = get_models_catalog()
             for m in catalog.get("models", []):
-                if m.get("filename") == filename or m.get("id") == filename or m.get("name") == filename:
+                if (m.get("filename") == filename or m.get("id") == filename or 
+                    m.get("name") == filename or m.get("tag") == filename):
                     target_item = m
                     break
+            if not target_item and filename in MODELS_CATALOG:
+                target_item = MODELS_CATALOG[filename]
             if not target_item:
                 target_item = {
                     "filename": filename,
@@ -2496,6 +2436,22 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 self._send_cors(404)
                 self.wfile.write(json.dumps({"success": False, "error": f"Model not found on disk: {filename}"}).encode("utf-8"))
                 return
+
+            # Pre-flight RAM safety check: protect host from OOM lockups
+            try:
+                from llama_supervisor import get_available_memory_gb, detect_hardware_profile
+                model_sz_gb = os.path.getsize(target_path) / (1024 ** 3)
+                avail_gb = get_available_memory_gb()
+                hw = detect_hardware_profile()
+                if hw.get("tier") == "cpu_budget" and model_sz_gb > (avail_gb + 0.5) and model_sz_gb > 5.0:
+                    self._send_cors(422)
+                    self.wfile.write(json.dumps({
+                        "success": False,
+                        "error": f"Activation prevented to protect your PC from freezing: {filename} requires ~{model_sz_gb:.1f} GB RAM, but only {avail_gb:.1f} GB is currently available."
+                    }).encode("utf-8"))
+                    return
+            except Exception:
+                pass
 
             prev_model = LLAMA_SUPERVISOR.model_path
             try:
@@ -2745,7 +2701,6 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     "<|im_end|>",
                     "<|endoftext|>",
                     "</sstream>",
-                    "<solution>",
                     "</solution>",
                     "User:",
                     "\n\nUser",
@@ -2829,8 +2784,8 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                                         delta = choices[0].get("delta", {})
                                         tok = delta.get("content", "")
                                         if tok:
-                                            if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
-                                                clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
+                                            if "</sstream>" in tok or "</solution>" in tok:
+                                                clean_tok = tok.replace("</sstream>", "").replace("</solution>", "")
                                                 if clean_tok.strip():
                                                     accumulated_text += clean_tok
                                                     _emit("token", clean_tok)
@@ -2850,10 +2805,10 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                             "model": active_model,
                             "messages": model_messages,
                             "options": {
-                                "num_gpu": hybrid["num_gpu"],
-                                "num_thread": hybrid["num_thread"],
+                                "num_gpu": telemetry.get("gpu", {}).get("num_gpu", 0),
+                                "num_thread": user_cfg.get("cpu_threads", 4),
                                 "num_ctx": target_ctx,
-                                "num_batch": hybrid.get("num_batch", 256),
+                                "num_batch": 256,
                                 "num_predict": min(target_ctx, 4096),
                                 "repeat_penalty": 1.15,
                                 "repeat_last_n": 64,
@@ -2879,8 +2834,8 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                                 chunk = json.loads(line_s)
                                 tok = chunk.get("message", {}).get("content", "")
                                 if tok:
-                                    if "</sstream>" in tok or "<solution>" in tok or "</solution>" in tok:
-                                        clean_tok = tok.replace("</sstream>", "").replace("<solution>", "").replace("</solution>", "")
+                                    if "</sstream>" in tok or "</solution>" in tok:
+                                        clean_tok = tok.replace("</sstream>", "").replace("</solution>", "")
                                         if clean_tok.strip():
                                             accumulated_text += clean_tok
                                             _emit("token", clean_tok)

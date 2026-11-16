@@ -56,10 +56,10 @@
   }
 
   const STARTERS = [
-    { badge: "RLC", label: "Transient Analysis", prompt: "Derive the step response and damping ratio of an underdamped series RLC circuit with R=20 Ohm, L=0.1 H, and C=100 uF." },
-    { badge: "CAS", label: "Symbolic Calculus", prompt: "Evaluate the analytical integral of x^2 * exp(-x) dx from 0 to infinity using step-by-step SymPy derivation." },
-    { badge: "QM", label: "Quantum Tunneling", prompt: "Derive the transmission coefficient T for quantum tunneling through a rectangular finite potential barrier of width a and height V0." },
-    { badge: "ODE", label: "Harmonic Oscillation", prompt: "Solve the second-order differential equation m*x''(t) + c*x'(t) + k*x(t) = 0 for initial conditions x(0)=x0, x'(0)=0." },
+    { badge: "⚡", label: "Circuit Analysis", prompt: "Derive the step response and damping ratio of an underdamped series RLC circuit with R=20 Ohm, L=0.1 H, and C=100 uF." },
+    { badge: "∫", label: "Calculus Proof", prompt: "Evaluate the analytical integral of x^2 * exp(-x) dx from 0 to infinity using step-by-step SymPy derivation." },
+    { badge: "⚛", label: "Quantum Physics", prompt: "Derive the transmission coefficient T for quantum tunneling through a rectangular finite potential barrier of width a and height V0." },
+    { badge: "〰", label: "Differential Equation", prompt: "Solve the second-order differential equation m*x''(t) + c*x'(t) + k*x(t) = 0 for initial conditions x(0)=x0, x'(0)=0." },
   ];
 
   const fontClass: Record<"sm" | "md" | "lg", string> = {
@@ -229,6 +229,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (e.isComposing) return;
     if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       send(input);
@@ -238,7 +239,8 @@
   function stop() {
     abortController?.abort();
     isStreaming = false;
-    const last = chatStore.messages.at(-1);
+    const len = chatStore.messages.length;
+    const last = len > 0 ? chatStore.messages[len - 1] : null;
     if (last && last.role === "assistant") {
       last.streaming = false;
       last.thinkingDone = true;

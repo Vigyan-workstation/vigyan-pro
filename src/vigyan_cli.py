@@ -25,197 +25,180 @@ from typing import Optional, List, Dict, Any
 DEFAULT_HOST = "http://127.0.0.1:8086"
 MODELS_DIR = os.path.expanduser("~/.vigyan/models")
 
-VERIFIED_EXPERIMENTLAB_MODELS = [
+ALLOWED_SOVEREIGN_MODELS = {
+    "vigyan-3b-quad-master-iq3_m.gguf",     # Daily Driver (3B)
+    "vigyan-vl-4b-iq3_m.gguf",              # Multimodal Vision (4B)
+    "vigyan-7b-quad-master-q4_k_m.gguf",     # Doctoral STEM (7B)
+    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"  # Deep R1 Reasoning (14B)
+}
+
+SOVEREIGN_PRODUCTION_MODELS = [
     {
         "id": "vigyan-3b-quad-master-iq3_m",
         "name": "Vigyan-3B Quad-Master",
-        "tag": "vigyan-3b",
+        "tag": "vigyan:3b",
+        "short_label": "3B Daily Driver",
         "filename": "vigyan-3b-quad-master-iq3_m.gguf",
         "size_bytes": 1488894752,
         "size_formatted": "1.39 GB",
         "ram_required_gb": 4.0,
-        "domain": "Flagship STEM, Calculus & Exact CAS",
+        "domain": "Flagship STEM, Calculus & Exact Symbolic CAS",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-3b-quad-master/resolve/main/vigyan-3b-quad-master-iq3_m.gguf?download=true",
         "hf_repo": "shreyansh12183/vigyan-3b-quad-master",
     },
     {
-        "id": "vigyan-2b-stem-q4_k_m",
-        "name": "Vigyan-2B STEM Reasoner",
-        "tag": "vigyan-2b-stem",
-        "filename": "vigyan-2b-stem-q4_k_m.gguf",
-        "size_bytes": 1170000000,
-        "size_formatted": "1.09 GB",
-        "ram_required_gb": 3.0,
-        "domain": "Fast Real Analysis & Theorem Prover",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-stem-q4_k_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
-    },
-    {
-        "id": "vigyan-2b-reasoning-q4_k_m",
-        "name": "Vigyan-2B Reasoning",
-        "tag": "vigyan-2b-reasoning",
-        "filename": "vigyan-2b-reasoning-q4_k_m.gguf",
-        "size_bytes": 1170000000,
-        "size_formatted": "1.09 GB",
-        "ram_required_gb": 3.0,
-        "domain": "Deterministic Logic & Multi-Step Reasoning",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-2b-reasoning-q4_k_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
-    },
-    {
-        "id": "vigyan-1.5b-4x-moe",
-        "name": "Vigyan-1.5B 4x-MoE",
-        "tag": "vigyan-1.5b-moe",
-        "filename": "vigyan-1.5b-4x-moe.Q4_K_M.gguf",
-        "size_bytes": 3920000000,
-        "size_formatted": "3.65 GB",
-        "ram_required_gb": 4.5,
-        "domain": "High-Velocity Top-2 MoE Calculus",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-1.5B-4x-MoE/resolve/main/vigyan-1.5b-4x-moe.Q4_K_M.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-1.5B-4x-MoE",
-    },
-    {
-        "id": "vigyan-7b-stem-q4_k_m",
-        "name": "Vigyan-7B STEM Instruct",
-        "tag": "vigyan-7b-stem",
-        "filename": "vigyan-7b-stem-q4_k_m.gguf",
-        "size_bytes": 4467000000,
-        "size_formatted": "4.16 GB",
-        "ram_required_gb": 8.0,
-        "domain": "Comprehensive Science & Physical Engineering",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/vigyan-7b-stem-q4_k_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-Models-GGUF",
+        "id": "vigyan-vl-4b-iq3_m",
+        "name": "Vigyan-VL-4B Multimodal",
+        "tag": "vigyan:4b",
+        "short_label": "4B Vision",
+        "filename": "vigyan-vl-4b-iq3_m.gguf",
+        "size_bytes": 2980000000,
+        "size_formatted": "2.78 GB",
+        "ram_required_gb": 5.0,
+        "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
     },
     {
         "id": "vigyan-7b-quad-master-q4_k_m",
         "name": "Vigyan-7B Quad-Master",
-        "tag": "vigyan-7b-quad",
+        "tag": "vigyan:7b",
+        "short_label": "7B Doctoral",
         "filename": "vigyan-7b-quad-master-q4_k_m.gguf",
         "size_bytes": 4467000000,
         "size_formatted": "4.16 GB",
         "ram_required_gb": 8.0,
-        "domain": "Doctoral Proofs & Advanced Symbolic Algebra",
+        "domain": "Doctoral Proofs, Complex Engineering & Physical Science",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-olmo2-7b-quad-master/resolve/main/vigyan-7b-quad-master-q4_k_m.gguf?download=true",
         "hf_repo": "shreyansh12183/vigyan-olmo2-7b-quad-master",
     },
     {
         "id": "vigyan-r1-14b-health-semi-quantum",
-        "name": "Vigyan-R1-14B Biomedical Quantum",
-        "tag": "vigyan-r1-14b",
+        "name": "Vigyan-R1-14B Reasoning",
+        "tag": "vigyan:14b",
+        "short_label": "14B Frontier",
         "filename": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
         "size_bytes": 6917000000,
         "size_formatted": "6.44 GB",
         "ram_required_gb": 10.0,
-        "domain": "Biomedical, Molecular Dynamics & Quantum Circuits",
+        "domain": "Frontier Step-by-Step Chain-of-Thought & Quantum Physics",
         "hf_url": "https://huggingface.co/shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf/resolve/main/vigyan-r1-14b-health-semi-quantum-iq3_m.gguf?download=true",
         "hf_repo": "shreyansh12183/vigyan-r1-14b-health-semi-quantum-gguf",
-    },
-    {
-        "id": "vigyan-125m-q4_k_m",
-        "name": "Vigyan-125M Canary Reasoner",
-        "tag": "vigyan-125m",
-        "filename": "vigyan-125m-q4_k_m.gguf",
-        "size_bytes": 150000000,
-        "size_formatted": "0.14 GB",
-        "ram_required_gb": 1.0,
-        "domain": "Ultra-Fast Micro-Edge Canary Model",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-125m-158bit-gguf/resolve/main/vigyan-125m-q4_k_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-125m-158bit-gguf",
     }
 ]
 
+VERIFIED_EXPERIMENTLAB_MODELS = SOVEREIGN_PRODUCTION_MODELS
+
+
+MODEL_ALIASES = {
+    "3b": "vigyan-3b-quad-master-iq3_m.gguf",
+    "vigyan:3b": "vigyan-3b-quad-master-iq3_m.gguf",
+    "vigyan-3b": "vigyan-3b-quad-master-iq3_m.gguf",
+    "4b": "vigyan-vl-4b-iq3_m.gguf",
+    "vigyan:4b": "vigyan-vl-4b-iq3_m.gguf",
+    "vigyan-4b": "vigyan-vl-4b-iq3_m.gguf",
+    "vigyan-vl-4b": "vigyan-vl-4b-iq3_m.gguf",
+    "7b": "vigyan-7b-quad-master-q4_k_m.gguf",
+    "vigyan:7b": "vigyan-7b-quad-master-q4_k_m.gguf",
+    "vigyan-7b": "vigyan-7b-quad-master-q4_k_m.gguf",
+    "14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+    "vigyan:14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+    "vigyan-14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+    "vigyan-r1-14b": "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+}
+
 
 def get_local_models() -> List[str]:
-    """Scan ~/.vigyan/models/ for downloaded GGUF weights."""
+    """Scan ~/.vigyan/models/ for authorized GGUF weights."""
     if not os.path.isdir(MODELS_DIR):
         return []
-    models = [f for f in os.listdir(MODELS_DIR) if f.endswith(".gguf") and not f.startswith("mmproj")]
+    models = []
+    for f in os.listdir(MODELS_DIR):
+        if f.endswith(".gguf") and not f.startswith("mmproj"):
+            if f in ALLOWED_SOVEREIGN_MODELS:
+                models.append(f)
     vl_dir = os.path.join(MODELS_DIR, "vl4b")
     if os.path.isdir(vl_dir):
         for f in os.listdir(vl_dir):
             if f.endswith(".gguf") and not f.startswith("mmproj"):
-                models.append(os.path.join("vl4b", f))
+                if f in ALLOWED_SOVEREIGN_MODELS:
+                    models.append(os.path.join("vl4b", f))
     return sorted(models)
 
 
 def find_model_file(name_or_tag: str) -> Optional[str]:
-    """Resolve a user-supplied model identifier to an absolute path."""
-    clean = name_or_tag.strip()
-    if os.path.isfile(clean):
-        return os.path.abspath(clean)
+    """Resolve a user-supplied model identifier or alias to an absolute path."""
+    clean = name_or_tag.strip().lower()
+    if os.path.isfile(name_or_tag.strip()):
+        return os.path.abspath(name_or_tag.strip())
+
+    resolved_fname = MODEL_ALIASES.get(clean, clean)
+    if not resolved_fname.endswith(".gguf"):
+        resolved_fname = f"{resolved_fname}.gguf"
+
+    # Check direct in MODELS_DIR
+    cand = os.path.join(MODELS_DIR, resolved_fname)
+    if os.path.isfile(cand):
+        return cand
+
+    # Check in MODELS_DIR/vl4b
+    cand_vl = os.path.join(MODELS_DIR, "vl4b", resolved_fname)
+    if os.path.isfile(cand_vl):
+        return cand_vl
 
     local = get_local_models()
-    # Exact filename match
-    if clean in local:
-        return os.path.join(MODELS_DIR, clean)
-    if f"{clean}.gguf" in local:
-        return os.path.join(MODELS_DIR, f"{clean}.gguf")
-
-    # Tag or prefix match
     for m in local:
-        if clean.lower() in m.lower():
+        if resolved_fname.lower() in m.lower():
             return os.path.join(MODELS_DIR, m)
 
     return None
 
 
 def get_dynamic_catalog(refresh: bool = False) -> List[Dict[str, Any]]:
-    """Fetch dynamic catalog from local server or disk cache or Hugging Face."""
-    # 1. Try local server bridge
+    """Return the 4 sovereign production models (queried from local bridge if running)."""
     try:
         url = f"{DEFAULT_HOST}/api/models/catalog"
-        if refresh:
-            url += "?refresh=1"
         req = urllib.request.Request(url, headers={"User-Agent": "Vigyan-CLI/5.0"})
-        with urllib.request.urlopen(req, timeout=1.5) as resp:
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if data and "models" in data:
                 return data["models"]
     except Exception:
         pass
-
-    # 2. Try disk cache or direct HF query
-    cache_file = os.path.expanduser("~/.vigyan/models/hf_catalog_cache.json")
-    now = time.time()
-    if not refresh and os.path.isfile(cache_file):
-        try:
-            with open(cache_file, "r") as f:
-                cdata = json.load(f)
-                if now - cdata.get("timestamp", 0) < 600:
-                    return cdata.get("models", [])
-        except Exception:
-            pass
-
-    # 3. Dynamic HF scan fallback
-    try:
-        from launch_desktop import fetch_dynamic_hf_catalog
-        return fetch_dynamic_hf_catalog(force_refresh=refresh)
-    except Exception:
-        pass
-
-    # 4. Built-in seed list
-    return VERIFIED_EXPERIMENTLAB_MODELS
+    return list(SOVEREIGN_PRODUCTION_MODELS)
 
 
 def cmd_models(refresh: bool = False):
-    """List installed and cloud models from Experimentlab."""
+    """List the 4 authorized sovereign models with hardware compatibility."""
     from llama_supervisor import detect_hardware_profile
     hw = detect_hardware_profile()
     total_ram = hw.get("total_ram_gb", 8.0)
     avail_ram = hw.get("avail_ram_gb", 4.0)
+    tier = hw.get("tier", "cpu")
 
-    if refresh:
-        print("Polling Hugging Face CDN for newly published Experimentlab models...")
-
-    catalog = get_dynamic_catalog(refresh=refresh)
+    catalog = get_dynamic_catalog(refresh=False)
     local = get_local_models()
 
-    print("┌──────────────────────────────────────────────────────────────────────────────────────────────────┐")
-    print("│  VIGYAN SOVEREIGN MODEL REGISTRY • https://huggingface.co/Experimentlab                          │")
-    print(f"│  Host Profile: {total_ram} GB RAM ({avail_ram} GB available) • Hardware Tier: {hw.get('tier', 'cpu'):<24} │")
-    print("├─────────────┬──────────────────────────┬───────────┬───────────────┬─────────────────────────────┤")
-    print(f"│ {'STATUS':<11} │ {'MODEL NAME':<24} │ {'SIZE':<9} │ {'HARDWARE':<13} │ {'DOMAIN':<27} │")
-    print("├─────────────┼──────────────────────────┼───────────┼───────────────┼─────────────────────────────┤")
+    print("┌────────────────────────────────────────────────────────────────────────────────────────┐")
+    print("│  VIGYAN SOVEREIGN MATRIX • 4 Authorized Scientific Engines                             │")
+    print(f"│  Host: {total_ram:.1f} GB RAM ({avail_ram:.1f} GB available) • Compute: {tier:<38} │")
+    print("├─────────────┬─────────────┬──────────────────────────┬──────────┬──────────────┬───────┤")
+    print(f"│ {'STATUS':<11} │ {'ALIAS':<11} │ {'MODEL NAME':<24} │ {'SIZE':<8} │ {'MEMORY':<12} │ {'TIER':<5} │")
+    print("├─────────────┼─────────────┼──────────────────────────┼──────────┼──────────────┼───────┤")
+
+    tier_labels = {
+        "vigyan-3b-quad-master-iq3_m.gguf": "Daily",
+        "vigyan-vl-4b-iq3_m.gguf": "Vision",
+        "vigyan-7b-quad-master-q4_k_m.gguf": "Doct.",
+        "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf": "Front."
+    }
+
+    alias_display = {
+        "vigyan-3b-quad-master-iq3_m.gguf": "vigyan:3b",
+        "vigyan-vl-4b-iq3_m.gguf": "vigyan:4b",
+        "vigyan-7b-quad-master-q4_k_m.gguf": "vigyan:7b",
+        "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf": "vigyan:14b"
+    }
 
     seen = set()
     for m in catalog:
@@ -232,56 +215,54 @@ def cmd_models(refresh: bool = False):
         elif total_ram >= req:
             badge = "🟡 Tight RAM"
         else:
-            badge = "🔴 Incompatible"
+            badge = "🔴 Recom 16G"
 
+        alias = alias_display.get(fname, m.get("tag", "vigyan"))
         name_display = m.get("name", fname)[:24]
-        size_display = m.get("size_formatted", "~1.4 GB")[:9]
-        domain_display = m.get("domain", "Sovereign Engine")[:27]
-        print(f"│ {status:<11} │ {name_display:<24} │ {size_display:<9} │ {badge:<13} │ {domain_display:<27} │")
+        size_display = m.get("size_formatted", "~1.4 GB")[:8]
+        t_label = tier_labels.get(fname, "STEM")
+        print(f"│ {status:<11} │ {alias:<11} │ {name_display:<24} │ {size_display:<8} │ {badge:<12} │ {t_label:<5} │")
 
-    # List custom local models not in catalog
-    for m in local:
-        basename = os.path.basename(m)
-        if basename not in seen:
-            size_gb = round(os.path.getsize(os.path.join(MODELS_DIR, m)) / (1024 ** 3), 2)
-            clean_title = basename.replace(".gguf", "").replace("-", " ").title()[:24]
-            print(f"│ {'● INSTALLED':<11} │ {clean_title:<24} │ {size_gb:>5.2f} GB   │ {'🟢 Local':<13} │ {'Local Custom Engine':<27} │")
-
-    print("└─────────────┴──────────────────────────┴───────────┴───────────────┴─────────────────────────────┘")
-    print("Commands: vigyan pull <name>  │  vigyan run [name]  │  vigyan models --refresh")
+    print("└─────────────┴─────────────┴──────────────────────────┴──────────┴──────────────┴───────┘")
+    print("Commands: vigyan pull <alias>  │  vigyan run [alias]  │  vigyan rm <alias>")
     print()
 
 
 def cmd_pull(model_name: str) -> bool:
     """Download model with terminal progress bar, ETA, and GGUF header verification."""
-    clean = model_name.strip()
+    clean = model_name.strip().lower()
     target_info = None
 
-    catalog = get_dynamic_catalog(refresh=False)
-    for m in catalog:
-        m_id = m.get("id", "").lower()
-        m_tag = m.get("tag", "").lower()
-        m_fname = m.get("filename", "").lower()
-        m_name = m.get("name", "").lower()
-        if clean.lower() in (m_id, m_tag, m_fname, m_name):
+    # Resolve alias
+    resolved_fname = MODEL_ALIASES.get(clean, clean)
+    if not resolved_fname.endswith(".gguf"):
+        resolved_fname = f"{resolved_fname}.gguf"
+
+    if resolved_fname not in ALLOWED_SOVEREIGN_MODELS:
+        print(f"[Error] '{model_name}' is not an authorized sovereign model.", file=sys.stderr)
+        print("Authorized models: 3b, 4b, 7b, 14b (or vigyan:3b, vigyan:4b, vigyan:7b, vigyan:14b)", file=sys.stderr)
+        return False
+
+    for m in SOVEREIGN_PRODUCTION_MODELS:
+        if m["filename"] == resolved_fname:
             target_info = m
             break
 
     if not target_info:
-        for m in VERIFIED_EXPERIMENTLAB_MODELS:
-            if clean.lower() in (m["id"].lower(), m["tag"].lower(), m["filename"].lower(), m["name"].lower()):
-                target_info = m
-                break
+        print(f"[Error] Metadata not found for {resolved_fname}", file=sys.stderr)
+        return False
 
-    if not target_info:
-        dest_filename = clean if clean.endswith(".gguf") else f"{clean}.gguf"
-        target_info = {
-            "name": clean,
-            "filename": dest_filename,
-            "size_bytes": 1_400_000_000,
-            "size_formatted": "~1.4 GB",
-            "hf_url": f"https://huggingface.co/Experimentlab/Vigyan-Models-GGUF/resolve/main/{dest_filename}?download=true",
-        }
+    # Check RAM advisory
+    try:
+        from llama_supervisor import detect_hardware_profile
+        hw = detect_hardware_profile()
+        avail_ram = hw.get("avail_ram_gb", 4.0)
+        req_ram = target_info.get("ram_required_gb", 4.0)
+        if avail_ram < req_ram:
+            print(f"[RAM Notice] {target_info['name']} requires ~{req_ram:.1f} GB RAM. Your system has {avail_ram:.1f} GB available.")
+            print("  (Execution may be slow or restricted to conserve memory.)")
+    except Exception:
+        pass
 
     os.makedirs(MODELS_DIR, exist_ok=True)
     dest_file = os.path.join(MODELS_DIR, target_info["filename"])
@@ -416,11 +397,12 @@ def cmd_pull(model_name: str) -> bool:
 
 def cmd_rm(model_name: str) -> bool:
     """Delete model from local ~/.vigyan/models/."""
-    clean = model_name.strip()
+    clean = model_name.strip().lower()
     target_path = find_model_file(clean)
     part_path = None
     if not target_path:
-        fname = clean if clean.endswith(".gguf") else f"{clean}.gguf"
+        resolved = MODEL_ALIASES.get(clean, clean)
+        fname = resolved if resolved.endswith(".gguf") else f"{resolved}.gguf"
         candidate_part = os.path.join(MODELS_DIR, fname + ".part")
         if os.path.isfile(candidate_part):
             part_path = candidate_part
@@ -459,11 +441,10 @@ def cmd_rm(model_name: str) -> bool:
 
 
 def ensure_first_run_interactive() -> Optional[str]:
-    """If no models are installed locally, prompt user with interactive numbered menu."""
+    """If no models are installed locally, prompt user with clean 4-model selection."""
     local = get_local_models()
     if local:
-        # Prefer flagship 3b, 2b, or first found
-        preferred = ["vigyan-3b-quad-master-iq3_m.gguf", "vigyan-2b-stem-q4_k_m.gguf", "vigyan-1.5b-4x-moe.gguf"]
+        preferred = ["vigyan-3b-quad-master-iq3_m.gguf", "vigyan-vl-4b-iq3_m.gguf", "vigyan-7b-quad-master-q4_k_m.gguf"]
         for p in preferred:
             for m in local:
                 if p in m:
@@ -471,37 +452,41 @@ def ensure_first_run_interactive() -> Optional[str]:
         return os.path.join(MODELS_DIR, local[0])
 
     if not sys.stdin.isatty():
-        print("[Error] No model installed. Run 'vigyan pull vigyan-3b' to download the flagship engine.", file=sys.stderr)
+        print("[Error] No model installed. Run 'vigyan pull 3b' to download the flagship engine.", file=sys.stderr)
         sys.exit(1)
 
     print("┌────────────────────────────────────────────────────────────────────────┐")
-    print("│  WELCOME TO VIGYAN PRO SOVEREIGN CLI (100% Offline)                   │")
+    print("│  VIGYAN PRO • SOVEREIGN PHYSICAL INTELLIGENCE (100% Offline)           │")
     print("│  No local models found in ~/.vigyan/models/.                          │")
     print("├────────────────────────────────────────────────────────────────────────┤")
-    print("│  Select a sovereign engine to download from Experimentlab:             │")
-    print("│    [1] Vigyan-3B Quad-Master (1.39 GB) - Flagship STEM  [Recommended]  │")
-    print("│    [2] Vigyan-2B STEM Reasoner (1.18 GB) - Fast Real Analysis          │")
-    print("│    [3] Vigyan-1.5B 4x-MoE (1.10 GB) - High-Speed Calculus              │")
-    print("│    [4] View All Available Models                                       │")
+    print("│  Select a sovereign engine to download:                                │")
+    print("│    [1] 3B Daily Driver  (1.39 GB) - STEM, Calculus & CAS [Recommended] │")
+    print("│    [2] 4B Vision        (2.78 GB) - Circuit Schematics & Diagrams      │")
+    print("│    [3] 7B Doctoral      (4.16 GB) - Advanced Physics & Engineering     │")
+    print("│    [4] 14B Frontier     (6.44 GB) - Deep Chain-of-Thought Reasoning    │")
+    print("│    [5] View Model Matrix                                               │")
     print("│    [q] Quit                                                            │")
     print("└────────────────────────────────────────────────────────────────────────┘")
 
     try:
-        choice = input("Enter selection [1-4]: ").strip().lower()
+        choice = input("Enter selection [1-5]: ").strip().lower()
     except (KeyboardInterrupt, EOFError):
         print()
         sys.exit(0)
 
     if choice == "1":
-        if cmd_pull("vigyan-3b-quad-master-iq3_m.gguf"):
+        if cmd_pull("3b"):
             return os.path.join(MODELS_DIR, "vigyan-3b-quad-master-iq3_m.gguf")
     elif choice == "2":
-        if cmd_pull("vigyan-2b-stem-q4_k_m.gguf"):
-            return os.path.join(MODELS_DIR, "vigyan-2b-stem-q4_k_m.gguf")
+        if cmd_pull("4b"):
+            return os.path.join(MODELS_DIR, "vigyan-vl-4b-iq3_m.gguf")
     elif choice == "3":
-        if cmd_pull("vigyan-1.5b-4x-moe.gguf"):
-            return os.path.join(MODELS_DIR, "vigyan-1.5b-4x-moe.gguf")
+        if cmd_pull("7b"):
+            return os.path.join(MODELS_DIR, "vigyan-7b-quad-master-q4_k_m.gguf")
     elif choice == "4":
+        if cmd_pull("14b"):
+            return os.path.join(MODELS_DIR, "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf")
+    elif choice == "5":
         cmd_models()
         sys.exit(0)
     else:
@@ -574,19 +559,25 @@ def print_usage():
 Vigyan Pro Sovereign CLI v5.0 [100% Offline • Air-Gapped STEM Workstation]
 Usage:
   vigyan                                Launch interactive scientific REPL
-  vigyan run [model]                    Launch REPL with a specific model
-  vigyan models | ls [--refresh]        List installed & available Hugging Face models
-  vigyan pull <model>                   Download model from https://huggingface.co/Experimentlab
-  vigyan rm <model>                     Delete local model and reclaim disk space
+  vigyan run [3b|4b|7b|14b]             Launch REPL with a specific model
+  vigyan models | ls                    List 4 authorized models with hardware compatibility
+  vigyan pull <3b|4b|7b|14b>            Download model directly to ~/.vigyan/models/
+  vigyan rm <3b|4b|7b|14b>              Delete local model and reclaim disk space
   vigyan --version | -v                 Display version specification
   vigyan "<query>"                      One-shot CLI evaluation with streaming answer
   echo "<query>" | vigyan               Piped evaluation for bash scripts and VS Code tasks
 
+Authorized Sovereign Models:
+  3b   • Vigyan-3B Quad-Master    (1.39 GB)  Flagship STEM & Symbolic Algebra
+  4b   • Vigyan-VL-4B Multimodal  (2.78 GB)  Circuit Schematics & Diagrams
+  7b   • Vigyan-7B Quad-Master    (4.16 GB)  Doctoral Physics & Engineering
+  14b  • Vigyan-R1-14B Reasoning  (6.44 GB)  Frontier Step-by-Step Chain-of-Thought
+
 Examples:
-  vigyan models --refresh
-  vigyan pull vigyan-3b-quad-master-iq3_m.gguf
-  vigyan "Integrate x^2 * sin(x) dx"
-  cat problem.tex | vigyan
+  vigyan models
+  vigyan pull 3b
+  vigyan run 3b
+  vigyan "Solve d^2y/dx^2 + 4y = 0"
 """)
 
 
