@@ -63,7 +63,7 @@ from llama_supervisor import LlamaServerSupervisor
 try:
     from version import __version__
 except Exception:
-    __version__ = "5.0.0"
+    __version__ = "5.0.2"
 
 try:
     import psutil
@@ -1024,12 +1024,55 @@ class RAMGovernor:
 
 
 
-def select_cascade_model(requested_model: str, query: str) -> Dict[str, Any]:
+def get_hf_auth_token() -> Optional[str]:
+    """Discover user's Hugging Face auth token from environment, config, or cache."""
+    env_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if env_token and env_token.strip():
+        return env_token.strip()
+
+    try:
+        cfg = load_user_config()
+        if cfg.get("hf_token"):
+            return str(cfg["hf_token"]).strip()
+    except Exception:
+        pass
+
+    try:
+        from huggingface_hub import get_token
+        hub_token = get_token()
+        if hub_token and hub_token.strip():
+            return hub_token.strip()
+    except Exception:
+        pass
+
+    token_path = os.path.expanduser("~/.cache/huggingface/token")
+    if os.path.isfile(token_path):
+        try:
+            with open(token_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    return content
+        except Exception:
+            pass
+
+    return None
+
+
+def select_cascade_model(requested_model: str, query: str = "", has_image: bool = False) -> Dict[str, Any]:
     """Sovereign Vigyan AI execution router.
     Flagship Vigyan-3B Quad-Master IQ3_M is the primary sovereign engine,
-    with Vigyan AI 1.5B Quad-Master available for ultra-fast edge inference.
+    with Vigyan AI 1.5B Quad-Master available for ultra-fast edge inference,
+    and Vigyan-VL-4B for multimodal vision reasoning.
     """
     req = (requested_model or "").strip().lower()
+
+    if has_image or req in ("vigyan:4b", "4b", "vigyan-vl-4b", "vl4b"):
+        return {
+            "tier": 4,
+            "model": "vigyan:4b",
+            "downgraded": False,
+            "reason": "Vigyan-VL-4B Multimodal Vision Engine (Circuit Schematics & Diagrams)"
+        }
 
     # 1. Explicit 1.5B request
     if req in ("vigyan:1.5b", "1.5b"):
@@ -1108,16 +1151,18 @@ SOVEREIGN_PRODUCTION_MODELS = [
     {
         "id": "vigyan-vl-4b-iq3_m",
         "name": "Vigyan-VL-4B Multimodal",
-        "tag": "vigyan-vl-4b",
+        "tag": "vigyan:4b",
         "short_label": "4B Vision",
         "filename": "vigyan-vl-4b-iq3_m.gguf",
         "dest_filename": "vigyan-vl-4b-iq3_m.gguf",
-        "size_bytes": 2980000000,
-        "size_formatted": "2.78 GB",
+        "size_bytes": 1962897120,
+        "size_formatted": "1.83 GB",
         "ram_required_gb": 5.0,
         "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-vl-4b-gguf",
+        "mmproj_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
+        "mmproj_filename": "mmproj-vigyan-vl-4b-f16.gguf",
         "template": "{{ prompt }}",
         "stop": ["<|endoftext|>", "<|im_end|>"]
     },
@@ -1252,6 +1297,9 @@ class ModelDownloadManager:
 
             existing_bytes = os.path.getsize(part_file) if os.path.exists(part_file) else 0
             headers = {"User-Agent": "Vigyan-Pro-Sovereign-Downloader/5.0"}
+            auth_token = get_hf_auth_token()
+            if auth_token:
+                headers["Authorization"] = f"Bearer {auth_token}"
             if existing_bytes > 0:
                 headers["Range"] = f"bytes={existing_bytes}-"
 
@@ -1383,6 +1431,29 @@ class ModelDownloadManager:
 
                 if not replaced:
                     os.rename(part_file, dest_file)
+
+                # Check companion mmproj download for Vision models
+                mmproj_url = item.get("mmproj_url")
+                mmproj_filename = item.get("mmproj_filename")
+                if mmproj_url and mmproj_filename:
+                    vl_dir = os.path.join(target_dir, "vl4b")
+                    os.makedirs(vl_dir, exist_ok=True)
+                    target_mmproj = os.path.join(vl_dir, mmproj_filename)
+                    if not os.path.isfile(target_mmproj):
+                        try:
+                            logger.info("Downloading companion vision projector: %s", mmproj_filename)
+                            mmproj_req = urllib.request.Request(mmproj_url, headers={"User-Agent": "Vigyan-Pro-Sovereign-Downloader/5.0"})
+                            if auth_token:
+                                mmproj_req.add_header("Authorization", f"Bearer {auth_token}")
+                            with urllib.request.urlopen(mmproj_req, timeout=120) as m_resp, open(target_mmproj + ".part", "wb") as m_f:
+                                while True:
+                                    m_chunk = m_resp.read(1024 * 256)
+                                    if not m_chunk:
+                                        break
+                                    m_f.write(m_chunk)
+                            os.replace(target_mmproj + ".part", target_mmproj)
+                        except Exception as mmproj_err:
+                            logger.warning("Companion mmproj download error: %s", mmproj_err)
 
                 if was_active and LLAMA_SUPERVISOR:
                     try:
@@ -2083,17 +2154,33 @@ def calc_physics(sim_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return {"tool": "physics_sim", "success": False, "error": f"Unknown sim type: '{stype}' (supported: kepler_orbit, projectile)"}
 
 
-def compress_conversation_history(messages: List[Dict[str, str]], max_tokens_est: int = 2048) -> List[Dict[str, str]]:
+def _extract_text_content(content: Any) -> str:
+    """Extract string text from string or multimodal list content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text", "")))
+            elif isinstance(item, str):
+                parts.append(item)
+        return " ".join(parts)
+    return str(content or "")
+
+
+def compress_conversation_history(messages: List[Dict[str, Any]], max_tokens_est: int = 2048) -> List[Dict[str, Any]]:
     """
     Sliding Window + Micro-Summary Compressor.
     Preserves system axioms & original user goal, condenses intermediate turns into
     a compact bulleted memory summary, and streams the latest 4 turns verbatim.
     Prevents overflowing the context budget on long sessions while retaining depth.
+    Safely handles multimodal messages with image attachments.
     """
     if not messages or len(messages) <= 5:
         return messages
 
-    total_chars = sum(len(m.get("content", "")) for m in messages)
+    total_chars = sum(len(_extract_text_content(m.get("content", ""))) for m in messages)
     if total_chars < max_tokens_est * 4:
         return messages
 
@@ -2110,7 +2197,7 @@ def compress_conversation_history(messages: List[Dict[str, str]], max_tokens_est
     bullets = []
     for m in middle_turns:
         role = m.get("role", "user")
-        snippet = m.get("content", "").strip()[:70].replace("\n", " ")
+        snippet = _extract_text_content(m.get("content", "")).strip()[:70].replace("\n", " ")
         if snippet:
             bullets.append(f"{role.capitalize()}: {snippet}...")
 
@@ -2138,6 +2225,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "context_window": 2048,
     "font_size": "md",
     "auto_open_canvas": True,
+    "hf_token": "",
 }
 
 
@@ -2587,6 +2675,27 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
             user_query = (body.get("query") or body.get("message") or "").strip()
             requested_model = body.get("model") or "auto"
 
+            attachment = body.get("attachment")
+            images = body.get("images") or []
+            has_image = False
+            image_data_uri = None
+
+            if isinstance(attachment, dict) and attachment.get("data"):
+                has_image = True
+                raw_data = str(attachment["data"])
+                if raw_data.startswith("data:image/"):
+                    image_data_uri = raw_data
+                else:
+                    mime = attachment.get("type") or "image/jpeg"
+                    image_data_uri = f"data:{mime};base64,{raw_data}"
+            elif images and isinstance(images, list) and len(images) > 0:
+                has_image = True
+                raw_img = str(images[0])
+                if raw_img.startswith("data:image/"):
+                    image_data_uri = raw_img
+                else:
+                    image_data_uri = f"data:image/jpeg;base64,{raw_img}"
+
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache, no-transform")
@@ -2648,12 +2757,31 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 sys_prompt += f"\n[SymPy Verified Grounding]: {s.get('expression')} = {s.get('result')}"
 
             # Sovereign Offline Engine with RAM Governor
-            cascade = select_cascade_model(requested_model, user_query)
+            cascade = select_cascade_model(requested_model, user_query, has_image=has_image)
             active_model = cascade["model"]
             _emit("cascade_tier", cascade)
             if cascade.get("downgraded"):
                 _emit("tier_downgrade", cascade)
                 _emit("think", f"[RAM Guard]: System routed to {active_model} Sovereign Engine.\n")
+
+            # Multimodal Vision Routing & Auto-Swap
+            if has_image:
+                current_model_path = (LLAMA_SUPERVISOR.model_path or "").lower()
+                current_is_vl = "vl" in os.path.basename(current_model_path)
+                if not current_is_vl:
+                    vl_candidates = [
+                        os.path.expanduser("~/.vigyan/models/vigyan-vl-4b-iq3_m.gguf"),
+                        os.path.expanduser("~/.vigyan/models/vl4b/vigyan-vl-4b-iq3_m.gguf"),
+                        os.path.join(os.getcwd(), "models", "vigyan-vl-4b-iq3_m.gguf"),
+                    ]
+                    found_vl = next((p for p in vl_candidates if os.path.isfile(p)), None)
+                    if found_vl:
+                        _emit("think", "[Vision Router]: Swapping engine to Vigyan-VL-4B for image and schematic analysis...\n")
+                        LLAMA_SUPERVISOR.swap_model(found_vl)
+                    else:
+                        _emit("token", "**Notice**: Image and schematic reasoning requires the **Vigyan-VL-4B Multimodal** engine.\n\nPlease open the **Models** tab and click Download on **Vigyan-VL-4B**, or run `vigyan pull 4b` in your terminal.\n")
+                        _emit("done", {})
+                        return
 
             try:
                 user_cfg = load_user_config()
@@ -2676,14 +2804,27 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                 if target_ctx > 2048 and avail_ram < 1.0:
                     target_ctx = 2048
 
+                if has_image and image_data_uri:
+                    user_msg_content: Any = [
+                        {"type": "text", "text": user_query or "Analyze this image in detail and explain the components, equations, or structures."},
+                        {"type": "image_url", "image_url": {"url": image_data_uri}}
+                    ]
+                else:
+                    user_msg_content = user_query
+
                 raw_messages = body.get("messages") or []
                 if raw_messages:
+                    if has_image and image_data_uri:
+                        if raw_messages[-1].get("role") == "user":
+                            raw_messages[-1]["content"] = user_msg_content
+                        else:
+                            raw_messages.append({"role": "user", "content": user_msg_content})
                     full_msgs = [{"role": "system", "content": sys_prompt}] + raw_messages
                     model_messages = compress_conversation_history(full_msgs, max_tokens_est=target_ctx)
                 else:
                     model_messages = [
                         {"role": "system", "content": sys_prompt},
-                        {"role": "user", "content": user_query},
+                        {"role": "user", "content": user_msg_content},
                     ]
                 user_temp = body.get("temperature")
                 if user_temp is None:
@@ -2707,8 +2848,9 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     "Human:"
                 ]
 
+                is_active_vl = has_image or "vl" in os.path.basename(LLAMA_SUPERVISOR.model_path or "").lower()
                 openai_payload = {
-                    "model": "vigyan-3b",
+                    "model": "vigyan-vl-4b" if is_active_vl else "vigyan-3b",
                     "messages": model_messages,
                     "temperature": user_temp,
                     "top_p": 0.95,

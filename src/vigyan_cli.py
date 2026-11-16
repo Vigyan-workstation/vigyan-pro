@@ -52,12 +52,14 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "tag": "vigyan:4b",
         "short_label": "4B Vision",
         "filename": "vigyan-vl-4b-iq3_m.gguf",
-        "size_bytes": 2980000000,
-        "size_formatted": "2.78 GB",
+        "size_bytes": 1962897120,
+        "size_formatted": "1.83 GB",
         "ram_required_gb": 5.0,
         "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
-        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
+        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "shreyansh12183/vigyan-vl-4b-gguf",
+        "mmproj_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
+        "mmproj_filename": "mmproj-vigyan-vl-4b-f16.gguf",
     },
     {
         "id": "vigyan-7b-quad-master-q4_k_m",
@@ -228,6 +230,43 @@ def cmd_models(refresh: bool = False):
     print()
 
 
+def get_hf_auth_token() -> Optional[str]:
+    """Discover user's Hugging Face auth token from environment, config, or cache."""
+    env_token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    if env_token and env_token.strip():
+        return env_token.strip()
+
+    try:
+        cfg_path = os.path.expanduser("~/.vigyan/config.json")
+        if os.path.isfile(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                if cfg.get("hf_token"):
+                    return str(cfg["hf_token"]).strip()
+    except Exception:
+        pass
+
+    try:
+        from huggingface_hub import get_token
+        hub_token = get_token()
+        if hub_token and hub_token.strip():
+            return hub_token.strip()
+    except Exception:
+        pass
+
+    token_path = os.path.expanduser("~/.cache/huggingface/token")
+    if os.path.isfile(token_path):
+        try:
+            with open(token_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    return content
+        except Exception:
+            pass
+
+    return None
+
+
 def cmd_pull(model_name: str) -> bool:
     """Download model with terminal progress bar, ETA, and GGUF header verification."""
     clean = model_name.strip().lower()
@@ -287,6 +326,9 @@ def cmd_pull(model_name: str) -> bool:
     print(f"Connecting to Hugging Face CDN ({target_info['hf_url']})...")
     existing_bytes = os.path.getsize(part_file) if os.path.exists(part_file) else 0
     headers = {"User-Agent": "Vigyan-CLI-Sovereign-Downloader/5.0"}
+    auth_token = get_hf_auth_token()
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
     if existing_bytes > 0:
         headers["Range"] = f"bytes={existing_bytes}-"
         print(f"Resuming download from byte offset {existing_bytes}...")
@@ -382,6 +424,30 @@ def cmd_pull(model_name: str) -> bool:
                 time.sleep(0.2)
         if not replaced:
             os.rename(part_file, dest_file)
+
+        # Companion mmproj download for Vision models
+        mmproj_url = target_info.get("mmproj_url")
+        mmproj_filename = target_info.get("mmproj_filename")
+        if mmproj_url and mmproj_filename:
+            vl_dir = os.path.join(MODELS_DIR, "vl4b")
+            os.makedirs(vl_dir, exist_ok=True)
+            target_mmproj = os.path.join(vl_dir, mmproj_filename)
+            if not os.path.isfile(target_mmproj):
+                print(f"Downloading companion vision projector ({mmproj_filename})...")
+                m_req = urllib.request.Request(mmproj_url, headers={"User-Agent": "Vigyan-CLI-Sovereign-Downloader/5.0"})
+                if auth_token:
+                    m_req.add_header("Authorization", f"Bearer {auth_token}")
+                try:
+                    with urllib.request.urlopen(m_req, timeout=120) as m_resp, open(target_mmproj + ".part", "wb") as m_f:
+                        while True:
+                            m_chunk = m_resp.read(1024 * 256)
+                            if not m_chunk:
+                                break
+                            m_f.write(m_chunk)
+                    os.replace(target_mmproj + ".part", target_mmproj)
+                    print(f"✓ Companion vision projector installed: {target_mmproj}")
+                except Exception as m_err:
+                    print(f"[Warning] Failed to download companion mmproj: {m_err}", file=sys.stderr)
 
         print(f"✓ Successfully installed {target_info['filename']} to ~/.vigyan/models/")
         return True
@@ -663,8 +729,8 @@ def main():
     if args and args[0] in ("--version", "-v", "version"):
         try:
             from version import __version__
-        except ImportError:
-            __version__ = "5.0.0"
+        except Exception:
+            __version__ = "5.0.2"
         print(f"Vigyan Pro v{__version__} [Sovereign Offline Intelligence]")
         return
 

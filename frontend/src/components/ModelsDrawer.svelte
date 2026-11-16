@@ -354,22 +354,19 @@
     }
   }
 
-  // Filter models based on search and tab
-  let filteredModels = $derived(
-    models.filter(m => {
-      // Tab filter
-      if (activeFilter === "installed" && !m.is_installed) return false;
-      if (activeFilter === "available" && m.is_installed) return false;
+  // Filter & Canonical Order for the 4 Authorized Sovereign Engines
+  const CANONICAL_ORDER = [
+    "vigyan-3b-quad-master-iq3_m.gguf",
+    "vigyan-vl-4b-iq3_m.gguf",
+    "vigyan-7b-quad-master-q4_k_m.gguf",
+    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"
+  ];
 
-      // Search query
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        m.name.toLowerCase().includes(q) ||
-        m.domain.toLowerCase().includes(q) ||
-        m.filename.toLowerCase().includes(q) ||
-        m.tag.toLowerCase().includes(q)
-      );
+  let displayModels = $derived(
+    [...models].sort((a, b) => {
+      const idxA = CANONICAL_ORDER.indexOf(a.filename);
+      const idxB = CANONICAL_ORDER.indexOf(b.filename);
+      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
     })
   );
 
@@ -447,14 +444,14 @@
 
     <div class="flex items-center justify-between mt-1 text-[10px] font-mono text-neutral-500">
       <div class="flex items-center gap-1.5 truncate">
-        <span>Source:</span>
+        <span>Registry:</span>
         <a
-          href="https://huggingface.co/Experimentlab"
+          href="https://huggingface.co/shreyansh12183"
           target="_blank"
           rel="noreferrer"
           class="text-sky-400 hover:underline truncate"
         >
-          huggingface.co/Experimentlab
+          huggingface.co/shreyansh12183
         </a>
         <button
           onclick={handleRefreshCatalog}
@@ -486,130 +483,26 @@
     </div>
   {/if}
 
-  <!-- Minimal Download Manager Deck -->
+  <!-- Whisper-Quiet Micro Download Bar (Compact & Minimal) -->
   {#if activeDownloadList.length > 0}
-    <div class="p-3.5 border-b border-white/[0.08] bg-[#0c0e15] space-y-2.5 flex-shrink-0">
-      <div class="flex items-center justify-between text-xs font-mono">
-        <span class="text-white font-semibold flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full {hasActiveDownloads ? 'bg-sky-400 animate-pulse' : 'bg-amber-400'}"></span>
-          <span>Download Manager ({activeDownloadList.length})</span>
+    <div class="px-5 py-2 border-b border-sky-500/20 bg-sky-950/20 flex items-center justify-between gap-3 text-xs font-mono flex-shrink-0 animate-fade-in">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-1.5 h-1.5 rounded-full {hasActiveDownloads ? 'bg-sky-400 animate-pulse' : 'bg-amber-400'} flex-shrink-0"></span>
+        <span class="text-white text-[11px] truncate">
+          Downloading {activeDownloadList[0].name || activeDownloadList[0].filename}
         </span>
-        <span class="text-[10px] text-neutral-400">Resumable Transfer</span>
       </div>
-
-      {#each activeDownloadList as dl (dl.filename || dl.tag)}
-        <div class="bg-[#10131d] border border-white/10 rounded-xl p-3 space-y-2">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-semibold text-white truncate max-w-[210px]">
-              {dl.name || dl.filename}
-            </span>
-            <div class="flex items-center gap-1.5 flex-shrink-0">
-              {#if dl.status === "downloading" || dl.status === "starting"}
-                <button
-                  onclick={() => handlePauseDownload(dl)}
-                  class="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 hover:bg-white/20 text-neutral-300 hover:text-white transition-all cursor-pointer flex items-center gap-1 border border-white/10"
-                  title="Pause download"
-                >
-                  <span>⏸ Pause</span>
-                </button>
-              {:else if dl.status === "paused"}
-                <button
-                  onclick={() => handleResumeDownload(dl)}
-                  class="px-2 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 transition-all cursor-pointer flex items-center gap-1"
-                  title="Resume download"
-                >
-                  <span>▶ Resume</span>
-                </button>
-              {/if}
-              <button
-                onclick={() => handleCancelDownload(dl)}
-                class="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition-all cursor-pointer"
-                title="Cancel download"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          <!-- Progress Bar -->
-          <div class="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
-            <div
-              class="h-full {dl.status === 'paused' ? 'bg-amber-500' : 'bg-gradient-to-r from-sky-500 to-emerald-400'} transition-all duration-300"
-              style="width: {Math.max(2, Math.min(100, dl.progress_pct))}%;"
-            ></div>
-          </div>
-
-          <!-- Telemetry Footer: % • Speed • ETA -->
-          <div class="flex items-center justify-between text-[10px] font-mono text-neutral-400">
-            <span>{dl.progress_pct.toFixed(1)}%</span>
-            <span>{dl.status === 'paused' ? 'Paused' : `${dl.speed_mbps.toFixed(1)} MB/s`}</span>
-            <span>{dl.status === 'paused' ? 'Paused' : (dl.eta_formatted ? `ETA: ${dl.eta_formatted}` : '')}</span>
-          </div>
-        </div>
-      {/each}
+      <div class="flex items-center gap-2 flex-shrink-0 text-[11px]">
+        <span class="text-sky-300 font-semibold">{activeDownloadList[0].progress_pct.toFixed(0)}%</span>
+        <span class="text-neutral-400 text-[10px] hidden sm:inline">{activeDownloadList[0].speed_mbps.toFixed(1)} MB/s</span>
+      </div>
     </div>
   {/if}
 
-  <!-- Filter & Search Controls -->
-  <div class="p-4 border-b border-white/[0.06] bg-[#08090d] flex flex-col gap-2.5 flex-shrink-0">
-    <!-- Search Bar -->
-    <div class="relative">
-      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-500">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </div>
-      <input
-        type="text"
-        bind:value={searchQuery}
-        placeholder="Search models by name, domain, size..."
-        class="w-full bg-[#0d0f14] border border-white/10 focus:border-white/25 rounded-lg pl-9 pr-8 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none transition-colors font-mono"
-      />
-      {#if searchQuery}
-        <button
-          onclick={() => (searchQuery = "")}
-          class="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-500 hover:text-white cursor-pointer"
-          aria-label="Clear search"
-        >
-          &times;
-        </button>
-      {/if}
-    </div>
-
-    <!-- Filter Pills -->
-    <div class="flex items-center gap-1.5">
-      <button
-        onclick={() => (activeFilter = "all")}
-        class="px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer border {activeFilter === 'all'
-          ? 'bg-white/10 text-white border-white/20'
-          : 'bg-transparent text-neutral-400 border-transparent hover:text-white hover:bg-white/[0.04]'}"
-      >
-        All ({models.length})
-      </button>
-      <button
-        onclick={() => (activeFilter = "installed")}
-        class="px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer border {activeFilter === 'installed'
-          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-          : 'bg-transparent text-neutral-400 border-transparent hover:text-white hover:bg-white/[0.04]'}"
-      >
-        Installed ({installedCount})
-      </button>
-      <button
-        onclick={() => (activeFilter = "available")}
-        class="px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer border {activeFilter === 'available'
-          ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
-          : 'bg-transparent text-neutral-400 border-transparent hover:text-white hover:bg-white/[0.04]'}"
-      >
-        Available ({Math.max(0, models.length - installedCount)})
-      </button>
-    </div>
-  </div>
-
-  <!-- Main Scrollable Catalog Feed -->
+  <!-- Main Scrollable Catalog Feed (4 Authorized Sovereign Engines) -->
   <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
     <!-- Zero Installed First-Run Banner -->
-    {#if installedCount === 0 && !searchQuery && activeFilter !== "installed"}
+    {#if installedCount === 0}
       <div class="bg-gradient-to-br from-emerald-950/30 to-[#0c0e14] border border-emerald-500/20 rounded-xl p-3.5 space-y-2">
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -621,18 +514,7 @@
       </div>
     {/if}
 
-    {#if filteredModels.length === 0}
-      <div class="py-16 text-center text-xs font-mono text-neutral-600 space-y-2 select-none">
-        <p>No models matching "{searchQuery}"</p>
-        <button
-          onclick={() => { searchQuery = ""; activeFilter = "all"; }}
-          class="text-sky-400 hover:underline text-[11px]"
-        >
-          Reset filters
-        </button>
-      </div>
-    {:else}
-      {#each filteredModels as m (m.filename)}
+    {#each displayModels as m (m.filename)}
         {@const dl = downloads[m.filename] || downloads[m.tag] || downloads[m.id]}
         {@const isDownloading = dl && (dl.status === "downloading" || dl.status === "starting" || dl.status === "paused")}
         {@const isCurrentActive = m.is_active || (activeFilename && m.filename === activeFilename)}
@@ -856,7 +738,6 @@
           {/if}
         </div>
       {/each}
-    {/if}
   </div>
 
   <!-- Minimal Executive Footer -->

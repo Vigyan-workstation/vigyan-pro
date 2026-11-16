@@ -30,6 +30,7 @@
   let contextWindow = $state<number>(2048);
   let fontSize = $state<"sm" | "md" | "lg">("md");
   let autoOpenCanvas = $state<boolean>(true);
+  let hfToken = $state<string>("");
 
   // Storage and hardware diagnostics
   let storageStats = $state<{
@@ -64,6 +65,7 @@
         if (data.context_window !== undefined) contextWindow = data.context_window;
         if (data.font_size) fontSize = data.font_size;
         if (data.auto_open_canvas !== undefined) autoOpenCanvas = data.auto_open_canvas;
+        if (data.hf_token) hfToken = data.hf_token;
         if (data.hardware) {
           totalRamGb = data.hardware.total_ram_gb || 7.0;
           hardwareTier = data.hardware.tier || "cpu_budget";
@@ -86,6 +88,8 @@
         if (localCtx) contextWindow = parseInt(localCtx, 10);
         const localFont = localStorage.getItem("vigyan_pref_font_size") as "sm" | "md" | "lg" | null;
         if (localFont) fontSize = localFont;
+        const localToken = localStorage.getItem("vigyan_hf_token");
+        if (localToken) hfToken = localToken;
       } catch {}
     }
   }
@@ -102,6 +106,9 @@
       if (key === "font_size") {
         localStorage.setItem("vigyan_pref_font_size", value);
         if (onFontSizeChange) onFontSizeChange(value);
+      }
+      if (key === "hf_token") {
+        localStorage.setItem("vigyan_hf_token", String(value));
       }
     } catch {}
 
@@ -375,6 +382,22 @@
           </button>
         </div>
 
+        <!-- Hugging Face Authentication Token -->
+        <div class="space-y-1.5 pt-2 border-t border-white/10">
+          <div class="flex items-center justify-between">
+            <label for="hf-token-input" class="text-xs text-neutral-300 font-medium">Hugging Face Access Token</label>
+            <span class="text-[10px] font-mono text-neutral-500">For private models</span>
+          </div>
+          <input
+            id="hf-token-input"
+            type="password"
+            bind:value={hfToken}
+            onchange={() => updateSetting("hf_token", hfToken)}
+            placeholder="hf_..."
+            class="w-full bg-[#11131a] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-neutral-600 focus:outline-none focus:border-white/30"
+          />
+        </div>
+
       </div>
     </section>
 
@@ -422,15 +445,15 @@
       <div class="bg-[#0a0a0a] border border-white/10 rounded-3xl p-4 space-y-2.5 text-[11px] shadow-md">
         <div class="flex items-center justify-between text-white">
           <span class="font-semibold text-xs">Vigyan Pro Desktop</span>
-          <span class="font-mono text-[10px] text-black bg-white px-2.5 py-0.5 rounded-full font-semibold">v5.0.0</span>
+          <span class="font-mono text-[10px] text-black bg-white px-2.5 py-0.5 rounded-full font-semibold">v5.0.2</span>
         </div>
         <p class="text-neutral-400 leading-relaxed text-[10px]">
           Sovereign physical and mathematical engineering intelligence workstation combining local SLMs with exact closed-form SymPy CAS algebra.
         </p>
         <div class="pt-2.5 border-t border-white/10 space-y-1 text-[10px] font-mono text-neutral-500">
           <div class="flex justify-between">
-            <span>Author</span>
-            <span class="text-neutral-300">ExperimentLab AI</span>
+            <span>Architect</span>
+            <span class="text-neutral-300">Shreyansh Singh</span>
           </div>
           <div class="flex justify-between">
             <span>Architecture</span>

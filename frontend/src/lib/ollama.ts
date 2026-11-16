@@ -6,6 +6,12 @@ import { compressContext, isCompressionEnabled } from "./compression";
 
 export const DEFAULT_MODEL = "vigyan:3b";
 
+export interface AttachmentPayload {
+  type: string;
+  data: string;
+  name: string;
+}
+
 export interface ToolResult {
   tool: string;
   render_type?: string;
@@ -102,10 +108,11 @@ export async function getAvailableModels(): Promise<string[]> {
  * and falls back seamlessly to direct Ollama daemon.
  */
 export async function streamChat(
-  messages: { role: "user" | "assistant" | "system"; content: string }[],
+  messages: { role: "user" | "assistant" | "system"; content: string; attachment?: AttachmentPayload }[],
   model: string,
   onChunk: (chunk: StreamChunk) => void,
   signal?: AbortSignal,
+  attachment?: AttachmentPayload,
 ): Promise<void> {
   let payloadMessages = messages;
   if (isCompressionEnabled() && messages.length > 6) {
@@ -128,15 +135,20 @@ export async function streamChat(
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["X-Vigyan-Token"] = token;
 
+    const chatBody: any = {
+      query: latestUserMsg,
+      messages: payloadMessages,
+      model: model || DEFAULT_MODEL,
+      num_ctx: userCtx,
+    };
+    if (attachment) {
+      chatBody.attachment = attachment;
+    }
+
     const bridgeResp = await fetch(`${agentHost}/api/chat`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        query: latestUserMsg,
-        messages: payloadMessages,
-        model: model || DEFAULT_MODEL,
-        num_ctx: userCtx,
-      }),
+      body: JSON.stringify(chatBody),
       signal,
     });
 

@@ -136,3 +136,62 @@ def test_steve_jobs_four_models_whitelist():
     # Verify unauthorized model pull rejection
     assert cmd_pull("unauthorized_model_xyz.gguf") is False
 
+
+def test_hf_token_discovery():
+    """Verify Hugging Face authentication token discovery from environment and config."""
+    from launch_desktop import get_hf_auth_token
+    from vigyan_cli import get_hf_auth_token as cli_get_token
+
+    # Test with HF_TOKEN set
+    old_env = os.environ.get("HF_TOKEN")
+    try:
+        os.environ["HF_TOKEN"] = "hf_test_secret_token_12345"
+        assert get_hf_auth_token() == "hf_test_secret_token_12345"
+        assert cli_get_token() == "hf_test_secret_token_12345"
+    finally:
+        if old_env is not None:
+            os.environ["HF_TOKEN"] = old_env
+        else:
+            os.environ.pop("HF_TOKEN", None)
+
+
+def test_multimodal_vision_routing():
+    """Verify select_cascade_model automatically routes to Vigyan-VL-4B when has_image is True."""
+    # When has_image is True, route to vigyan:4b
+    res_img = select_cascade_model("auto", "Analyze this schematic", has_image=True)
+    assert res_img["model"] == "vigyan:4b"
+    assert res_img["tier"] == 4
+
+    # When explicit 4b request
+    res_4b = select_cascade_model("vigyan:4b", "What is this component?")
+    assert res_4b["model"] == "vigyan:4b"
+
+    # When text-only query without image, route to flagship 3B
+    res_text = select_cascade_model("auto", "Calculate integral", has_image=False)
+    assert res_text["model"] == "vigyan:3b"
+
+
+def test_compress_conversation_history_multimodal_safe():
+    """Verify compress_conversation_history safely handles multimodal message contents (lists) without error."""
+    from launch_desktop import compress_conversation_history
+
+    messages = [
+        {"role": "system", "content": "You are Vigyan AI."},
+        {"role": "user", "content": [
+            {"type": "text", "text": "Analyze this diagram."},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="}}
+        ]},
+        {"role": "assistant", "content": "The diagram displays a low-pass filter."},
+        {"role": "user", "content": "What is the cutoff frequency?"},
+        {"role": "assistant", "content": "The cutoff frequency fc = 1 / (2*pi*R*C)."},
+        {"role": "user", "content": "Can you compute it for R=1k and C=1uF?"},
+        {"role": "assistant", "content": "fc = 159.15 Hz."},
+    ]
+
+    compressed = compress_conversation_history(messages, max_tokens_est=20)
+    assert isinstance(compressed, list)
+    assert len(compressed) > 0
+    # The latest turn should be intact
+    assert compressed[-1]["role"] == "assistant"
+
+

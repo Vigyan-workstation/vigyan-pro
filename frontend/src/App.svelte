@@ -286,6 +286,10 @@
         {fontSize}
         {installedCount}
         {activeDownload}
+        onSelectModel={(m) => {
+          model = m;
+          activeModelName = m;
+        }}
         onStartDownload={() => {
           if (modelsDrawerRef?.downloadFlagship) {
             modelsDrawerRef.downloadFlagship();
