@@ -1,9 +1,9 @@
 <script lang="ts">
-  // ModelsDrawer.svelte — Sovereign Intelligence Model Catalog & Manager
-  // Directly interfaces with Experimentlab Hugging Face models and local ~/.vigyan/models/
-  // Supports Search, Download, Swap, and Safe Deletion with live hardware profiling.
+  // ModelsDrawer.svelte — Steve Jobs 4-Model Purity Vault (v5.0.3)
+  // 70% Decluttering: Pure 4 plain-English cards with zero raw .gguf filenames or RAM math algebra.
+  // Directly connects to Experimentlab public models and local ~/.vigyan/models/
 
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { getAgentHost, getVigyanToken } from "../lib/ollama";
 
   interface Props {
@@ -16,24 +16,6 @@
 
   let { open, onClose, onModelSwapped, onDownloadUpdate, onCatalogUpdate }: Props = $props();
 
-  export interface ModelItem {
-    id: string;
-    name: string;
-    tag: string;
-    filename: string;
-    size_bytes: number;
-    size_formatted: string;
-    actual_size_bytes?: number;
-    ram_required_gb: number;
-    domain: string;
-    hf_url: string;
-    hf_repo: string;
-    is_installed: boolean;
-    is_active: boolean;
-    compatibility: "verified" | "tight" | "incompatible";
-    compatibility_badge: string;
-  }
-
   export interface DownloadInfo {
     tag?: string;
     name?: string;
@@ -43,254 +25,185 @@
     downloaded_bytes: number;
     total_bytes: number;
     speed_mbps: number;
-    eta_seconds?: number;
     eta_formatted?: string;
     error?: string | null;
   }
 
-  let models = $state<ModelItem[]>([]);
+  interface CuratedCard {
+    key: "3b" | "4b" | "7b" | "14b";
+    title: string;
+    subtitle: string;
+    sizeFormatted: string;
+    ramRequiredGb: number;
+    filename: string;
+    rawItem?: any;
+    isInstalled: boolean;
+    isActive: boolean;
+    downloadInfo?: DownloadInfo;
+  }
+
+  let rawModels = $state<any[]>([]);
   let downloads = $state<Record<string, DownloadInfo>>({});
   let activeFilename = $state<string>("");
-  let installedCount = $state<number>(0);
-  let totalCount = $state<number>(0);
-  let hardware = $state<{ total_ram_gb?: number; avail_ram_gb?: number; tier?: string; cpu_threads?: number }>({});
-  
-  let searchQuery = $state("");
-  let activeFilter = $state<"all" | "installed" | "available">("all");
-  let isLoading = $state(false);
-  let isRefreshing = $state(false);
-  let swappingFilename = $state<string | null>(null);
-  let confirmDeleteFilename = $state<string | null>(null);
-  let statusMessage = $state<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  let hardware = $state<{ total_ram_gb?: number }>({ total_ram_gb: 7.0 });
 
-  let activeDownloadList = $derived(
-    Object.values(downloads).filter(d =>
-      d && (d.status === "downloading" || d.status === "starting" || d.status === "paused")
-    )
-  );
-
+  let swappingKey = $state<string | null>(null);
+  let confirmDeleteKey = $state<string | null>(null);
+  let statusMessage = $state<{ text: string; error?: boolean } | null>(null);
+  let statusTimer: ReturnType<typeof setTimeout> | null = null;
   let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-  function isRamExceeded(model: ModelItem): boolean {
-    const totalRam = hardware.total_ram_gb || 7.0;
-    return model.ram_required_gb > totalRam;
+  function showStatus(text: string, error = false) {
+    statusMessage = { text, error };
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+      statusMessage = null;
+    }, 3200);
   }
 
-  function getModelTitle(m: ModelItem): string {
-    const raw = (m.name || m.filename || "").replace(/\.gguf$/i, "").toLowerCase();
-    if (raw.includes("3b")) return "Vigyan-3B Quad-Master";
-    if (raw.includes("vl-4b") || raw.includes("vl4b")) return "Vigyan-VL-4B Multimodal";
-    if (raw.includes("7b")) return "Vigyan-7B Quad-Master";
-    if (raw.includes("14b") || raw.includes("r1")) return "Vigyan-R1-14B Reasoning";
-    if (m.name && !m.name.toLowerCase().endsWith(".gguf") && m.name !== m.filename) {
-      return m.name;
-    }
-    return raw
-      .split(/[-_]/)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-  }
+  // 4 Steve Jobs Curated Cards
+  const cards = $derived<CuratedCard[]>([
+    {
+      key: "3b",
+      title: "Daily STEM",
+      subtitle: "Instant math, physics, calculus & symbolic code",
+      sizeFormatted: "1.4 GB",
+      ramRequiredGb: 4.0,
+      filename: "vigyan-3b-quad-master-iq3_m.gguf",
+      isInstalled: false,
+      isActive: false,
+    },
+    {
+      key: "4b",
+      title: "Vision & Circuits",
+      subtitle: "Understands diagrams, formulas, schematics & photos",
+      sizeFormatted: "1.8 GB",
+      ramRequiredGb: 5.0,
+      filename: "vigyan-vl-4b-iq3_m.gguf",
+      isInstalled: false,
+      isActive: false,
+    },
+    {
+      key: "7b",
+      title: "Doctoral STEM",
+      subtitle: "Advanced derivations, simulations & scientific research",
+      sizeFormatted: "4.1 GB",
+      ramRequiredGb: 8.0,
+      filename: "vigyan-7b-quad-master-q4_k_m.gguf",
+      isInstalled: false,
+      isActive: false,
+    },
+    {
+      key: "14b",
+      title: "Deep Reasoning",
+      subtitle: "Frontier step-by-step thinking for deep problem solving",
+      sizeFormatted: "7.3 GB",
+      ramRequiredGb: 14.0,
+      filename: "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf",
+      isInstalled: false,
+      isActive: false,
+    },
+  ].map(card => {
+    const raw = rawModels.find(m => m.filename === card.filename);
+    const dl = downloads[card.filename] || (raw ? downloads[raw.tag] : undefined);
+    const isInst = raw ? Boolean(raw.is_installed) : false;
+    const isAct = raw ? Boolean(raw.is_active) : (activeFilename === card.filename);
+    return {
+      ...card,
+      rawItem: raw,
+      isInstalled: isInst,
+      isActive: isAct,
+      downloadInfo: dl,
+    };
+  }));
 
-  function getModelSubtitle(m: ModelItem): string {
-    const raw = (m.name || m.filename || "").toLowerCase();
-    if (raw.includes("3b")) return "Daily Driver: Fast STEM, Calculus & Exact Symbolic Mathematics";
-    if (raw.includes("vl-4b") || raw.includes("vl4b")) return "Vision-Language: Circuit Schematics, Waveforms & Diagrams";
-    if (raw.includes("7b")) return "Doctoral Proofs, Complex Engineering & Physical Science";
-    if (raw.includes("14b") || raw.includes("r1")) return "Frontier Step-by-Step Chain-of-Thought & Quantum Physics";
-    return m.domain || "Sovereign Physical Intelligence Engine";
-  }
-
-  function selectFlagship() {
-    const flagship = models.find(m => m.filename.includes("3b"));
-    if (flagship) {
-      if (flagship.is_installed) {
-        handleSwap(flagship);
-      } else {
-        handleDownload(flagship);
-      }
-    }
-  }
-
-  export async function downloadFlagship() {
-    let target = models.find(m => m.id === "vigyan-3b-quad-master" || m.filename.includes("vigyan-3b-quad-master") || m.filename.includes("vigyan-2b-stem"));
-    if (!target) {
-      await fetchCatalog(true, true);
-      target = models.find(m => m.id === "vigyan-3b-quad-master" || m.filename.includes("vigyan-3b-quad-master") || m.filename.includes("vigyan-2b-stem"));
-    }
-    if (target) {
-      await handleDownload(target);
-    } else {
-      try {
-        const host = getAgentHost();
-        const token = getVigyanToken();
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (token) headers["X-Vigyan-Token"] = token;
-        await fetch(`${host}/api/models/download`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ filename: "vigyan-3b-quad-master-iq3_m.gguf" })
-        });
-        await fetchCatalog(true);
-      } catch (e) {
-        console.error("Flagship download dispatch failed:", e);
-      }
-    }
-  }
-
-  async function fetchCatalog(silent = false, forceRefresh = false) {
-    if (!silent) isLoading = true;
+  async function fetchCatalog() {
     try {
       const host = getAgentHost();
       const token = getVigyanToken();
       const headers: Record<string, string> = {};
       if (token) headers["X-Vigyan-Token"] = token;
 
-      const url = forceRefresh ? `${host}/api/models/catalog?refresh=1` : `${host}/api/models/catalog`;
-      const res = await fetch(url, { headers });
+      const res = await fetch(`${host}/api/models/catalog`, { headers });
       if (res.ok) {
         const data = await res.json();
-        models = data.models || [];
-        installedCount = data.installed_count ?? models.filter(m => m.is_installed).length;
-        totalCount = models.length;
+        rawModels = data.models || [];
         activeFilename = data.active_filename || "";
-        hardware = data.hardware || {};
-        downloads = data.downloads || {};
-
-        // Dispatch active download to parent
-        const activeDl = Object.values(downloads).find(d => d.status === "downloading" || d.status === "starting" || d.status === "paused") || null;
-        if (onDownloadUpdate) {
-          onDownloadUpdate(activeDl);
+        if (data.hardware) {
+          hardware = data.hardware;
         }
 
-        // Dispatch catalog metadata to parent
+        const activeItem = rawModels.find(m => m.filename === activeFilename || m.is_active);
+        const installedCount = rawModels.filter(m => m.is_installed).length;
         if (onCatalogUpdate) {
-          const activeItem = models.find(m => m.filename === activeFilename || m.is_active);
-          const displayName = activeItem ? getModelTitle(activeItem) : (activeFilename ? activeFilename.replace(/\.gguf$/i, "") : "");
           onCatalogUpdate({
             installedCount,
             activeFilename,
-            activeModelName: displayName
+            activeModelName: activeItem ? activeItem.name : "Vigyan-3B",
           });
         }
       }
-    } catch (err) {
-      console.error("Failed to fetch model catalog:", err);
-    } finally {
-      if (!silent) isLoading = false;
+    } catch {
+      // offline bridge fallback
     }
   }
 
-  async function handlePauseDownload(dl: DownloadInfo) {
-    try {
-      const host = getAgentHost();
-      const token = getVigyanToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["X-Vigyan-Token"] = token;
-      await fetch(`${host}/api/models/download/pause`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ tag: dl.tag || dl.filename })
-      });
-      statusMessage = { type: "info", text: `Paused download: ${dl.name || dl.filename}` };
-      setTimeout(() => { if (statusMessage?.text.includes("Paused")) statusMessage = null; }, 3000);
-      await fetchCatalog(true);
-    } catch (e: any) {
-      statusMessage = { type: "error", text: `Pause error: ${e.message}` };
-    }
-  }
-
-  async function handleResumeDownload(dl: DownloadInfo) {
-    try {
-      const host = getAgentHost();
-      const token = getVigyanToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["X-Vigyan-Token"] = token;
-      await fetch(`${host}/api/models/download/resume`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ tag: dl.tag || dl.filename })
-      });
-      statusMessage = { type: "info", text: `Resumed download: ${dl.name || dl.filename}` };
-      setTimeout(() => { if (statusMessage?.text.includes("Resumed")) statusMessage = null; }, 3000);
-      await fetchCatalog(true);
-    } catch (e: any) {
-      statusMessage = { type: "error", text: `Resume error: ${e.message}` };
-    }
-  }
-
-  async function handleCancelDownload(dl: DownloadInfo) {
-    try {
-      const host = getAgentHost();
-      const token = getVigyanToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["X-Vigyan-Token"] = token;
-      await fetch(`${host}/api/models/download/cancel`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ tag: dl.tag || dl.filename, remove_part: true })
-      });
-      statusMessage = { type: "info", text: `Cancelled download: ${dl.name || dl.filename}` };
-      setTimeout(() => { if (statusMessage?.text.includes("Cancelled")) statusMessage = null; }, 3000);
-      await fetchCatalog(true);
-    } catch (e: any) {
-      statusMessage = { type: "error", text: `Cancel error: ${e.message}` };
-    }
-  }
-
-  async function handleRefreshCatalog() {
-    isRefreshing = true;
-    statusMessage = { type: "info", text: "Scanning Hugging Face for newly published models…" };
+  async function pollDownloads() {
     try {
       const host = getAgentHost();
       const token = getVigyanToken();
       const headers: Record<string, string> = {};
       if (token) headers["X-Vigyan-Token"] = token;
-      await fetch(`${host}/api/models/catalog/refresh`, { method: "POST", headers });
-      await fetchCatalog(true);
-      statusMessage = { type: "success", text: "Catalog synchronized with Hugging Face (Experimentlab)" };
-      setTimeout(() => { if (statusMessage?.text.includes("synchronized")) statusMessage = null; }, 3500);
-    } catch (e: any) {
-      statusMessage = { type: "error", text: `Refresh error: ${e.message}` };
-    } finally {
-      isRefreshing = false;
-    }
+
+      const res = await fetch(`${host}/api/models/download/status`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        downloads = data;
+
+        const activeList = Object.values(data).filter((d: any) =>
+          d && (d.status === "downloading" || d.status === "starting")
+        );
+        if (onDownloadUpdate) {
+          onDownloadUpdate(activeList.length > 0 ? (activeList[0] as DownloadInfo) : null);
+        }
+
+        const hasFinished = Object.values(data).some((d: any) => d && d.status === "ready");
+        if (hasFinished) {
+          await fetchCatalog();
+        }
+      }
+    } catch {}
   }
 
-  async function handleDownload(model: ModelItem) {
+  async function handleDownload(card: CuratedCard) {
     try {
       const host = getAgentHost();
       const token = getVigyanToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["X-Vigyan-Token"] = token;
 
+      showStatus(`Starting download for ${card.title}…`);
       const res = await fetch(`${host}/api/models/download`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          filename: model.filename,
-          name: model.name,
-          hf_url: model.hf_url,
-          size_bytes: model.size_bytes
-        })
+        body: JSON.stringify({ filename: card.filename }),
       });
 
       if (res.ok) {
-        statusMessage = { type: "info", text: `Download started: ${model.name}` };
-        setTimeout(() => { if (statusMessage?.text.includes("Download started")) statusMessage = null; }, 4000);
-        await fetchCatalog(true);
+        pollDownloads();
       } else {
         const err = await res.json().catch(() => ({}));
-        statusMessage = { type: "error", text: err.error || "Failed to start download" };
+        showStatus(err.error || "Could not start download", true);
       }
-    } catch (err: any) {
-      statusMessage = { type: "error", text: `Network error: ${err.message}` };
+    } catch {
+      showStatus("Network connection error", true);
     }
   }
 
-  async function handleSwap(model: ModelItem) {
-    if (swappingFilename) return;
-    swappingFilename = model.filename;
-    statusMessage = { type: "info", text: `Activating ${model.name}…` };
+  async function handleSwap(card: CuratedCard) {
+    if (swappingKey) return;
+    swappingKey = card.key;
+    showStatus(`Activating ${card.title}…`);
 
     try {
       const host = getAgentHost();
@@ -301,33 +214,35 @@
       const res = await fetch(`${host}/api/models/swap`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ filename: model.filename })
+        body: JSON.stringify({ filename: card.filename }),
       });
 
       if (res.ok) {
-        const data = await res.json();
-        activeFilename = data.active_model || model.filename;
-        statusMessage = { type: "success", text: `Active engine switched to ${model.name}` };
-        setTimeout(() => { statusMessage = null; }, 3000);
-        await fetchCatalog(true);
-        if (onModelSwapped) onModelSwapped(model.filename);
+        activeFilename = card.filename;
+        await fetchCatalog();
+        if (onModelSwapped) onModelSwapped(card.filename);
+        showStatus(`${card.title} is now active!`);
       } else {
         const err = await res.json().catch(() => ({}));
-        statusMessage = { type: "error", text: err.error || "Failed to swap model" };
+        showStatus(err.error || "Failed to switch model", true);
       }
-    } catch (err: any) {
-      statusMessage = { type: "error", text: `Swap failed: ${err.message}` };
+    } catch {
+      showStatus("Connection error during switch", true);
     } finally {
-      swappingFilename = null;
+      swappingKey = null;
     }
   }
 
-  async function handleDelete(model: ModelItem) {
-    if (confirmDeleteFilename !== model.filename) {
-      confirmDeleteFilename = model.filename;
+  async function handleDelete(card: CuratedCard) {
+    if (confirmDeleteKey !== card.key) {
+      confirmDeleteKey = card.key;
+      setTimeout(() => {
+        if (confirmDeleteKey === card.key) confirmDeleteKey = null;
+      }, 3500);
       return;
     }
 
+    confirmDeleteKey = null;
     try {
       const host = getAgentHost();
       const token = getVigyanToken();
@@ -337,412 +252,189 @@
       const res = await fetch(`${host}/api/models/delete`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ filename: model.filename })
+        body: JSON.stringify({ filename: card.filename }),
       });
 
       if (res.ok) {
-        statusMessage = { type: "info", text: `Deleted ${model.filename}. Space reclaimed.` };
-        setTimeout(() => { statusMessage = null; }, 3500);
-        confirmDeleteFilename = null;
-        await fetchCatalog(true);
+        showStatus(`Deleted ${card.title}`);
+        await fetchCatalog();
       } else {
-        const err = await res.json().catch(() => ({}));
-        statusMessage = { type: "error", text: err.error || "Failed to delete model" };
+        showStatus("Could not delete model", true);
       }
-    } catch (err: any) {
-      statusMessage = { type: "error", text: `Delete failed: ${err.message}` };
+    } catch {
+      showStatus("Failed to delete model", true);
     }
   }
 
-  // Filter & Canonical Order for the 4 Authorized Sovereign Engines
-  const CANONICAL_ORDER = [
-    "vigyan-3b-quad-master-iq3_m.gguf",
-    "vigyan-vl-4b-iq3_m.gguf",
-    "vigyan-7b-quad-master-q4_k_m.gguf",
-    "vigyan-r1-14b-health-semi-quantum-iq3_m.gguf"
-  ];
-
-  let displayModels = $derived(
-    [...models].sort((a, b) => {
-      const idxA = CANONICAL_ORDER.indexOf(a.filename);
-      const idxB = CANONICAL_ORDER.indexOf(b.filename);
-      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
-    })
-  );
-
-  // Check if any download is active or paused to adjust polling rate
-  let hasActiveDownloads = $derived(
-    Object.values(downloads).some(d => d && (d.status === "downloading" || d.status === "starting" || d.status === "paused"))
-  );
-
   $effect(() => {
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      pollInterval = null;
-    }
-
     if (open) {
-      fetchCatalog(true);
-      pollInterval = setInterval(() => {
-        fetchCatalog(true);
-      }, hasActiveDownloads ? 1200 : 4000);
-    } else if (hasActiveDownloads) {
-      // Continue tracking background downloads when drawer is closed
-      pollInterval = setInterval(() => {
-        fetchCatalog(true);
-      }, 1500);
+      fetchCatalog();
+      if (!pollInterval) {
+        pollInterval = setInterval(pollDownloads, 1200);
+      }
     } else {
-      confirmDeleteFilename = null;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
     }
   });
 
-  onMount(() => {
-    fetchCatalog(true);
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
+  onDestroy(() => {
+    if (pollInterval) clearInterval(pollInterval);
   });
 </script>
 
-<!-- Backdrop Blur -->
 {#if open}
-  <button
-    type="button"
-    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm border-0 cursor-default"
+  <!-- Tactile backdrop -->
+  <div
+    role="button"
+    tabindex="0"
+    aria-label="Close Model Vault"
     onclick={onClose}
-    aria-label="Close models drawer"
-  ></button>
+    onkeydown={(e) => (e.key === "Escape" || e.key === "Enter" || e.key === " ") && onClose()}
+    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 cursor-pointer"
+  ></div>
 {/if}
 
-<!-- Obsidian Executive Slide-in Drawer with Apple Fluid Spring Curve -->
+<!-- Steve Jobs 4-Model Drawer -->
 <aside
-  class="fixed top-0 right-0 h-full w-full sm:w-[440px] z-50 flex flex-col bg-[#07080b] border-l border-white/[0.08] shadow-2xl transition-transform duration-300 {open
-    ? 'translate-x-0'
-    : 'translate-x-full'}"
-  style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); will-change: transform;"
+  class="fixed top-0 right-0 h-full w-[440px] max-w-[94vw] bg-[#06080c] border-l border-white/10 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] {open ? 'translate-x-0' : 'translate-x-full'}"
+  aria-label="Intelligence Vault"
 >
-  <!-- Executive Header -->
-  <div class="px-5 py-3.5 border-b border-white/[0.07] bg-[#0a0c10] flex-shrink-0">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <span class="text-xs font-mono font-semibold tracking-wider text-white uppercase">Intelligence Models</span>
-        <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/[0.06] border border-white/10 text-neutral-300">
-          {installedCount} of {totalCount} ready
-        </span>
-      </div>
-      <button
-        onclick={onClose}
-        class="text-neutral-500 hover:text-white transition-colors p-1 cursor-pointer flex items-center justify-center rounded"
-        aria-label="Close"
-      >
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
+  <!-- Header -->
+  <div class="px-6 py-5 border-b border-white/[0.08] flex items-center justify-between flex-shrink-0">
+    <div class="space-y-0.5">
+      <h2 class="text-sm font-semibold tracking-tight text-white flex items-center gap-2">
+        <span>Intelligence Models</span>
+        <span class="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded-full font-mono font-medium">4 Models</span>
+      </h2>
+      <p class="text-[11px] text-neutral-400">100% offline sovereign reasoning engines</p>
     </div>
-
-    <div class="flex items-center justify-between mt-1 text-[10px] font-mono text-neutral-500">
-      <div class="flex items-center gap-1.5 truncate">
-        <span>Registry:</span>
-        <a
-          href="https://huggingface.co/shreyansh12183"
-          target="_blank"
-          rel="noreferrer"
-          class="text-sky-400 hover:underline truncate"
-        >
-          huggingface.co/shreyansh12183
-        </a>
-        <button
-          onclick={handleRefreshCatalog}
-          disabled={isRefreshing}
-          class="ml-1 px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-neutral-400 hover:text-white border border-white/10 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-          title="Check Hugging Face for newly added or updated models"
-        >
-          <span class={isRefreshing ? "animate-spin" : ""}>↻</span>
-          <span>{isRefreshing ? "Syncing…" : "Sync"}</span>
-        </button>
-      </div>
-      {#if hardware.total_ram_gb}
-        <span class="text-neutral-400">{hardware.avail_ram_gb ?? 2.0}G / {hardware.total_ram_gb}G RAM</span>
-      {/if}
-    </div>
+    <button
+      onclick={onClose}
+      class="w-7 h-7 rounded-full bg-white/5 hover:bg-white/15 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+      aria-label="Close models"
+    >
+      ✕
+    </button>
   </div>
 
-  <!-- Toast Notification Bar -->
+  <!-- Status Notification -->
   {#if statusMessage}
-    <div
-      class="px-5 py-2 text-xs font-mono flex items-center justify-between border-b transition-all {statusMessage.type === 'error'
-        ? 'bg-rose-950/40 border-rose-800/40 text-rose-300'
-        : statusMessage.type === 'success'
-        ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-300'
-        : 'bg-sky-950/40 border-sky-800/40 text-sky-300'}"
-    >
-      <span class="truncate">{statusMessage.text}</span>
-      <button onclick={() => (statusMessage = null)} class="text-xs hover:opacity-75 cursor-pointer ml-2">&times;</button>
+    <div class="px-6 py-2 text-xs font-medium tracking-tight text-center flex-shrink-0 transition-all {statusMessage.error ? 'bg-rose-500 text-white' : 'bg-white text-black'}">
+      {statusMessage.text}
     </div>
   {/if}
 
-  <!-- Whisper-Quiet Micro Download Bar (Compact & Minimal) -->
-  {#if activeDownloadList.length > 0}
-    <div class="px-5 py-2 border-b border-sky-500/20 bg-sky-950/20 flex items-center justify-between gap-3 text-xs font-mono flex-shrink-0 animate-fade-in">
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="w-1.5 h-1.5 rounded-full {hasActiveDownloads ? 'bg-sky-400 animate-pulse' : 'bg-amber-400'} flex-shrink-0"></span>
-        <span class="text-white text-[11px] truncate">
-          Downloading {activeDownloadList[0].name || activeDownloadList[0].filename}
-        </span>
-      </div>
-      <div class="flex items-center gap-2 flex-shrink-0 text-[11px]">
-        <span class="text-sky-300 font-semibold">{activeDownloadList[0].progress_pct.toFixed(0)}%</span>
-        <span class="text-neutral-400 text-[10px] hidden sm:inline">{activeDownloadList[0].speed_mbps.toFixed(1)} MB/s</span>
-      </div>
-    </div>
-  {/if}
+  <!-- Body: 4 Curated Plain-English Cards -->
+  <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+    {#each cards as card}
+      {@const dl = card.downloadInfo}
+      {@const isDownloading = dl && (dl.status === "downloading" || dl.status === "starting")}
+      {@const isOverRam = card.ramRequiredGb > (hardware.total_ram_gb || 7.0)}
 
-  <!-- Main Scrollable Catalog Feed (4 Authorized Sovereign Engines) -->
-  <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-    <!-- Zero Installed First-Run Banner -->
-    {#if installedCount === 0}
-      <div class="bg-gradient-to-br from-emerald-950/30 to-[#0c0e14] border border-emerald-500/20 rounded-xl p-3.5 space-y-2">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <h4 class="text-xs font-semibold text-white tracking-wide">First-Run Setup</h4>
+      <div class="p-4 rounded-2xl border transition-all duration-200 {card.isActive
+        ? 'bg-white/[0.06] border-white/40 shadow-lg'
+        : 'bg-white/[0.02] border-white/[0.08] hover:border-white/20 hover:bg-white/[0.04]'}">
+
+        <!-- Card Top: Title, Size, and Active Badge -->
+        <div class="flex items-start justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold text-white tracking-tight">{card.title}</h3>
+              <span class="text-[11px] font-mono text-neutral-400 bg-white/5 px-2 py-0.5 rounded-md">{card.sizeFormatted}</span>
+            </div>
+            <p class="text-xs text-neutral-400 leading-relaxed">{card.subtitle}</p>
+          </div>
+
+          {#if card.isActive}
+            <span class="flex-shrink-0 text-[10px] font-semibold text-black bg-white px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm">
+              Active
+            </span>
+          {/if}
         </div>
-        <p class="text-[11px] text-neutral-300 leading-relaxed font-sans">
-          No model is installed yet. Download <strong class="text-white">Vigyan-3B Quad-Master</strong> below for complete offline STEM reasoning.
-        </p>
-      </div>
-    {/if}
 
-    {#each displayModels as m (m.filename)}
-        {@const dl = downloads[m.filename] || downloads[m.tag] || downloads[m.id]}
-        {@const isDownloading = dl && (dl.status === "downloading" || dl.status === "starting" || dl.status === "paused")}
-        {@const isCurrentActive = m.is_active || (activeFilename && m.filename === activeFilename)}
-
-        <div
-          class="group rounded-xl border p-3.5 transition-all flex flex-col gap-2.5 {isCurrentActive
-            ? 'bg-[#0b1218] border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.06)]'
-            : m.is_installed
-            ? 'bg-[#0a0c10] border-white/[0.08] hover:border-white/20'
-            : 'bg-[#08090d]/80 border-white/[0.05] hover:border-white/15'}"
-        >
-          <!-- Top Row: Title, Badges -->
-          <div class="flex items-start justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-xs font-semibold text-white tracking-tight truncate">
-                  {getModelTitle(m)}
-                </h3>
-                {#if isCurrentActive}
-                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono font-medium text-emerald-400">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Active
-                  </span>
-                {/if}
-              </div>
-              <p class="text-[11px] text-neutral-400 font-sans mt-0.5 leading-snug line-clamp-2">
-                {getModelSubtitle(m)}
-              </p>
+        <!-- Download Progress Bar (When actively downloading) -->
+        {#if isDownloading}
+          <div class="mt-3.5 space-y-1.5 pt-3 border-t border-white/[0.06]">
+            <div class="flex items-center justify-between text-[11px] font-mono text-neutral-400">
+              <span class="text-white font-medium">{dl?.status === "starting" ? "Connecting…" : `${dl?.progress_pct || 0}%`}</span>
+              <span>{dl?.speed_mbps ? `${dl.speed_mbps.toFixed(1)} MB/s` : ""}</span>
             </div>
-
-            <!-- Size Pill -->
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.05] border border-white/10 text-neutral-300 flex-shrink-0">
-              {m.size_formatted}
-            </span>
+            <div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-white rounded-full transition-all duration-300"
+                style="width: {dl?.progress_pct || 5}%"
+              ></div>
+            </div>
           </div>
+        {/if}
 
-          <!-- Compatibility & Architecture Metadata -->
-          <div class="flex items-center gap-1.5 flex-wrap">
-            {#if isRamExceeded(m)}
-              <span class="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/25 text-rose-300">
-                <span>✕</span>
-                <span>Requires {m.ram_required_gb.toFixed(1)} GB RAM (Host: {hardware.total_ram_gb?.toFixed(1) || '7.0'} GB)</span>
-              </span>
-            {:else if m.compatibility === "verified"}
-              <span class="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/25 text-emerald-300">
-                <span>●</span>
-                <span>{m.compatibility_badge}</span>
-              </span>
-            {:else if m.compatibility === "tight"}
-              <span class="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 border border-amber-500/25 text-amber-300">
-                <span>▲</span>
-                <span>{m.compatibility_badge}</span>
-              </span>
-            {:else}
-              <span class="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/25 text-rose-300">
-                <span>✕</span>
-                <span>{m.compatibility_badge}</span>
-              </span>
-            {/if}
-
-            <span class="text-[9px] font-mono text-neutral-600 truncate">
-              {m.filename}
-            </span>
-          </div>
-
-          <!-- Action States -->
+        <!-- Card Bottom: Action Controls -->
+        <div class="mt-3.5 pt-3 border-t border-white/[0.06] flex items-center justify-end gap-2">
           {#if isDownloading}
-            <!-- Live Progress Bar Deck -->
-            <div class="space-y-1.5 pt-1">
-              <div class="flex items-center justify-between text-[10px] font-mono text-neutral-300">
-                <span class="flex items-center gap-1.5 {dl.status === 'paused' ? 'text-amber-400' : 'text-sky-400'}">
-                  {#if dl.status === 'paused'}
-                    <span>⏸ Paused</span>
-                  {:else}
-                    <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" />
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span>Downloading…</span>
-                  {/if}
-                </span>
-                <div class="flex items-center gap-2">
-                  <span>{dl.progress_pct.toFixed(1)}% ({dl.status === 'paused' ? '0 MB/s' : `${dl.speed_mbps.toFixed(1)} MB/s`})</span>
-                  {#if dl.eta_formatted && dl.status !== 'paused'}
-                    <span class="text-neutral-500">• {dl.eta_formatted}</span>
-                  {/if}
-                </div>
-              </div>
-              <div class="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden border border-white/5">
-                <div
-                  class="h-full {dl.status === 'paused' ? 'bg-amber-500' : 'bg-gradient-to-r from-sky-500 to-emerald-400'} transition-all duration-300"
-                  style="width: {Math.max(2, Math.min(100, dl.progress_pct))}%;"
-                ></div>
-              </div>
-              <div class="flex items-center justify-between text-[10px] font-mono text-neutral-400 pt-0.5">
-                <span>{dl.status === 'paused' ? 'Paused in Download Manager' : 'Streaming via Hugging Face'}</span>
-                <span class="text-neutral-500">Deck controls above ↑</span>
-              </div>
-            </div>
-          {:else if dl && (dl.status === 'completed' || dl.status === 'ready' || dl.progress_pct >= 99.9) && !m.is_installed}
-            <div class="flex items-center justify-between pt-1">
-              <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span>Download Complete</span>
-              </span>
+            <span class="text-xs text-neutral-400 font-mono">Downloading…</span>
+          {:else if card.isInstalled}
+            <!-- Delete button -->
+            <button
+              onclick={() => handleDelete(card)}
+              class="px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer {confirmDeleteKey === card.key
+                ? 'bg-rose-500 text-white font-medium'
+                : 'text-neutral-500 hover:text-rose-400 hover:bg-white/5'}"
+              title="Delete model from disk"
+            >
+              {confirmDeleteKey === card.key ? "Confirm Delete" : "Delete"}
+            </button>
+
+            <!-- Switch / Use button -->
+            {#if !card.isActive}
               <button
-                onclick={() => handleSwap(m)}
-                class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 cursor-pointer flex items-center gap-1"
+                onclick={() => handleSwap(card)}
+                disabled={swappingKey !== null}
+                class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white text-black hover:bg-neutral-200 transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
-                <span>Activate Now ›</span>
+                {swappingKey === card.key ? "Activating…" : "Use"}
               </button>
-            </div>
-          {:else if dl && dl.status === 'error'}
-            <div class="flex items-center justify-between pt-1 gap-2">
-              <span class="inline-flex items-center gap-1.5 text-[10px] font-mono text-rose-400 truncate">
-                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                <span class="truncate">Download failed: {dl.error || "Network error"}</span>
+            {/if}
+          {:else if isOverRam}
+            <!-- Steve Jobs hardware guidance for low-RAM laptops -->
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] text-amber-300/80 bg-amber-950/40 border border-amber-500/20 px-2 py-1 rounded-lg">
+                Requires 16GB+ RAM
               </span>
               <button
-                onclick={() => handleDownload(m)}
-                class="px-2.5 py-1 rounded text-[11px] font-mono font-medium bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 cursor-pointer flex items-center gap-1 flex-shrink-0"
+                onclick={() => {
+                  const c3b = cards.find(c => c.key === "3b");
+                  if (c3b) {
+                    if (c3b.isInstalled) handleSwap(c3b);
+                    else handleDownload(c3b);
+                  }
+                }}
+                class="px-3 py-1.5 rounded-xl text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all cursor-pointer"
               >
-                <span>Retry ↻</span>
+                Use 3B ›
               </button>
             </div>
           {:else}
-            <!-- Button Deck -->
-            <div class="flex items-center justify-end gap-2 pt-1">
-              {#if m.is_installed}
-                {#if isCurrentActive}
-                  <button
-                    disabled
-                    class="px-3 py-1.5 rounded-lg text-xs font-mono bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 cursor-default flex items-center gap-1.5"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    <span>Active Engine</span>
-                  </button>
-                {:else if isRamExceeded(m)}
-                  <div class="flex items-center gap-1.5">
-                    <span
-                      class="px-2 py-1 rounded text-[10px] font-mono bg-amber-950/40 border border-amber-500/25 text-amber-300"
-                      title="Exceeds host RAM: {m.ram_required_gb.toFixed(1)} GB required vs {hardware.total_ram_gb?.toFixed(1) || '7.0'} GB available"
-                    >
-                      Requires 16GB+ RAM
-                    </span>
-                    <button
-                      onclick={selectFlagship}
-                      class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer"
-                      title="Activate recommended 3B model"
-                    >
-                      Use 3B ›
-                    </button>
-                  </div>
-                {:else}
-                  <button
-                    onclick={() => handleSwap(m)}
-                    disabled={swappingFilename !== null}
-                    class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-white/10 hover:bg-white/20 border border-white/15 text-white transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                    {#if swappingFilename === m.filename}
-                      <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      <span>Activating…</span>
-                    {:else}
-                      <svg class="w-3 h-3 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                      </svg>
-                      <span>Switch & Chat</span>
-                    {/if}
-                  </button>
-                {/if}
-
-                <!-- Delete Action -->
-                <button
-                  onclick={() => handleDelete(m)}
-                  title={confirmDeleteFilename === m.filename ? "Click again to confirm delete" : "Delete model"}
-                  class="px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-all cursor-pointer {confirmDeleteFilename === m.filename
-                    ? 'bg-rose-500/20 border-rose-500/50 text-rose-300'
-                    : 'bg-transparent border-transparent text-neutral-500 hover:text-rose-400 hover:bg-white/[0.04]'}"
-                >
-                  {#if confirmDeleteFilename === m.filename}
-                    <span>Confirm 🗑</span>
-                  {:else}
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                    </svg>
-                  {/if}
-                </button>
-              {:else if isRamExceeded(m)}
-                <!-- RAM Safety Lockout for uninstalled models with Steve Jobs graceful guidance -->
-                <div class="flex items-center gap-2">
-                  <span class="text-[10px] font-mono text-amber-300/90 bg-amber-950/40 border border-amber-500/25 px-2 py-1 rounded" title="This model requires 16GB+ RAM. Recommended: Vigyan-3B Quad-Master.">
-                    Requires 16GB+ RAM
-                  </span>
-                  <button
-                    onclick={selectFlagship}
-                    class="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1"
-                    title="Install recommended 3B model"
-                  >
-                    Use Recommended 3B ›
-                  </button>
-                </div>
-              {:else}
-                <!-- Download Button -->
-                <button
-                  onclick={() => handleDownload(m)}
-                  class="px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-400/30 text-white shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                  <span>Download</span>
-                </button>
-              {/if}
-            </div>
+            <!-- Clean 1-click Download button -->
+            <button
+              onclick={() => handleDownload(card)}
+              class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white text-black hover:bg-neutral-200 transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            >
+              <span>Download</span>
+              <span class="opacity-60 text-[10px]">({card.sizeFormatted})</span>
+            </button>
           {/if}
         </div>
-      {/each}
+
+      </div>
+    {/each}
   </div>
 
   <!-- Minimal Executive Footer -->
-  <div class="px-5 py-2.5 border-t border-white/[0.06] bg-[#090b0e] text-[10px] font-mono text-neutral-500 flex items-center justify-between flex-shrink-0">
-    <span class="truncate">~/.vigyan/models/</span>
-    <span class="text-neutral-400">Zero Cloud Egress</span>
+  <div class="px-6 py-3.5 border-t border-white/[0.08] bg-[#040608] flex items-center justify-between text-[11px] text-neutral-400 flex-shrink-0">
+    <span>Public on Experimentlab</span>
+    <span>Zero Token Required</span>
   </div>
 </aside>

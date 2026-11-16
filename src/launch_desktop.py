@@ -1159,9 +1159,9 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "size_formatted": "1.83 GB",
         "ram_required_gb": 5.0,
         "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-vl-4b-gguf",
-        "mmproj_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
+        "mmproj_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
         "mmproj_filename": "mmproj-vigyan-vl-4b-f16.gguf",
         "template": "{{ prompt }}",
         "stop": ["<|endoftext|>", "<|im_end|>"]
@@ -2356,14 +2356,14 @@ class _NeuroSymbolicHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b'{"error":"Forbidden: Invalid or missing X-Vigyan-Token"}')
                 return
 
-        if self.path.startswith("/api/models/catalog"):
+        if self.path.startswith("/api/models/catalog") or self.path == "/api/models" or self.path.startswith("/api/models?"):
             force = ("refresh=1" in self.path or "refresh=true" in self.path)
             payload = get_models_catalog(force_refresh=force)
             self._send_cors(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
             return
 
-        if self.path.startswith("/api/models/download/status"):
+        if self.path.startswith("/api/models/download/status") or self.path.startswith("/api/models/downloads"):
             payload = _DOWNLOAD_MGR.get_status()
             self._send_cors(200)
             self.wfile.write(json.dumps(payload).encode("utf-8"))
@@ -2564,6 +2564,39 @@ try {{ localStorage.setItem('vigyan_token', '{_SESSION_TOKEN}'); localStorage.se
                     "error": err_msg,
                     "reverted_to": os.path.basename(prev_model) if reverted else None
                 }).encode("utf-8"))
+            return
+
+        if self.path.startswith("/api/models/purge"):
+            try:
+                models_dir = os.path.expanduser("~/.vigyan/models")
+                reclaimed_bytes = 0
+                
+                # Stop supervisor
+                LLAMA_SUPERVISOR.stop()
+                time.sleep(0.3)
+
+                if os.path.isdir(models_dir):
+                    for root, _, files in os.walk(models_dir):
+                        for f in files:
+                            if f.endswith(".gguf") or f.endswith(".part"):
+                                fp = os.path.join(root, f)
+                                try:
+                                    sz = os.path.getsize(fp)
+                                    os.remove(fp)
+                                    reclaimed_bytes += sz
+                                except Exception:
+                                    pass
+
+                reclaimed_gb = round(reclaimed_bytes / (1024 ** 3), 2)
+                self._send_cors(200)
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "reclaimed_bytes": reclaimed_bytes,
+                    "reclaimed_formatted": f"{reclaimed_gb} GB"
+                }).encode("utf-8"))
+            except Exception as exc:
+                self._send_cors(500)
+                self.wfile.write(json.dumps({"success": False, "error": str(exc)}).encode("utf-8"))
             return
 
         if self.path.startswith("/api/models/delete"):

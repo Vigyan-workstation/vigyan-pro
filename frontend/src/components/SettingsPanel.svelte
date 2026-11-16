@@ -1,7 +1,8 @@
 <script lang="ts">
-  // SettingsPanel.svelte — Sovereign Executive Preferences & Workstation Tuning
-  // Dual-persisted (localStorage + ~/.vigyan/config.json) via /api/settings.
-  // Full hardware threading clamps, temperature presets, and storage diagnostics.
+  // SettingsPanel.svelte — Steve Jobs Sovereign Control Center (v5.0.3)
+  // Radical 80% reduction: Pure 4-row tactile control center.
+  // Dual-persisted (localStorage + ~/.vigyan/config.json).
+  // Zero nerd clutter: No CPU core sliders, no HF token fields, no raw numbers.
 
   import { onMount } from "svelte";
   import { chatStore } from "../lib/chatStore.svelte";
@@ -23,16 +24,11 @@
     onFontSizeChange,
   }: Props = $props();
 
-  // Inference tuning state
-  let temperature = $state<number>(0.0);
-  let cpuThreads = $state<number>(3);
-  let maxThreads = $state<number>(4);
-  let contextWindow = $state<number>(2048);
+  // Pure 4-Row State
+  let responseStyle = $state<"precise" | "balanced" | "creative">("precise");
   let fontSize = $state<"sm" | "md" | "lg">("md");
-  let autoOpenCanvas = $state<boolean>(true);
-  let hfToken = $state<string>("");
 
-  // Storage and hardware diagnostics
+  // Storage Stats
   let storageStats = $state<{
     models_formatted?: string;
     free_formatted?: string;
@@ -40,13 +36,24 @@
     disk_percent?: number;
   } | null>(null);
 
-  let hardwareTier = $state<string>("cpu_budget");
-  let totalRamGb = $state<number>(7.0);
+  // Confirmations
+  let confirmClearChat = $state<boolean>(false);
+  let clearTimer: ReturnType<typeof setTimeout> | null = null;
 
-  let confirmReset = $state<boolean>(false);
-  let resetTimer: ReturnType<typeof setTimeout> | null = null;
-  let saveNotice = $state<string | null>(null);
+  let confirmPurge = $state<boolean>(false);
+  let purgeTimer: ReturnType<typeof setTimeout> | null = null;
+  let isPurging = $state<boolean>(false);
+
+  let statusNotice = $state<string | null>(null);
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function showNotice(msg: string) {
+    statusNotice = msg;
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => {
+      statusNotice = null;
+    }, 2800);
+  }
 
   async function loadSettings() {
     try {
@@ -59,99 +66,151 @@
       const res = await fetch(`${host}/api/settings`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.temperature !== undefined) temperature = data.temperature;
-        if (data.cpu_threads !== undefined) cpuThreads = data.cpu_threads;
-        if (data.max_cpu_threads !== undefined) maxThreads = data.max_cpu_threads;
-        if (data.context_window !== undefined) contextWindow = data.context_window;
-        if (data.font_size) fontSize = data.font_size;
-        if (data.auto_open_canvas !== undefined) autoOpenCanvas = data.auto_open_canvas;
-        if (data.hf_token) hfToken = data.hf_token;
-        if (data.hardware) {
-          totalRamGb = data.hardware.total_ram_gb || 7.0;
-          hardwareTier = data.hardware.tier || "cpu_budget";
+        if (data.temperature !== undefined) {
+          if (data.temperature <= 0.1) responseStyle = "precise";
+          else if (data.temperature <= 0.5) responseStyle = "balanced";
+          else responseStyle = "creative";
         }
+        if (data.font_size) fontSize = data.font_size;
       }
 
-      // 2. Fetch storage diagnostics
-      const stRes = await fetch(`${host}/api/storage`, { headers });
-      if (stRes.ok) {
-        storageStats = await stRes.json();
-      }
+      // 2. Fetch storage
+      await refreshStorage();
     } catch {
-      // Fallback to localStorage if bridge offline
+      // Fallback to localStorage
       try {
         const localTemp = localStorage.getItem("vigyan_pref_temperature");
-        if (localTemp) temperature = parseFloat(localTemp);
-        const localThreads = localStorage.getItem("vigyan_pref_threads");
-        if (localThreads) cpuThreads = parseInt(localThreads, 10);
-        const localCtx = localStorage.getItem("vigyan_pref_ctx");
-        if (localCtx) contextWindow = parseInt(localCtx, 10);
+        if (localTemp) {
+          const t = parseFloat(localTemp);
+          if (t <= 0.1) responseStyle = "precise";
+          else if (t <= 0.5) responseStyle = "balanced";
+          else responseStyle = "creative";
+        }
         const localFont = localStorage.getItem("vigyan_pref_font_size") as "sm" | "md" | "lg" | null;
         if (localFont) fontSize = localFont;
-        const localToken = localStorage.getItem("vigyan_hf_token");
-        if (localToken) hfToken = localToken;
       } catch {}
     }
   }
 
-  async function updateSetting(key: string, value: any) {
-    // Update local storage for zero-latency local render
+  async function refreshStorage() {
     try {
-      if (key === "temperature") localStorage.setItem("vigyan_pref_temperature", String(value));
-      if (key === "cpu_threads") localStorage.setItem("vigyan_pref_threads", String(value));
-      if (key === "context_window") {
-        localStorage.setItem("vigyan_pref_ctx", String(value));
-        localStorage.setItem("vigyan_context_budget", String(value));
-      }
-      if (key === "font_size") {
-        localStorage.setItem("vigyan_pref_font_size", value);
-        if (onFontSizeChange) onFontSizeChange(value);
-      }
-      if (key === "hf_token") {
-        localStorage.setItem("vigyan_hf_token", String(value));
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["X-Vigyan-Token"] = token;
+      const stRes = await fetch(`${host}/api/storage`, { headers });
+      if (stRes.ok) {
+        storageStats = await stRes.json();
       }
     } catch {}
+  }
 
-    // Synchronize to bridge backend (~/.vigyan/config.json)
+  async function setStyle(style: "precise" | "balanced" | "creative") {
+    responseStyle = style;
+    const tempMap = { precise: 0.0, balanced: 0.3, creative: 0.7 };
+    const temp = tempMap[style];
+
+    try {
+      localStorage.setItem("vigyan_pref_temperature", String(temp));
+    } catch {}
+
+    try {
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["X-Vigyan-Token"] = token;
+      await fetch(`${host}/api/settings`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ temperature: temp }),
+      });
+      showNotice(`Style set to ${style.charAt(0).toUpperCase() + style.slice(1)}`);
+    } catch {}
+  }
+
+  async function setSize(size: "sm" | "md" | "lg") {
+    fontSize = size;
+    try {
+      localStorage.setItem("vigyan_pref_font_size", size);
+      if (onFontSizeChange) onFontSizeChange(size);
+    } catch {}
+
+    try {
+      const host = getAgentHost();
+      const token = getVigyanToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["X-Vigyan-Token"] = token;
+      await fetch(`${host}/api/settings`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ font_size: size }),
+      });
+      showNotice(`Text size: ${size.toUpperCase()}`);
+    } catch {}
+  }
+
+  async function handlePurgeStorage() {
+    if (!confirmPurge) {
+      confirmPurge = true;
+      if (purgeTimer) clearTimeout(purgeTimer);
+      purgeTimer = setTimeout(() => {
+        confirmPurge = false;
+      }, 4000);
+      return;
+    }
+
+    confirmPurge = false;
+    isPurging = true;
     try {
       const host = getAgentHost();
       const token = getVigyanToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["X-Vigyan-Token"] = token;
 
-      await fetch(`${host}/api/settings`, {
+      const res = await fetch(`${host}/api/models/purge`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ [key]: value }),
+        body: JSON.stringify({}),
       });
 
-      saveNotice = "Settings saved";
-      if (noticeTimer) clearTimeout(noticeTimer);
-      noticeTimer = setTimeout(() => {
-        saveNotice = null;
-      }, 2000);
-    } catch {}
+      if (res.ok) {
+        const data = await res.json();
+        showNotice(`Reclaimed ${data.reclaimed_formatted || "disk space"}`);
+        await refreshStorage();
+      } else {
+        showNotice("Could not purge storage");
+      }
+    } catch {
+      showNotice("Network error while reclaiming space");
+    } finally {
+      isPurging = false;
+    }
   }
 
   function handleResetChat() {
-    if (!confirmReset) {
-      confirmReset = true;
-      if (resetTimer) clearTimeout(resetTimer);
-      resetTimer = setTimeout(() => {
-        confirmReset = false;
+    if (!confirmClearChat) {
+      confirmClearChat = true;
+      if (clearTimer) clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => {
+        confirmClearChat = false;
       }, 3500);
-    } else {
-      confirmReset = false;
-      if (resetTimer) clearTimeout(resetTimer);
+      return;
+    }
+
+    confirmClearChat = false;
+    try {
       chatStore.clear();
-      onClose();
+      showNotice("Conversation cleared");
+    } catch {
+      showNotice("Reset failed");
     }
   }
+
+  const handleClearChat = handleResetChat;
 
   $effect(() => {
     if (open) {
       loadSettings();
-      confirmReset = false;
     }
   });
 
@@ -160,312 +219,158 @@
   });
 </script>
 
-<!-- Backdrop Blur -->
 {#if open}
-  <button
-    type="button"
-    class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm border-0 cursor-default transition-opacity duration-300"
+  <!-- Backdrop with tactile blur -->
+  <div
+    role="button"
+    tabindex="0"
+    aria-label="Close Settings Backdrop"
     onclick={onClose}
-    aria-label="Close preferences"
-  ></button>
+    onkeydown={(e) => (e.key === "Escape" || e.key === "Enter" || e.key === " ") && onClose()}
+    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300 cursor-pointer"
+  ></div>
 {/if}
 
-<!-- Apple Fluid Spring Slide-in Drawer -->
+<!-- Pure Steve Jobs Drawer -->
 <aside
-  class="fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 flex flex-col bg-black border-l border-white/10 shadow-2xl transition-transform duration-300 {open
-    ? 'translate-x-0'
-    : 'translate-x-full'}"
-  style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); will-change: transform;"
+  class="fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-[#06080c] border-l border-white/10 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] {open ? 'translate-x-0' : 'translate-x-full'}"
+  aria-label="Preferences Panel"
 >
-  <!-- Executive Monochrome Header -->
-  <div class="px-5 py-4 border-b border-white/10 bg-black flex items-center justify-between flex-shrink-0">
-    <div class="flex items-center gap-2">
-      <span class="text-xs font-mono font-semibold tracking-wider text-white uppercase">Workstation Preferences</span>
-      {#if saveNotice}
-        <span class="text-[10px] font-mono text-black bg-white px-2.5 py-0.5 rounded-full font-semibold transition-all">
-          ✓ {saveNotice}
-        </span>
-      {/if}
+  <!-- Header -->
+  <div class="px-6 py-5 border-b border-white/[0.08] flex items-center justify-between flex-shrink-0">
+    <div class="space-y-0.5">
+      <h2 class="text-sm font-semibold tracking-tight text-white flex items-center gap-2">
+        <span>Preferences</span>
+      </h2>
+      <p class="text-[11px] text-neutral-400">Minimal workstation control</p>
     </div>
     <button
       onclick={onClose}
-      class="text-neutral-400 hover:text-white transition-colors p-1.5 cursor-pointer flex items-center justify-center rounded-full hover:bg-white/10"
-      aria-label="Close"
+      class="w-7 h-7 rounded-full bg-white/5 hover:bg-white/15 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+      aria-label="Close preferences"
     >
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="18" y1="6" x2="6" y2="18" />
-        <line x1="6" y1="6" x2="18" y2="18" />
-      </svg>
+      ✕
     </button>
   </div>
 
-  <!-- Content Feed -->
-  <div class="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+  <!-- Status Notification -->
+  {#if statusNotice}
+    <div class="px-6 py-2 bg-white text-black text-xs font-medium tracking-tight text-center flex-shrink-0 transition-all">
+      {statusNotice}
+    </div>
+  {/if}
 
-    <!-- Active Engine Card (Spherical rounded-3xl) -->
-    <section class="space-y-2">
-      <div class="flex items-center justify-between px-1">
-        <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400">Intelligence Engine</span>
-        {#if onOpenModels}
-          <button
-            onclick={() => {
-              onClose();
-              onOpenModels();
-            }}
-            class="text-[11px] font-mono text-neutral-300 hover:text-white hover:underline cursor-pointer flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 transition-colors"
-          >
-            <span>Models Catalog</span>
-            <span>›</span>
-          </button>
+  <!-- Body: Pure 4-Row Control Card -->
+  <div class="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+
+    <!-- Row 1: Response Style -->
+    <div class="space-y-2.5">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-medium text-neutral-200">Response Style</span>
+        <span class="text-[11px] text-neutral-500 capitalize">{responseStyle}</span>
+      </div>
+      <div class="grid grid-cols-3 gap-1.5 p-1 bg-white/[0.03] border border-white/10 rounded-2xl">
+        <button
+          onclick={() => setStyle("precise")}
+          class="py-2 rounded-xl text-xs font-medium transition-all cursor-pointer {responseStyle === 'precise' ? 'bg-white text-black shadow-sm font-semibold' : 'text-neutral-400 hover:text-white'}"
+        >
+          Precise
+        </button>
+        <button
+          onclick={() => setStyle("balanced")}
+          class="py-2 rounded-xl text-xs font-medium transition-all cursor-pointer {responseStyle === 'balanced' ? 'bg-white text-black shadow-sm font-semibold' : 'text-neutral-400 hover:text-white'}"
+        >
+          Balanced
+        </button>
+        <button
+          onclick={() => setStyle("creative")}
+          class="py-2 rounded-xl text-xs font-medium transition-all cursor-pointer {responseStyle === 'creative' ? 'bg-white text-black shadow-sm font-semibold' : 'text-neutral-400 hover:text-white'}"
+        >
+          Creative
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 2: Text Size -->
+    <div class="space-y-2.5">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-medium text-neutral-200">Text Size</span>
+        <span class="text-[11px] text-neutral-500 uppercase">{fontSize}</span>
+      </div>
+      <div class="grid grid-cols-3 gap-1.5 p-1 bg-white/[0.03] border border-white/10 rounded-2xl">
+        <button
+          onclick={() => setSize("sm")}
+          class="py-2 rounded-xl text-xs font-medium transition-all cursor-pointer {fontSize === 'sm' ? 'bg-white text-black shadow-sm font-semibold' : 'text-neutral-400 hover:text-white'}"
+        >
+          Small
+        </button>
+        <button
+          onclick={() => setSize("md")}
+          class="py-2 rounded-xl text-xs font-medium transition-all cursor-pointer {fontSize === 'md' ? 'bg-white text-black shadow-sm font-semibold' : 'text-neutral-400 hover:text-white'}"
+        >
+          Medium
+        </button>
+        <button
+          onclick={() => setSize("lg")}
+          class="py-2 rounded-xl text-xs font-medium transition-all cursor-pointer {fontSize === 'lg' ? 'bg-white text-black shadow-sm font-semibold' : 'text-neutral-400 hover:text-white'}"
+        >
+          Large
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 3: Local Storage & Reclaim -->
+    <div class="space-y-2.5 pt-2 border-t border-white/[0.08]">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-medium text-neutral-200">Local Model Storage</span>
+        <span class="text-xs font-medium text-white">{storageStats?.models_formatted || "0 MB"} Used</span>
+      </div>
+      
+      {#if storageStats?.free_formatted}
+        <div class="flex items-center justify-between text-[11px] text-neutral-500">
+          <span>Available on Disk</span>
+          <span>{storageStats.free_formatted}</span>
+        </div>
+      {/if}
+
+      <button
+        onclick={handlePurgeStorage}
+        disabled={isPurging}
+        class="w-full py-2.5 px-4 rounded-2xl text-xs font-medium transition-all border cursor-pointer flex items-center justify-center gap-2 {confirmPurge
+          ? 'bg-rose-500 text-white border-rose-500 font-semibold animate-pulse'
+          : 'bg-white/[0.03] border-white/15 text-neutral-300 hover:bg-white hover:text-black hover:border-white'}"
+      >
+        {#if isPurging}
+          <span>Reclaiming disk space…</span>
+        {:else if confirmPurge}
+          <span>Click again to delete models & free space</span>
+        {:else}
+          <span>Reclaim Storage Space</span>
         {/if}
-      </div>
-      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 flex items-center justify-between gap-3 shadow-md">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-xs font-semibold text-white tracking-tight truncate">
-            {activeModelName ? activeModelName.replace(/\.gguf$/i, "") : "Offline Engine"}
-          </h3>
-          <p class="text-[10px] text-neutral-400 font-mono mt-0.5 truncate">
-            Tier: {hardwareTier} • {totalRamGb} GB Host RAM
-          </p>
-        </div>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black text-[10px] font-mono font-semibold flex-shrink-0 shadow-sm">
-          <span class="w-1.5 h-1.5 rounded-full bg-black"></span>
-          Active
-        </span>
-      </div>
-    </section>
+      </button>
+    </div>
 
-    <!-- Inference Tuning Section (Spherical rounded-3xl) -->
-    <section class="space-y-2">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">Inference Parameters</span>
-      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 space-y-4 shadow-md">
-        
-        <!-- Temperature Presets (Spherical rounded-full capsules) -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <label for="temp-slider" class="text-xs text-neutral-300 font-medium">Temperature</label>
-            <span class="text-xs font-mono text-white font-semibold">{temperature.toFixed(2)}</span>
-          </div>
-          <div class="grid grid-cols-3 gap-2">
-            <button
-              onclick={() => {
-                temperature = 0.0;
-                updateSetting("temperature", 0.0);
-              }}
-              class="py-2 px-2.5 rounded-full text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature === 0.0
-                ? 'bg-white border-white text-black font-semibold shadow-md'
-                : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
-            >
-              <span class="font-semibold">0.0 Exact</span>
-              <span class="text-[8px] {temperature === 0.0 ? 'text-neutral-700' : 'text-neutral-500'}">Math & Proofs</span>
-            </button>
-            <button
-              onclick={() => {
-                temperature = 0.2;
-                updateSetting("temperature", 0.2);
-              }}
-              class="py-2 px-2.5 rounded-full text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature > 0.05 && temperature <= 0.3
-                ? 'bg-white border-white text-black font-semibold shadow-md'
-                : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
-            >
-              <span class="font-semibold">0.2 Balanced</span>
-              <span class="text-[8px] {temperature > 0.05 && temperature <= 0.3 ? 'text-neutral-700' : 'text-neutral-500'}">Standard STEM</span>
-            </button>
-            <button
-              onclick={() => {
-                temperature = 0.7;
-                updateSetting("temperature", 0.7);
-              }}
-              class="py-2 px-2.5 rounded-full text-[10px] font-mono transition-all border cursor-pointer flex flex-col items-center justify-center {temperature > 0.3
-                ? 'bg-white border-white text-black font-semibold shadow-md'
-                : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
-            >
-              <span class="font-semibold">0.7 Creative</span>
-              <span class="text-[8px] {temperature > 0.3 ? 'text-neutral-700' : 'text-neutral-500'}">Brainstorming</span>
-            </button>
-          </div>
-        </div>
+    <!-- Row 4: Clear Conversation -->
+    <div class="space-y-2.5 pt-2 border-t border-white/[0.08]">
+      <span class="text-xs font-medium text-neutral-200 block">Conversation History</span>
+      <button
+        onclick={handleClearChat}
+        class="w-full py-2.5 px-4 rounded-2xl text-xs font-medium transition-all border cursor-pointer {confirmClearChat
+          ? 'bg-white text-black border-white font-semibold shadow-md'
+          : 'bg-white/[0.03] border-white/15 text-neutral-300 hover:bg-white hover:text-black hover:border-white'}"
+      >
+        {confirmClearChat ? "Click again to confirm reset" : "Clear Conversation History"}
+      </button>
+    </div>
 
-        <!-- CPU Threading Clamp -->
-        <div class="space-y-1.5 pt-2 border-t border-white/10">
-          <div class="flex items-center justify-between">
-            <label for="threads-slider" class="text-xs text-neutral-300 font-medium">CPU Compute Threads</label>
-            <span class="text-xs font-mono text-white font-semibold">{cpuThreads} of {maxThreads} cores</span>
-          </div>
-          <p class="text-[10px] text-neutral-500 leading-normal">
-            Clamping threads preserves host responsiveness and prevents screen freezes.
-          </p>
-          <div class="flex items-center gap-2 pt-1">
-            <input
-              id="threads-slider"
-              type="range"
-              min="1"
-              max={maxThreads}
-              step="1"
-              bind:value={cpuThreads}
-              onchange={() => updateSetting("cpu_threads", cpuThreads)}
-              class="w-full accent-white cursor-pointer h-2 bg-neutral-800 rounded-full border border-white/10"
-            />
-          </div>
-        </div>
+  </div>
 
-        <!-- Context Window Size (Spherical rounded-full capsules) -->
-        <div class="space-y-2 pt-2 border-t border-white/10">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-neutral-300 font-medium">Context Window</span>
-            <span class="text-xs font-mono text-neutral-400">{contextWindow} tokens</span>
-          </div>
-          <div class="flex items-center gap-2">
-            {#each [2048, 4096, 8192] as ctx}
-              <button
-                onclick={() => {
-                  contextWindow = ctx;
-                  updateSetting("context_window", ctx);
-                }}
-                class="flex-1 py-1.5 rounded-full text-xs font-mono border transition-all cursor-pointer {contextWindow === ctx
-                  ? 'bg-white border-white text-black font-semibold shadow-md'
-                  : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
-              >
-                {ctx}
-              </button>
-            {/each}
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- Appearance & Workspace Section (Spherical rounded-3xl) -->
-    <section class="space-y-2">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">Appearance & Workspace</span>
-      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 space-y-4 shadow-md">
-        
-        <!-- Font Size Scale (Spherical rounded-full capsules) -->
-        <div class="space-y-2">
-          <span class="text-xs text-neutral-300 font-medium block">Dialogue Font Scale</span>
-          <div class="flex items-center gap-2">
-            {#each [
-              { id: 'sm', label: 'Compact' },
-              { id: 'md', label: 'Standard' },
-              { id: 'lg', label: 'Comfortable' }
-            ] as f}
-              <button
-                onclick={() => {
-                  fontSize = f.id as any;
-                  updateSetting("font_size", f.id);
-                }}
-                class="flex-1 py-1.5 rounded-full text-xs font-mono border transition-all cursor-pointer {fontSize === f.id
-                  ? 'bg-white border-white text-black font-semibold shadow-md'
-                  : 'bg-white/[0.03] border-white/10 text-neutral-400 hover:text-white hover:border-white/20'}"
-              >
-                {f.label}
-              </button>
-            {/each}
-          </div>
-        </div>
-
-        <!-- Split Canvas Auto-Open -->
-        <div class="flex items-center justify-between pt-2 border-t border-white/10">
-          <div>
-            <span class="text-xs text-neutral-300 font-medium block">Artifact Studio Canvas</span>
-            <span class="text-[10px] text-neutral-500">Auto-expand split canvas when plots are generated</span>
-          </div>
-          <button
-            onclick={() => {
-              autoOpenCanvas = !autoOpenCanvas;
-              updateSetting("auto_open_canvas", autoOpenCanvas);
-            }}
-            class="w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer relative {autoOpenCanvas ? 'bg-white' : 'bg-neutral-800 border border-white/10'}"
-            aria-label="Toggle auto canvas"
-          >
-            <div class="w-5 h-5 rounded-full transition-transform {autoOpenCanvas ? 'bg-black translate-x-5' : 'bg-neutral-400 translate-x-0'}"></div>
-          </button>
-        </div>
-
-        <!-- Hugging Face Authentication Token -->
-        <div class="space-y-1.5 pt-2 border-t border-white/10">
-          <div class="flex items-center justify-between">
-            <label for="hf-token-input" class="text-xs text-neutral-300 font-medium">Hugging Face Access Token</label>
-            <span class="text-[10px] font-mono text-neutral-500">For private models</span>
-          </div>
-          <input
-            id="hf-token-input"
-            type="password"
-            bind:value={hfToken}
-            onchange={() => updateSetting("hf_token", hfToken)}
-            placeholder="hf_..."
-            class="w-full bg-[#11131a] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-neutral-600 focus:outline-none focus:border-white/30"
-          />
-        </div>
-
-      </div>
-    </section>
-
-    <!-- Storage & System Diagnostics (Spherical rounded-3xl) -->
-    <section class="space-y-2">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">Storage & Diagnostics</span>
-      <div class="bg-[#0a0a0a] rounded-3xl border border-white/10 p-4 space-y-3 text-xs shadow-md">
-        {#if storageStats}
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between text-[11px] font-mono">
-              <span class="text-neutral-400">Models Storage (~/.vigyan/models/)</span>
-              <span class="text-white font-semibold">{storageStats.models_formatted || "0 MB"}</span>
-            </div>
-            <!-- Monochrome Spherical Disk Usage Meter -->
-            <div class="w-full h-2 bg-neutral-900 rounded-full overflow-hidden border border-white/10">
-              <div
-                class="h-full bg-white rounded-full transition-all duration-300"
-                style="width: {Math.max(5, Math.min(100, storageStats.disk_percent || 15))}%;"
-              ></div>
-            </div>
-            <div class="flex items-center justify-between text-[10px] font-mono text-neutral-500">
-              <span>Disk Available: {storageStats.free_formatted || "Unknown"}</span>
-              <span>Total: {storageStats.total_formatted || "Unknown"}</span>
-            </div>
-          </div>
-        {/if}
-
-        <div class="pt-2 border-t border-white/10">
-          <button
-            type="button"
-            onclick={handleResetChat}
-            class="w-full py-2.5 px-4 rounded-full text-xs font-mono font-medium transition-all border cursor-pointer {confirmReset
-              ? 'bg-white text-black border-white animate-pulse font-semibold shadow-md'
-              : 'bg-white/[0.04] border-white/15 text-neutral-300 hover:bg-white hover:text-black hover:border-white'}"
-          >
-            {confirmReset ? "Click again to confirm reset" : "Clear Conversation History"}
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- About Section (Spherical rounded-3xl) -->
-    <section class="space-y-2">
-      <span class="text-[10px] font-mono font-semibold uppercase tracking-wider text-neutral-400 block px-1">About</span>
-      <div class="bg-[#0a0a0a] border border-white/10 rounded-3xl p-4 space-y-2.5 text-[11px] shadow-md">
-        <div class="flex items-center justify-between text-white">
-          <span class="font-semibold text-xs">Vigyan Pro Desktop</span>
-          <span class="font-mono text-[10px] text-black bg-white px-2.5 py-0.5 rounded-full font-semibold">v5.0.2</span>
-        </div>
-        <p class="text-neutral-400 leading-relaxed text-[10px]">
-          Sovereign physical and mathematical engineering intelligence workstation combining local SLMs with exact closed-form SymPy CAS algebra.
-        </p>
-        <div class="pt-2.5 border-t border-white/10 space-y-1 text-[10px] font-mono text-neutral-500">
-          <div class="flex justify-between">
-            <span>Architect</span>
-            <span class="text-neutral-300">Shreyansh Singh</span>
-          </div>
-          <div class="flex justify-between">
-            <span>Architecture</span>
-            <span class="text-neutral-300">100% Offline • Zero Egress</span>
-          </div>
-          <div class="flex justify-between">
-            <span>Config Path</span>
-            <span class="text-neutral-400">~/.vigyan/config.json</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
+  <!-- Minimal Executive Footer -->
+  <div class="px-6 py-4 border-t border-white/[0.08] bg-[#040608] flex items-center justify-between text-[11px] text-neutral-400 flex-shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="font-medium text-white">Vigyan Pro</span>
+      <span class="bg-white/10 px-2 py-0.5 rounded-full text-[10px] text-white">v5.0.3</span>
+    </div>
+    <span>100% Offline • Zero Cloud Egress</span>
   </div>
 </aside>

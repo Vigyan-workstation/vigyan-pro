@@ -56,9 +56,9 @@ SOVEREIGN_PRODUCTION_MODELS = [
         "size_formatted": "1.83 GB",
         "ram_required_gb": 5.0,
         "domain": "Vision-Language, Circuit Schematics & Diagram Analysis",
-        "hf_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
-        "hf_repo": "shreyansh12183/vigyan-vl-4b-gguf",
-        "mmproj_url": "https://huggingface.co/shreyansh12183/vigyan-vl-4b-gguf/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
+        "hf_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/vigyan-vl-4b-iq3_m.gguf?download=true",
+        "hf_repo": "Experimentlab/Vigyan-VL-4B-GGUF",
+        "mmproj_url": "https://huggingface.co/Experimentlab/Vigyan-VL-4B-GGUF/resolve/main/mmproj-vigyan-vl-4b-f16.gguf?download=true",
         "mmproj_filename": "mmproj-vigyan-vl-4b-f16.gguf",
     },
     {

@@ -95,6 +95,15 @@
   }
 
   onMount(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("open") === "models") {
+        modelsOpen = true;
+      } else if (urlParams.get("open") === "settings") {
+        settingsOpen = true;
+      }
+    } catch (e) {}
+
     const handleGlobalKeydown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
       if (isMeta && e.key.toLowerCase() === "k") {
@@ -184,7 +193,7 @@
         </svg>
       </div>
       <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
-      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.3</span>
     </div>
 
     <!-- Center: Steve Jobs 4-Model Segmented Switcher & Live Engine Status -->
