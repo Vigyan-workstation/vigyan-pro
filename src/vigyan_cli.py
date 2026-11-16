@@ -464,6 +464,36 @@ def cmd_pull(model_name: str) -> bool:
 def cmd_rm(model_name: str) -> bool:
     """Delete model from local ~/.vigyan/models/."""
     clean = model_name.strip().lower()
+
+    # Total purge support: vigyan rm --all / vigyan purge
+    if clean in ("--all", "all", "purge"):
+        if not os.path.isdir(MODELS_DIR):
+            print("No models installed in ~/.vigyan/models/.")
+            return True
+        reclaimed_bytes = 0
+        deleted_count = 0
+        for root, dirs, files in os.walk(MODELS_DIR, topdown=False):
+            for f in files:
+                if f.endswith(".gguf") or f.endswith(".part"):
+                    fpath = os.path.join(root, f)
+                    try:
+                        sz = os.path.getsize(fpath)
+                        os.remove(fpath)
+                        reclaimed_bytes += sz
+                        deleted_count += 1
+                    except Exception:
+                        pass
+            for d in dirs:
+                dpath = os.path.join(root, d)
+                try:
+                    if not os.listdir(dpath):
+                        os.rmdir(dpath)
+                except Exception:
+                    pass
+        size_gb = round(reclaimed_bytes / (1024 ** 3), 2)
+        print(f"✓ Sovereign Purge: Removed {deleted_count} model binaries. Reclaimed {size_gb} GB disk space.")
+        return True
+
     target_path = find_model_file(clean)
     part_path = None
     if not target_path:
@@ -500,6 +530,22 @@ def cmd_rm(model_name: str) -> bool:
             except Exception:
                 time.sleep(0.2)
 
+    # Clean companion mmproj if removing vision model
+    if any(k in clean for k in ("vl", "4b", "vision")):
+        vl_proj = os.path.join(MODELS_DIR, "vl4b", "mmproj-vigyan-vl-4b-f16.gguf")
+        if os.path.isfile(vl_proj):
+            try:
+                reclaimed_bytes += os.path.getsize(vl_proj)
+                os.remove(vl_proj)
+            except Exception:
+                pass
+        vl_dir = os.path.join(MODELS_DIR, "vl4b")
+        if os.path.isdir(vl_dir) and not os.listdir(vl_dir):
+            try:
+                os.rmdir(vl_dir)
+            except Exception:
+                pass
+
     size_mb = round(reclaimed_bytes / (1024 ** 2), 1)
     display_name = os.path.basename(target_path or part_path)
     print(f"✓ Removed {display_name} (Reclaimed {size_mb} MB).")
@@ -527,7 +573,7 @@ def ensure_first_run_interactive() -> Optional[str]:
     print("├────────────────────────────────────────────────────────────────────────┤")
     print("│  Select a sovereign engine to download:                                │")
     print("│    [1] 3B Daily Driver  (1.39 GB) - STEM, Calculus & CAS [Recommended] │")
-    print("│    [2] 4B Vision        (2.78 GB) - Circuit Schematics & Diagrams      │")
+    print("│    [2] 4B Vision        (1.83 GB) - Circuit Schematics & Diagrams      │")
     print("│    [3] 7B Doctoral      (4.16 GB) - Advanced Physics & Engineering     │")
     print("│    [4] 14B Frontier     (6.44 GB) - Deep Chain-of-Thought Reasoning    │")
     print("│    [5] View Model Matrix                                               │")
@@ -635,7 +681,7 @@ Usage:
 
 Authorized Sovereign Models:
   3b   • Vigyan-3B Quad-Master    (1.39 GB)  Flagship STEM & Symbolic Algebra
-  4b   • Vigyan-VL-4B Multimodal  (2.78 GB)  Circuit Schematics & Diagrams
+  4b   • Vigyan-VL-4B Multimodal  (1.83 GB)  Circuit Schematics & Diagrams
   7b   • Vigyan-7B Quad-Master    (4.16 GB)  Doctoral Physics & Engineering
   14b  • Vigyan-R1-14B Reasoning  (6.44 GB)  Frontier Step-by-Step Chain-of-Thought
 
@@ -756,9 +802,14 @@ def main():
     # Subcommand: rm / delete
     if args and args[0] in ("rm", "delete", "remove"):
         if len(args) < 2:
-            print("Usage: vigyan rm <model_name>")
+            print("Usage: vigyan rm <model_name | --all>")
             sys.exit(1)
         cmd_rm(args[1])
+        return
+
+    # Subcommand: purge
+    if args and args[0] in ("purge", "clean"):
+        cmd_rm("--all")
         return
 
     # Subcommand: run
