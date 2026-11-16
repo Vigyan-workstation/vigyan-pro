@@ -110,13 +110,6 @@ jobs:
           chmod +x package.sh bin/vigyan-pro
           ./package.sh "$VERSION" --bundle-weights
 
-      - name: Upload Multi-OS Build Artifacts to Private GitHub Actions
-        uses: actions/upload-artifact@v4
-        with:
-          name: vigyan-pro-enterprise-offline-${{ github.event.inputs.version || github.ref_name }}
-          path: dist/*
-          retention-days: 14
-
       - name: Publish or Update Private GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
