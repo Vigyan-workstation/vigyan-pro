@@ -49,11 +49,11 @@ def test_cli_authorized_models_count_and_integrity():
 
 
 def test_cli_version_flag(capsys):
-    """Verify --version prints v5.0.6 specification."""
+    """Verify --version prints v5.0.7 specification."""
     with patch.object(sys, "argv", ["vigyan", "--version"]):
         main()
         out = capsys.readouterr().out
-        assert "5.0.6" in out
+        assert "5.0.7" in out
         assert "Sovereign" in out
 
 

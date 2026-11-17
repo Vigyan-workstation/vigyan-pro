@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ModelsDrawer.svelte — Steve Jobs 4-Model Purity Vault (v5.0.5)
+  // ModelsDrawer.svelte — Sovereign Model Vault (v5.0.7)
   // 70% Decluttering: Pure 4 plain-English cards with Auto-Heal & Instant Activation.
   // Directly connects to Experimentlab public models and local ~/.vigyan/models/
 
@@ -81,7 +81,7 @@
     }, 3500);
   }
 
-  // 3 Steve Jobs Curated Cards: 3B Quad-Master, 7B Quad-Master, 14B DeepSeek
+  // 3 Curated Cards: 3B Quad-Master, 7B Quad-Master, 14B DeepSeek
   const cards = $derived<CuratedCard[]>([
     {
       key: "3b",
@@ -325,7 +325,7 @@
   ></div>
 {/if}
 
-<!-- Steve Jobs 4-Model Drawer -->
+<!-- Sovereign Model Drawer -->
 <aside
   class="fixed top-0 right-0 h-full w-[440px] max-w-[94vw] bg-[#06080c] border-l border-white/10 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] {open ? 'translate-x-0' : 'translate-x-full'}"
   aria-label="Intelligence Vault"
@@ -446,7 +446,7 @@
               </button>
             </div>
           {:else if isOverRam}
-            <!-- Steve Jobs hardware guidance for low-RAM laptops -->
+            <!-- Hardware guidance for low-RAM laptops -->
             <div class="flex items-center gap-2">
               <span class="text-[11px] text-amber-300/80 bg-amber-950/40 border border-amber-500/20 px-2 py-1 rounded-lg">
                 Requires 16GB+ RAM

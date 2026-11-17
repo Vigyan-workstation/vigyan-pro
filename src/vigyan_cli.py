@@ -643,7 +643,7 @@ def query_local_server(prompt: str, host: str = DEFAULT_HOST, stream: bool = Tru
 
 def print_usage():
     print("""
-Vigyan Pro Sovereign CLI v5.0.6 [100% Offline • Air-Gapped STEM Workstation]
+Vigyan Pro Sovereign CLI v5.0.7 [100% Offline • Air-Gapped STEM Workstation]
 Usage:
   vigyan                                Launch interactive scientific REPL
   vigyan run [3b|7b|14b]                Launch REPL with a specific model
@@ -873,7 +873,7 @@ def main():
         try:
             from version import __version__
         except Exception:
-            __version__ = "5.0.6"
+            __version__ = "5.0.7"
         print(f"Vigyan Pro v{__version__} [Sovereign Offline Intelligence]")
         return
 

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="${1:-5.0.6}"
+VERSION="${1:-5.0.7}"
 DIST_DIR="$SCRIPT_DIR/dist"
 mkdir -p "$DIST_DIR"
 

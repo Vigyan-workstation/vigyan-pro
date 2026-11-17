@@ -9,7 +9,7 @@
 set -euo pipefail
 
 REPO="shreyansh001boy-tech/vigyan-pro-desktop"
-VERSION="${VIGYAN_VERSION:-5.0.6}"
+VERSION="${VIGYAN_VERSION:-5.0.7}"
 
 # Color formatting
 BOLD="\033[1m"

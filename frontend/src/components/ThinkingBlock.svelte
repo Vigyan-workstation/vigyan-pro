@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ThinkingBlock — Steve Jobs Collapsible Thought Process Drawer
+  // ThinkingBlock — Collapsible Thought Process Drawer
   // Human language, zero log dumps, pure Apple spring motion.
   interface Props {
     text: string;

@@ -8,7 +8,7 @@
 $ErrorActionPreference = "Stop"
 
 $Repo = "shreyansh001boy-tech/vigyan-pro-desktop"
-$Version = if ($env:VIGYAN_VERSION) { $env:VIGYAN_VERSION } else { "5.0.6" }
+$Version = if ($env:VIGYAN_VERSION) { $env:VIGYAN_VERSION } else { "5.0.7" }
 
 Write-Host "┌────────────────────────────────────────────────────────┐" -ForegroundColor Cyan
 Write-Host "│  VIGYAN PRO • SOVEREIGN STANDALONE CLI FOR WINDOWS     │" -ForegroundColor Cyan

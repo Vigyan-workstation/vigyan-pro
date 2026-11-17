@@ -193,10 +193,10 @@
         </svg>
       </div>
       <span class="text-[13px] font-semibold tracking-tight text-white">Vigyan Pro</span>
-      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.6</span>
+      <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-emerald-400">v5.0.7</span>
     </div>
 
-    <!-- Center: Steve Jobs 3-Model Segmented Switcher & Live Engine Status -->
+    <!-- Center: 3-Model Segmented Switcher & Live Engine Status -->
     <div class="hidden sm:flex items-center gap-2.5">
       <nav class="flex items-center p-0.5 rounded-full bg-white/[0.04] border border-white/[0.08]" aria-label="Sovereign model switcher">
         {#each [

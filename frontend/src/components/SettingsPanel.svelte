@@ -1,5 +1,5 @@
 <script lang="ts">
-  // SettingsPanel.svelte — Steve Jobs Sovereign Control Center (v5.0.3)
+  // SettingsPanel.svelte — Sovereign Control Center (v5.0.7)
   // Radical 80% reduction: Pure 4-row tactile control center.
   // Dual-persisted (localStorage + ~/.vigyan/config.json).
   // Zero nerd clutter: No CPU core sliders, no HF token fields, no raw numbers.
@@ -231,7 +231,7 @@
   ></div>
 {/if}
 
-<!-- Pure Steve Jobs Drawer -->
+<!-- Sovereign Preferences Drawer -->
 <aside
   class="fixed top-0 right-0 h-full w-[380px] max-w-[92vw] bg-[#06080c] border-l border-white/10 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] {open ? 'translate-x-0' : 'translate-x-full'}"
   aria-label="Preferences Panel"
@@ -369,7 +369,7 @@
   <div class="px-6 py-4 border-t border-white/[0.08] bg-[#040608] flex items-center justify-between text-[11px] text-neutral-400 flex-shrink-0">
     <div class="flex items-center gap-2">
       <span class="font-medium text-white">Vigyan Pro</span>
-      <span class="bg-white/10 px-2 py-0.5 rounded-full text-[10px] text-white">v5.0.6</span>
+      <span class="bg-white/10 px-2 py-0.5 rounded-full text-[10px] text-white">v5.0.7</span>
     </div>
     <span>100% Offline • Zero Cloud Egress</span>
   </div>
