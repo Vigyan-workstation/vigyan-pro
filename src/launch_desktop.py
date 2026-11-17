@@ -62,6 +62,19 @@ for _sys_p in (
     if os.path.isdir(_sys_p) and _sys_p not in sys.path:
         sys.path.append(_sys_p)
 
+# Linux / Wayland & WebKitGTK display and compositing compatibility
+# Modern Linux Wayland desktops (e.g. Ubuntu 24.04, Fedora 40/41) with WebKitGTK 4.1:
+# - Avoid crashes from DMA-BUF renderer conflicts on certain Wayland/Mesa drivers
+# - Allow graceful GDK backend fallback (wayland,x11,*)
+if sys.platform.startswith("linux"):
+    is_wayland = bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland")
+    # If GDK_BACKEND is not explicitly set, let GTK negotiate Wayland then X11 fallback safely
+    os.environ.setdefault("GDK_BACKEND", "wayland,x11,*")
+    # Prevent WebKitGTK DMA-BUF renderer crashes/freezes on Wayland compositors
+    if is_wayland:
+        os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
+
+
 from llama_supervisor import LlamaServerSupervisor
 
 try:
