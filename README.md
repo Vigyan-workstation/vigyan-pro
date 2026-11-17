@@ -4,6 +4,8 @@
 [![License - PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial-000000.svg)](LICENSE)
 [![Security - Air-Gapped Zero Egress](https://img.shields.io/badge/Security-Air--Gapped%20Zero--Egress-000000.svg)](SECURITY.md)
 [![Architecture - Pure STEM](https://img.shields.io/badge/Architecture-Deterministic%20SymPy%20CAS-000000.svg)](#system-architecture)
+[![Roadmap](https://img.shields.io/badge/Roadmap-View%20Milestones-000000.svg)](ROADMAP.md)
+[![Issues](https://img.shields.io/badge/Issues-Report%20Bug-000000.svg)](https://github.com/Vigyan-workstation/vigyan-pro/issues)
 
 > **Sovereign, Air-Gapped Physical Engineering & Scientific Intelligence Workstation**  
 > *Developed by [ExperimentLab.in](https://experimentlab.in). 100% On-Device. Zero Cloud Telemetry.*  
