@@ -1,14 +1,13 @@
-# Vigyan Workstation — Sovereign STEM Desktop (v3.0.0)
+# Vigyan Pro Workstation (v5.0.7)
 
-[![ExperimentLab](https://img.shields.io/badge/Developed%20By-ExperimentLab.in-38bdf8.svg)](https://experimentlab.in)
-[![License - Community & Demilitarized](https://img.shields.io/badge/License-Community%20%26%20Demilitarized-10b981.svg)](LICENSE)
-[![Ethics - Civilian STEM Only](https://img.shields.io/badge/Ethics-Peaceful%20Civilian%20STEM-8b5cf6.svg)](LICENSE)
-[![Security - Air Gapped Zero Egress](https://img.shields.io/badge/Security-Air--Gapped%20Zero--Egress-10b981.svg)](SECURITY.md)
-[![Inference - Air-Gapped Local Daemon](https://img.shields.io/badge/Inference-127.0.0.1%3A11434-38bdf8.svg)](#local-sovereign-runtime)
+[![ExperimentLab](https://img.shields.io/badge/Developed%20By-ExperimentLab.in-000000.svg)](https://experimentlab.in)
+[![License - PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial-000000.svg)](LICENSE)
+[![Security - Air-Gapped Zero Egress](https://img.shields.io/badge/Security-Air--Gapped%20Zero--Egress-000000.svg)](SECURITY.md)
+[![Architecture - Pure STEM](https://img.shields.io/badge/Architecture-Deterministic%20SymPy%20CAS-000000.svg)](#system-architecture)
 
-> **Sovereign, Air-Gapped Physical Engineering & Semiconductor AI Workstation**  
-> *Developed by [ExperimentLab AI](https://experimentlab.in). Zero cloud egress. Zero Node.js runtime requirement.*  
-> *"Your AI Never Leaves the Room." 100% Offline KaTeX derivations, Svelte 5 Multi-Mode Studio (CAD, Robotics, WaveDrom, PCB), and Embedded KùzuDB GraphRAG.*
+> **Sovereign, Air-Gapped Physical Engineering & Scientific Intelligence Workstation**  
+> *Developed by [ExperimentLab AI](https://experimentlab.in). 100% On-Device. Zero Cloud Telemetry.*  
+> *"Your AI Never Leaves the Room." Local mathematical derivations, exact SymPy Computer Algebra System, and standalone multi-OS desktop & terminal CLI.*
 
 ---
 
@@ -21,163 +20,141 @@
 │  • Zero-Node Client Runtime: Pre-compiled Svelte 5 bundle (src/dist/)  │
 │  • Ephemeral Session Security Token & Localhost Strict CORS Boundary   │
 ├────────────────────────────────────────────────────────────────────────┤
-│  Multi-Mode Studio Canvas & Engineering Stream                         │
-│  • 3D Parametric CAD: Three.js turntable, real-time sliders & STL exp  │
-│  • 6-DoF Robotics: Kinematics skeleton, reach envelope & DH matrix     │
-│  • WaveDrom Timing: Bus protocols (SPI, I2C, UART, AXI4) & SVG export  │
-│  • KiCad PCB: Schematic netlist visualizer & Bill of Materials (BOM)   │
-│  • Terminal Security Gate: Monospace preview & interactive auth        │
+│  STEM Derivations & Verified Mathematical Reasoning                    │
+│  • Exact Computer Algebra System (SymPy CAS)                           │
+│  • Deterministic Calculus, ODEs, Matrix Algebra & Physics Constants    │
+│  • Clean 2D Function Plotter & Live Derivative Curve                   │
+│  • Markdown, KaTeX & 1-Click LaTeX Report Export                       │
 ├────────────────────────────────────────────────────────────────────────┤
 │  Neuro-Symbolic Sovereign Engine (src/launch_desktop.py)               │
-│  • Exact SymPy AST Sandbox: Zero-hallucination calculus & ODEs         │
-│  • Embedded KùzuDB Graph: Vendored C++ graph database (db_store.db)    │
-│  • CPU OCR Ingestion Engine: Offline Tesseract & dimension parser      │
+│  • Exact SymPy AST Sandbox: Zero-hallucination mathematical truth      │
+│  • Local Model Inference Runtime (GGUF via llama-server / llama.cpp)   │
+│  • Zero Cloud Telemetry: 0.000000 outbound network packets             │
 ├────────────────────────────────────────────────────────────────────────┤
-│  Local Sovereign Runtime & Security Boundary                           │
-│  • Air-Gapped Local Daemon (http://127.0.0.1:11434)                    │
-│  • Offline Vendor Assets (Bundled KaTeX, Plotly WebGL, WaveDrom)       │
+│  Multi-OS Distribution & Standalone CLI                                │
+│  • Desktop GUI: Linux (.deb, .tar.gz), macOS Universal, Windows (.zip) │
+│  • Headless CLI: ~/.local/bin/vigyan standalone terminal binary        │
 │  • Cryptographic Release Verification (SHA256SUMS)                     │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Enterprise Security Architecture
+## 2. Security & Air-Gap Standard
 
-Vigyan Pro Desktop is architected for strict data sovereignty, intelligence research, and semiconductor IP protection:
+Vigyan Pro Workstation is architected for strict data sovereignty and research privacy:
 
-* **Zero Cloud Egress:** Client runtime initiates zero connections outside `127.0.0.1:11434`. No telemetry, analytics, crash pings, or font CDNs.
+* **Zero Cloud Egress:** Client runtime initiates zero external connections. No telemetry, analytics, session tracking, or remote font CDNs.
 * **Strict Content Security Policy (CSP):**
   ```http
-  default-src 'self' file: data: blob: http://127.0.0.1:11434 http://localhost:11434;
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' file: blob:;
-  connect-src 'self' http://127.0.0.1:11434 http://localhost:11434;
+  default-src 'self' file: data: blob: http://127.0.0.1:* http://localhost:*;
+  script-src 'self' 'unsafe-inline' file: blob:;
+  connect-src 'self' http://127.0.0.1:* http://localhost:*;
   object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none';
   ```
-* **Input/Output Sanitization:** All prompt queries and streaming model outputs pass through strict HTML entity encoding prior to LaTeX compilation, neutralizing DOM injection and Cross-Site Scripting (XSS).
-* **Restricted Navigation Handlers:** WebKitGTK and WebView2 intercept all navigation requests (`decide-policy`). Arbitrary URLs cannot be loaded inside the application window.
-* **Supply Chain Cryptographic Verification:** All build artifacts are signed and published with cryptographic SHA-256 hashes (`SHA256SUMS`).
+* **Input/Output Sanitization:** All queries and streaming outputs pass through strict entity encoding before rendering, neutralizing DOM injection and Cross-Site Scripting (XSS).
+* **Restricted Navigation Handlers:** Native desktop webviews intercept all navigation requests (`decide-policy`). Arbitrary external URLs cannot be opened inside the application window.
+* **Supply Chain Cryptographic Verification:** All binary build packages are published with verifiable SHA-256 checksums (`SHA256SUMS`).
 
 For complete threat models and reporting procedures, read [SECURITY.md](SECURITY.md).
 
 ---
 
-## 3. Multi-Platform Matrix & System Requirements
+## 3. Supported Platforms & System Requirements
 
-| OS | Desktop Engine | Min Requirements | Recommended Hardware |
+| OS | Engine | Minimum Requirements | Recommended |
 | :--- | :--- | :--- | :--- |
-| **Linux** | WebKitGTK 4.1 (`gir1.2-webkit2-4.1`) | Ubuntu 20.04+, Debian 11+, Arch, Fedora | 16 GB RAM, NVIDIA/AMD GPU, 4 cores |
-| **Windows** | Microsoft Edge WebView2 | Windows 10/11 x64 (Build 19041+) | 16 GB RAM, RTX 3060+, 4 cores |
-| **macOS** | Apple Cocoa WKWebView | macOS 12 Monterey+ (Universal M-Series / Intel) | 16 GB Unified Memory (Apple Silicon) |
+| **Linux (x86_64)** | WebKitGTK 4.1 (`gir1.2-webkit2-4.1`) | Ubuntu 20.04+, Debian 11+, Arch, Fedora | 8–16 GB RAM, 4 cores |
+| **Windows** | Microsoft Edge WebView2 | Windows 10/11 x64 (Build 19041+) | 8–16 GB RAM, 4 cores |
+| **macOS** | Apple Cocoa WKWebView | macOS 12 Monterey+ (Apple Silicon & Intel) | 8–16 GB Unified Memory |
 
 ---
 
-## 4. Multi-Device Installation & Verification
+## 4. Multi-OS Downloads & Verification (v5.0.7)
 
-Download official release packages from the [Private GitHub Releases](https://github.com/shreyansh001boy-tech/vigyan-pro-desktop/releases):
+Download verified binary packages directly from the official [Vigyan Workstation GitHub Releases](https://github.com/Vigyan-workstation/vigyan-pro/releases/tag/v5.0.7) or [ExperimentLab](https://experimentlab.in/download):
 
-### Linux (Debian / Ubuntu / Pop!_OS / Mint)
+### Linux (Debian / Ubuntu / Mint / Pop!_OS)
 ```bash
 # 1. Download deb package and checksum file
-wget https://github.com/shreyansh001boy-tech/vigyan-pro-desktop/releases/download/v2.7.0/vigyan-pro_2.7.0_amd64.deb
-wget https://github.com/shreyansh001boy-tech/vigyan-pro-desktop/releases/download/v2.7.0/SHA256SUMS
+wget https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v5.0.7/vigyan-pro_5.0.7_amd64.deb
+wget https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v5.0.7/SHA256SUMS
 
 # 2. Verify Cryptographic Integrity
 sha256sum --check --ignore-missing SHA256SUMS
 
 # 3. Install
-sudo apt install ./vigyan-pro_2.7.0_amd64.deb
+sudo apt install ./vigyan-pro_5.0.7_amd64.deb
 
-# 4. Launch from desktop application menu or terminal
+# 4. Launch
 vigyan-pro
 ```
 
 ### Linux Portable (Arch, Fedora, openSUSE, RHEL)
 ```bash
-tar -xzf vigyan-pro_2.7.0_linux_x86_64.tar.gz
-cd vigyan-pro-2.7.0
+wget https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v5.0.7/vigyan-pro_5.0.7_linux_x86_64.tar.gz
+tar -xzf vigyan-pro_5.0.7_linux_x86_64.tar.gz
+cd vigyan-pro-5.0.7
 ./vigyan-pro
 ```
 
-### Windows 10 / 11
-1. Extract `vigyan-pro_2.7.0_windows_x86_64.zip`.
-2. Double-click `Vigyan-Pro.bat` or run from PowerShell:
+### macOS (Apple Silicon M1–M4 & Intel Universal)
+```bash
+wget https://github.com/Vigyan-workstation/vigyan-pro/releases/download/v5.0.7/vigyan-pro_5.0.7_macos_universal.tar.gz
+tar -xzf vigyan-pro_5.0.7_macos_universal.tar.gz
+cd vigyan-pro-5.0.7
+./Vigyan-Pro.command
+```
+
+### Windows 10 / 11 (64-bit)
+1. Download `vigyan-pro_5.0.7_windows_x86_64.zip`.
+2. Extract the archive.
+3. Double-click `Vigyan-Pro.bat` or run from PowerShell:
    ```powershell
    .\Vigyan-Pro.bat
    ```
 
-### macOS (Apple Silicon & Intel)
-1. Extract `vigyan-pro_2.7.0_macos_universal.tar.gz`.
-2. Right-click `Vigyan-Pro.command` and select **Open**:
-   ```bash
-   ./Vigyan-Pro.command
-   ```
-
----
-
-## 5. STEM Scientific & Physical Engineering Capabilities
-
-1. **Multi-Mode Studio Canvas (Svelte 5):**
-   * **Parametric 3D CAD**: Interactive Three.js turntable viewport with Width, Length, Height, and Wall sliders + 1-click `.STL` manufacturing export.
-   * **6-DoF Robotics Kinematics**: Dynamic SVG kinematic skeleton with reach envelope, DH matrix calculations, 4 tactile pose presets (*Home 0°*, *Pick & Place*, *Full Reach*, *High Lift*), continuous joint sliders ($\theta_1 \dots \theta_6$), and `.json` kinematics model export.
-   * **WaveDrom Hardware Timing**: High-resolution vector waveforms with instant protocol switching chips (*SPI Master*, *I2C 7-Bit*, *UART 8N1*, *AXI4-Stream*) and `.svg` export.
-   * **KiCad PCB Netlists**: Electronics netlist viewer with full Bill of Materials (BOM) breakdown and `.net` export.
-
-2. **CPU OCR & Document Ingestion Engine:**
-   * Drag-and-drop hardware schematics, spec sheets, and circuit diagrams.
-   * Offline Tesseract OCR with automatic dimension extraction (`140x90x35mm`, voltages, frequencies).
-   * Context-aware 1-click action chips (e.g. *⚡ Synthesize 3D CAD Enclosure*, *⚡ Generate KiCad PCB Netlist*).
-
-3. **Sovereign Neuro-Symbolic & Knowledge Graph Engine:**
-   * **SymPy AST Core**: Zero-hallucination exact calculus, ODEs, Taylor expansions, and linear algebra in a secured sandbox.
-   * **Vendored KùzuDB Graph Engine**: 100% offline, C++ embedded graph database (`db_store.db`) containing 51 verified physical laws with multi-hop GraphRAG traversal.
-
-4. **Terminal Security Gate:**
-   * Human-in-the-Loop obsidian security card for state-altering terminal operations.
-   * Displays risk assessment, plain-English rationale, and monospace command preview with tactile `[⚡ Authorize & Run Command]` confirmation.
-
-5. **2D Dynamic Function Plotter & 60 FPS Physics Engine:**
-   * Dual-trace comparative plotting ($f_1(x)$ primary white trace, $f_2(x)$ secondary cyan trace).
-   * Real-time numerical calculus: live derivative curve ($f'(x)$ in amber) and cumulative numerical integral curve ($\int f(x)dx$ in emerald).
-   * Dynamic physics simulations: Quantum Tunneling, PN Junction Band Bending, and Keplerian Orbits.
-
----
-
-## 6. Curated Sovereign Model Vault
-
-Models strictly sourced from verified sovereign checkpoints (`@shreyansh12183` and `@allenai`):
-
-| Model Name | HuggingFace / Ollama Identifier | Architecture | Domain |
-| :--- | :--- | :--- | :--- |
-| **OLMoE 1B-7B MoE** | `@allenai/OLMoE-1B-7B-0924` | 64 Sparse Experts (1B active) | Multidisciplinary STEM |
-| **Vigyan 1.5B 4x-MoE** | `@shreyansh12183/Vigyan-1.5B-4x-MoE` | Sparse MoE Top-2 Routing | Calculus & Physics Solver |
-| **OLMo2 7B Pure Math** | `@shreyansh12183/olmo2-7b-phd-pure-math` | Dense 7B Full Precision | Doctoral Proofs & Real Analysis |
-| **OLMo2 7B Silicon EDA** | `@shreyansh12183/olmo2-7b-silicon-rtl-eda` | Dense 7B Instruction | Verilog RTL & VLSI Synthesis |
-| **OLMo 2 1B Instruct** | `@allenai/OLMo-2-0425-1B-Instruct` | Dense 1B Low-Latency | Low-Power Embedded Edge |
-| **Olmo 3 7B Instruct** | `@allenai/Olmo-3-7B-Instruct` | Dense 7B Sovereign | General Advanced Science |
-
----
-
-## 7. Packaging & Building from Source
-
+### Standalone Universal Terminal CLI (1-Line Command)
 ```bash
-# Build multi-OS distribution packages and generate SHA256SUMS
-chmod +x package.sh
-./package.sh 2.7.0
+curl -fsSL https://experimentlab.in/install.sh | bash
 ```
 
-All distribution packages are placed in `./dist/`:
-```
-dist/
-├── SHA256SUMS
-├── vigyan-pro_2.7.0_amd64.deb
-├── vigyan-pro_2.7.0_linux_x86_64.tar.gz
-├── vigyan-pro_2.7.0_macos_universal.tar.gz
-└── vigyan-pro_2.7.0_windows_x86_64.zip
-```
+Or download the standalone CLI archive directly:
+- **Linux**: `vigyan-cli_5.0.7_linux_x86_64.tar.gz`
+- **macOS**: `vigyan-cli_5.0.7_macos_universal.tar.gz`
+- **Windows**: `vigyan-cli_5.0.7_windows_x86_64.zip`
 
 ---
 
-## 8. License
+## 5. Clean 1-Command Uninstallation
 
-Proprietary Commercial Software — Copyright © 2026 Shreyansh Lab. All Rights Reserved. See [LICENSE](LICENSE) for terms.
+To completely remove Vigyan Pro without leaving residual system traces:
+
+- **Debian / Ubuntu**:
+  ```bash
+  sudo apt remove --purge vigyan-pro && rm -rf ~/.local/share/vigyan-pro
+  ```
+- **Portable Linux / macOS / Windows**:
+  Simply delete the extracted directory:
+  ```bash
+  rm -rf vigyan-pro-5.0.7
+  ```
+- **CLI**:
+  ```bash
+  rm -f ~/.local/bin/vigyan
+  ```
+
+---
+
+## 6. Intellectual Property & Legal Notice
+
+Copyright © 2026 ExperimentLab AI (https://experimentlab.in). All rights reserved.
+
+### Non-Commercial License
+This software is licensed under the **PolyForm Noncommercial License 1.0.0**.
+- **Permitted**: Academic research, educational study, personal engineering evaluation.
+- **Prohibited**: Commercial exploitation, fee-based hosted APIs, proprietary redistribution, and SaaS deployment without a commercial license.
+
+For commercial licensing and enterprise fleet inquiries:
+- **Web**: [experimentlab.in](https://experimentlab.in)
+- **Email**: [support@experimentlab.in](mailto:support@experimentlab.in)
