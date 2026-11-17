@@ -108,7 +108,7 @@ fi
 
 # Find host python3
 PYTHON_BIN=""
-for candidate in "/home/hello/.venv-rag/bin/python" "${HOME}/.venv/bin/python" "$(which python3 2>/dev/null)"; do
+for candidate in "${HOME}/.venv-rag/bin/python" "${HOME}/.venv/bin/python" "$(which python3 2>/dev/null)" "/usr/bin/python3"; do
   if [ -x "$candidate" ]; then
     PYTHON_BIN="$candidate"
     break

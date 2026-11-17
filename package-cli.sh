@@ -50,7 +50,7 @@ export PATH="${DIR}/bin:${PATH}"
 
 # Find python3 runtime
 PYTHON_CMD="python3"
-for cand in "/home/hello/.venv-rag/bin/python" "${HOME}/.venv/bin/python" "$(which python3 2>/dev/null)"; do
+for cand in "${HOME}/.venv-rag/bin/python" "${HOME}/.venv/bin/python" "$(which python3 2>/dev/null)" "/usr/bin/python3"; do
     if [ -x "$cand" ]; then
         PYTHON_CMD="$cand"
         break
