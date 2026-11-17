@@ -6,7 +6,7 @@
 [![Architecture - Pure STEM](https://img.shields.io/badge/Architecture-Deterministic%20SymPy%20CAS-000000.svg)](#system-architecture)
 
 > **Sovereign, Air-Gapped Physical Engineering & Scientific Intelligence Workstation**  
-> *Developed by [ExperimentLab AI](https://experimentlab.in). 100% On-Device. Zero Cloud Telemetry.*  
+> *Developed by [ExperimentLab.in](https://experimentlab.in). 100% On-Device. Zero Cloud Telemetry.*  
 > *"Your AI Never Leaves the Room." Local mathematical derivations, exact SymPy Computer Algebra System, and standalone multi-OS desktop & terminal CLI.*
 
 ---
@@ -148,7 +148,7 @@ To completely remove Vigyan Pro without leaving residual system traces:
 
 ## 6. Intellectual Property & Legal Notice
 
-Copyright © 2026 ExperimentLab AI (https://experimentlab.in). All rights reserved.
+Copyright © 2026 ExperimentLab.in (https://experimentlab.in). All rights reserved.
 
 ### Non-Commercial License
 This software is licensed under the **PolyForm Noncommercial License 1.0.0**.
