@@ -63,24 +63,35 @@ Vigyan Pro ships an auditable, reproducible, cryptographic receipt you can file.
 
 ---
 
-## 🚀 Flagship Architectural Transition: v5.1.0 (Next Version)
+## 🚀 Flagship Architectural Transition: v5.1.0 (The Non-Chinese, Apache-2.0 Trinity)
 
-### 🌟 4B Sovereign Engine Migration: Deprecating 3B for Qwen 3.5 4B IQ3_M
-- [ ] **Phase 1: Zero-Cost Cloud Pretraining & Alignment ($0.00 Kaggle Dual T4)**:
-  - Base Model: `Qwen/Qwen3.5-4B` (**100% Apache 2.0 Permissive**).
-  - Multi-adapter STEM SFT (Calculus, Physical Chemistry, Verilog HDL, CAD/Orbital).
+```
+[ THE SOVEREIGN COMPLIANCE FLEET: NON-CHINESE • APACHE 2.0 • 4-BIT EDGE ]
+Eliminates Chinese export-control / ITAR defense blockers.
+Unifies toolchains: One Google Gemma 4 pipeline for Tier 1 & Tier 3; Ai2 open-lineage for Tier 2.
+```
+
+| Tier | Sovereign Engine | Lab & Architecture | Upstream License | Footprint (4-bit) | Hardware Class | Core Strategic Role |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **4B (Default)** | **Gemma 4 E4B** | Google (4.5B eff / 8B MoE) | **Apache 2.0** | ~4.2–5.0 GB | 8–16 GB RAM Laptops | **Anti-Fabrication Edge Engine**: GPQA-D 58.6%. Refuses to guess or invent data when inputs are absent. |
+| **7B (Middle)** | **OLMo 3 7B** | Ai2 (Dense 7B) | **Apache 2.0** | ~4.2 GB | 8–16 GB RAM | **100% Auditable Open Lineage**: Fully public Dolma pretraining data, code & checkpoints for defense inspection. |
+| **14B (Heavy)** | **Gemma 4 12B Unified** | Google (Dense 11.95B) | **Apache 2.0** | ~8.9 GB | 12–16 GB VRAM Workstations | **Doctoral Science Powerhouse**: GPQA-D 78.8%, MMLU-Pro 77.2%, AIME 77.5%. Shares tokenizer with 4B tier. |
+
+### 🌟 Execution Milestones for v5.1.0:
+- [ ] **Phase 1: Cloud-to-Cloud Adaptation ($0.00 Kaggle Dual T4)**:
+  - Base Models: `google/gemma-4-E4B` and `google/gemma-4-12B` (**100% Apache 2.0**).
+  - Fine-tune with sovereign STEM adapters (Calculus, Physical Chemistry, Verilog HDL, Orbitals).
   - Targeted STEM DPO with SymPy CAS zero-residual verification.
-  - Importance-matrix calibration (`llama-imatrix`) on STEM corpus chunks.
-  - Export: `vigyan-4b-quad-master-iq3_m.gguf` (~1.95 GB, 3.66 bpw).
-- [ ] **Phase 2: 100-Question Audited Benchmark Certification**:
-  - Prove empirical superiority over Vigyan-3B (target: $\ge 75\%$ pass rate on 100-question unseen STEM suite).
-  - Benchmark arithmetic-and-derivation exact match rather than raw generative text.
+  - GGUF importance-matrix quantization (`IQ3_M` / `Q4_K_M`).
+- [ ] **Phase 2: The Non-Fabrication Benchmark Verification**:
+  - Verify that Gemma 4 E4B maintains its proven refusal-to-fabricate trait on incomplete engineering specs.
+  - Run the automated 100-Question STEM Derivation Benchmark (exact-match arithmetic & proofs).
 - [ ] **Phase 3: Workstation Core & CLI Engine Swap**:
-  - Replace default runtime target in `launch_desktop.py`, `vigyan_cli.py`, and `llama_supervisor.py` with `vigyan-4b-quad-master-iq3_m.gguf`.
-  - Treat models as swappable orchestrators in a verified registry (4B default, 7B/14B optional).
-  - Preserve backward compatibility for users with existing `vigyan-3b` files on disk.
+  - Replace default runtime target in `launch_desktop.py`, `vigyan_cli.py`, and `llama_supervisor.py` with `gemma-4-e4b-stem-iq3_m.gguf`.
+  - Update `ModelsDrawer.svelte`: Catalog structured around the 3 Apache-2.0 Non-Chinese Tiers.
+  - Preserve backward compatibility for users with legacy 3B files on disk.
 - [ ] **Phase 4: Multi-OS Installer & Portal Alignment**:
-  - Update Windows Inno Setup installer script (`ci/vigyan-pro-setup.iss`) to pull the 4B engine.
+  - Update Windows Inno Setup installer script (`ci/vigyan-pro-setup.iss`).
   - Synchronize download portal at [experimentlab.in/download](https://experimentlab.in/download) and Cloudflare Functions.
 
 ---
