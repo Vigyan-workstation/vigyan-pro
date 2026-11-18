@@ -23,6 +23,46 @@ The engineering roadmap for **Vigyan Pro Workstation**, the sovereign, air-gappe
 
 ---
 
+## ⚡ Immediate Critical Patch: v5.0.8 (Verification Integrity & CAS Enforcement)
+
+### 🛡️ Eliminating False Badging & Hallucinatory Calculus
+- [ ] **Kill False-Positive "CAS Verified" Badging**:
+  - Audit `Chat.svelte` and `InlineArtifactPill.svelte` to remove unconditional `verified: true` flags on math keywords.
+  - The green `• CAS Verified` badge must **strictly and exclusively render** when backend SymPy execution returns `success: true`. Unverified completions must carry `⚠️ Unverified LLM Heuristic`.
+- [ ] **Deterministic Pre-Execution Interception**:
+  - Upgrade natural language query parsing in `launch_desktop.py` (`_extract_math_expression`).
+  - Automatically intercept definite/improper integrals (e.g. Dirichlet $\int_0^\infty \frac{\sin x}{x} dx$), derivatives, limits, and exact arithmetic *before* LLM generation.
+  - Force SymPy to evaluate the analytical ground truth in < 5ms and inject it into the generation context so the LLM acts as an explanatory formatter rather than an error-prone probabilistic calculator.
+- [ ] **Streaming Token Sanitization**:
+  - Clean internal model training tokens (`<answer>`, `</answer>`, `<solution>`, `</solution>`) in the streaming parser to prevent raw XML tags leaking into user-facing derivations.
+
+---
+
+## 🧾 Strategic Elevation: "Sell the Receipt, Not the Model" (v5.1.0)
+
+```
+[ THE MOAT: VERIFICATION-AS-AN-ARTEFACT ]
+Wolfram owns "correct computation" behind a subscription wall.
+Cloud AI sells cheap unverified tokens.
+Vigyan Pro ships an auditable, reproducible, cryptographic receipt you can file.
+```
+
+### 1. Reproducible Derivation Receipts (`.receipt.json` & PDF)
+- [ ] **Standardized Derivation Receipt Schema**:
+  - Output every verified STEM proof with a cryptographic audit trail:
+    - Exact SymPy AST execution tree.
+    - Upstream input parameters, tolerances, and physical dimensions.
+    - Model version, quantization hash, and random seed.
+    - Timestamp and local SHA-256 integrity hash.
+- [ ] **Independent Third-Party Reproducibility**:
+  - Allow researchers, peer reviewers, patent attorneys, and design boards to re-verify any computation on a different air-gapped machine with zero software lock-in (`vigyan verify <file.receipt.json>`).
+
+### 2. The One-Laptop Restricted-Data Lab Funnel
+- [ ] **Target Air-Gapped Science Workbenches**: Focus explicitly on research groups handling export-controlled designs (ITAR/SCOMET), NDA datasets, patent-pending semiconductor RTL, and proprietary physical chemistry where cloud egress is legally forbidden.
+- [ ] **Free Non-Commercial Academic License as Distribution**: Maintain the zero-cost tier for students and university labs as the top-of-funnel acquisition engine, converting research groups to enterprise deployments when corporate foundry or defense verification is required.
+
+---
+
 ## 🚀 Flagship Architectural Transition: v5.1.0 (Next Version)
 
 ### 🌟 4B Sovereign Engine Migration: Deprecating 3B for Qwen 3.5 4B IQ3_M
@@ -34,11 +74,11 @@ The engineering roadmap for **Vigyan Pro Workstation**, the sovereign, air-gappe
   - Export: `vigyan-4b-quad-master-iq3_m.gguf` (~1.95 GB, 3.66 bpw).
 - [ ] **Phase 2: 100-Question Audited Benchmark Certification**:
   - Prove empirical superiority over Vigyan-3B (target: $\ge 75\%$ pass rate on 100-question unseen STEM suite).
-  - Verify zero-regression in synthesizable Verilog and SymPy proofs.
+  - Benchmark arithmetic-and-derivation exact match rather than raw generative text.
 - [ ] **Phase 3: Workstation Core & CLI Engine Swap**:
   - Replace default runtime target in `launch_desktop.py`, `vigyan_cli.py`, and `llama_supervisor.py` with `vigyan-4b-quad-master-iq3_m.gguf`.
+  - Treat models as swappable orchestrators in a verified registry (4B default, 7B/14B optional).
   - Preserve backward compatibility for users with existing `vigyan-3b` files on disk.
-  - Update `ModelsDrawer.svelte` catalog: Flagship daily driver promoted to **4B Daily (Apache 2.0)**.
 - [ ] **Phase 4: Multi-OS Installer & Portal Alignment**:
   - Update Windows Inno Setup installer script (`ci/vigyan-pro-setup.iss`) to pull the 4B engine.
   - Synchronize download portal at [experimentlab.in/download](https://experimentlab.in/download) and Cloudflare Functions.
