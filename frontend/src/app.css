@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global Reset ─────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ClearType Protection on standard-DPI displays; antialiased on high-DPI screens */
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+  *, *::before, *::after {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+}
+
+/* ─── Hide all scrollbars visually (keep functionality) */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Text selection ───────────────────────────────── */
+::selection {
+  background: rgba(255, 123, 95, 0.30);
+  color: #ffffff;
+}
+
+/* ─── KaTeX Fonts (loaded from local vendor if bundled) */
+/* KaTeX is loaded via CDN in index.html for dev; bundled for production */
+
+/* ─── Textarea auto-resize via field-sizing ─────────── */
+textarea {
+  field-sizing: content;
+}
+
+/* ─── Smooth window drag region (Tauri) ─────────────── */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  cursor: default;
+}
+[data-tauri-drag-region] * {
+  -webkit-app-region: no-drag;
+}
+
+/* ─── ExperimentLab Design System Tokens (v5.0.8) ────── */
+:root {
+  --bg:      #0A0A0B;
+  --surface: #111113;
+  --line:    rgba(255,255,255,.07);
+  --line-2:  rgba(255,255,255,.045);
+  --text:    #F1F1F3;
+  --text-2:  #9C9CA4;
+  --text-3:  #7C7C85;
+  --accent:  #FF7B5F;
+  --ok:      #3FB950;
+  --warn:    #D29922;
+  --err:     #E5534B;
+  --font:    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono:    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --t:       130ms cubic-bezier(.2,0,0,1);
+  --r:       6px;
+
+  /* Layout compatibility aliases */
+  --guide-color: var(--line);
+  --guide-active: rgba(255, 123, 95, 0.40);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseRing {
+  0%   { box-shadow: 0 0 0 0   rgba(63,185,80,.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(63,185,80,0); }
+  100% { box-shadow: 0 0 0 0   rgba(63,185,80,0); }
+}
+
+@keyframes sweep {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: .85; }
+  50%      { opacity: .18; }
+}
+
+.animate-fade-up {
+  animation: fadeUp var(--t) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Hairline blueprint guides */
+.border-guide {
+  border-color: var(--guide-color);
+}
+
+.border-guide-active {
+  border-color: var(--guide-active);
+}
+
+/* Technical micro-badge */
+.tech-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* KaTeX mathematical typography enhancements */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.4rem 0.5rem;
+  margin: 0.75rem 0 !important;
+  mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 12px, black calc(100% - 12px), transparent);
+}
+
+.katex {
+  font-size: 1.05em !important;
+  text-rendering: optimizeLegibility;
+}

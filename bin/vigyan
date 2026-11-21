@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Vigyan Pro Sovereign CLI Launcher v5.0
+# 100% Offline, Zero Cloud Egress, Air-Gapped Physical Engineering Intelligence
+# ==============================================================================
+
+set -e
+
+# Dynamic discovery of Python runtime
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_BIN="/usr/bin/python3"
+if [ -x "$SCRIPT_DIR/../.venv/bin/python" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/../.venv/bin/python"
+elif [ -x "$HOME/.venv-rag/bin/python" ]; then
+    PYTHON_BIN="$HOME/.venv-rag/bin/python"
+elif [ -x "$HOME/.vigyan/venv/bin/python" ]; then
+    PYTHON_BIN="$HOME/.vigyan/venv/bin/python"
+elif [ -x "$(command -v python3)" ]; then
+    PYTHON_BIN="$(command -v python3)"
+fi
+for _sp in /usr/lib*/python3*/site-packages /usr/lib*/python3/dist-packages "$HOME/.venv-rag/lib/python"*/site-packages; do
+    if [ -d "$_sp" ]; then
+        export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$_sp"
+    fi
+done
+
+if [ -f "$SCRIPT_DIR/../src/vigyan_cli.py" ]; then
+    exec "$PYTHON_BIN" "$SCRIPT_DIR/../src/vigyan_cli.py" "$@"
+elif [ -f "/opt/vigyan-pro/src/vigyan_cli.py" ]; then
+    exec "$PYTHON_BIN" "/opt/vigyan-pro/src/vigyan_cli.py" "$@"
+else
+    exec "$PYTHON_BIN" "$HOME/.vigyan/desktop/vigyan_cli.py" "$@"
+fi

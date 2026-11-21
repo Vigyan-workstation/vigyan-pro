@@ -1,0 +1,518 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Vigyan Pro Desktop - Multi-OS Release Packaging Script
+# Enterprise Offline Edition (~1.45 GB)
+# Builds packages for Linux (.deb, .tar.gz), Windows (.zip), and macOS (.tar.gz)
+# Pure Offline Bundles with 1.4 GB Quad Master weights and embedded llama-server
+# ==============================================================================
+
+set -e
+
+RAW_VERSION="5.0.8"
+BUNDLE_WEIGHTS=false
+
+for arg in "$@"; do
+    if [ "$arg" = "--bundle-weights" ] || [ "$arg" = "--bundled" ]; then
+        BUNDLE_WEIGHTS=true
+    elif [ "$arg" = "--lightweight" ] || [ "$arg" = "--no-weights" ]; then
+        BUNDLE_WEIGHTS=false
+    elif [[ "$arg" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        RAW_VERSION="$arg"
+    fi
+done
+
+VERSION="${RAW_VERSION#v}"
+
+echo "========================================================"
+echo "  Building Vigyan Pro Enterprise Multi-OS Release v${VERSION}"
+if [ "$BUNDLE_WEIGHTS" = true ]; then
+    echo "  Mode: Enterprise Offline Edition (Bundled Sovereign Weights + llama-server)"
+else
+    echo "  Mode: Standard Lightweight Packages"
+fi
+echo "========================================================"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+DIST_DIR="$SCRIPT_DIR/dist"
+mkdir -p "$DIST_DIR"
+
+MODEL_SOURCE="${MODEL_SOURCE:-$HOME/.vigyan/models/gemma-4-e4b-qat-q4-0.gguf}"
+if [ ! -f "$MODEL_SOURCE" ] && [ -f "$SCRIPT_DIR/models/gemma-4-e4b-qat-q4-0.gguf" ]; then
+    MODEL_SOURCE="$SCRIPT_DIR/models/gemma-4-e4b-qat-q4-0.gguf"
+fi
+
+# Locate llama-server binary for Linux / host
+LLAMA_SERVER_SRC=""
+if [ -f "$SCRIPT_DIR/bin/llama-server" ]; then
+    LLAMA_SERVER_SRC="$SCRIPT_DIR/bin/llama-server"
+elif [ -f "$HOME/.local/bin/llama-server" ]; then
+    LLAMA_SERVER_SRC="$HOME/.local/bin/llama-server"
+elif which llama-server >/dev/null 2>&1; then
+    LLAMA_SERVER_SRC="$(which llama-server)"
+fi
+
+# Ensure bin/ in the repository itself has llama-server
+if [ -n "$LLAMA_SERVER_SRC" ] && [ ! -f "$SCRIPT_DIR/bin/llama-server" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$SCRIPT_DIR/bin/llama-server"
+    chmod +x "$SCRIPT_DIR/bin/llama-server"
+fi
+
+# ------------------------------------------------------------------------------
+# 1. BUILD DEBIAN (.deb) PACKAGE FOR LINUX
+# ------------------------------------------------------------------------------
+echo "==> Staging Debian package..."
+DEB_STAGE="$SCRIPT_DIR/.build_deb"
+rm -rf "$DEB_STAGE"
+
+mkdir -p "$DEB_STAGE/DEBIAN"
+mkdir -p "$DEB_STAGE/opt/vigyan-pro/src"
+mkdir -p "$DEB_STAGE/opt/vigyan-pro/assets"
+mkdir -p "$DEB_STAGE/opt/vigyan-pro/bin"
+mkdir -p "$DEB_STAGE/usr/bin"
+mkdir -p "$DEB_STAGE/usr/share/applications"
+mkdir -p "$DEB_STAGE/usr/share/pixmaps"
+mkdir -p "$DEB_STAGE/usr/share/icons/hicolor/64x64/apps"
+mkdir -p "$DEB_STAGE/usr/share/icons/hicolor/128x128/apps"
+mkdir -p "$DEB_STAGE/usr/share/icons/hicolor/256x256/apps"
+
+# Copy application files
+cp -r "$SCRIPT_DIR/src/"* "$DEB_STAGE/opt/vigyan-pro/src/"
+cp -r "$SCRIPT_DIR/assets/"* "$DEB_STAGE/opt/vigyan-pro/assets/"
+chmod -R a+rX "$DEB_STAGE/opt/vigyan-pro/src"
+chmod -R a+rX "$DEB_STAGE/opt/vigyan-pro/assets"
+find "$DEB_STAGE/opt/vigyan-pro/src" -type f \( -name "*.sh" -o -name "launch_*.py" -o -name "run.py" \) -exec chmod +x {} +
+cp "$SCRIPT_DIR/bin/vigyan-pro" "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
+chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/vigyan-pro"
+if [ -f "$SCRIPT_DIR/bin/vigyan" ]; then
+    cp "$SCRIPT_DIR/bin/vigyan" "$DEB_STAGE/opt/vigyan-pro/bin/vigyan"
+    chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/vigyan"
+fi
+
+# Copy llama-server into staged bin
+if [ -n "$LLAMA_SERVER_SRC" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$DEB_STAGE/opt/vigyan-pro/bin/llama-server"
+    chmod +x "$DEB_STAGE/opt/vigyan-pro/bin/llama-server"
+    cp -P "$SCRIPT_DIR/bin/"lib*.so* "$DEB_STAGE/opt/vigyan-pro/bin/" 2>/dev/null || true
+fi
+
+# Bundle sovereign weights if enabled
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model weights into Debian package..."
+    mkdir -p "$DEB_STAGE/opt/vigyan-pro/models"
+    cp "$MODEL_SOURCE" "$DEB_STAGE/opt/vigyan-pro/models/"
+fi
+
+# Symlinks in /usr/bin
+ln -s "/opt/vigyan-pro/bin/vigyan-pro" "$DEB_STAGE/usr/bin/vigyan-pro"
+if [ -f "$SCRIPT_DIR/bin/vigyan" ]; then
+    ln -s "/opt/vigyan-pro/bin/vigyan" "$DEB_STAGE/usr/bin/vigyan"
+fi
+
+# Desktop Entry
+cp "$SCRIPT_DIR/assets/vigyan-pro.desktop" "$DEB_STAGE/usr/share/applications/vigyan-pro.desktop"
+
+# Icons
+if [ -f "$SCRIPT_DIR/assets/icons/vigyan-pro-64.png" ]; then
+    cp "$SCRIPT_DIR/assets/icons/vigyan-pro-64.png" "$DEB_STAGE/usr/share/icons/hicolor/64x64/apps/vigyan-pro.png"
+fi
+if [ -f "$SCRIPT_DIR/assets/icons/vigyan-pro-128.png" ]; then
+    cp "$SCRIPT_DIR/assets/icons/vigyan-pro-128.png" "$DEB_STAGE/usr/share/icons/hicolor/128x128/apps/vigyan-pro.png"
+fi
+if [ -f "$SCRIPT_DIR/assets/icons/vigyan-pro-256.png" ]; then
+    cp "$SCRIPT_DIR/assets/icons/vigyan-pro-256.png" "$DEB_STAGE/usr/share/icons/hicolor/256x256/apps/vigyan-pro.png"
+    cp "$SCRIPT_DIR/assets/icons/vigyan-pro-256.png" "$DEB_STAGE/usr/share/pixmaps/vigyan-pro.png"
+fi
+
+# DEBIAN Control File
+cat <<EOF > "$DEB_STAGE/DEBIAN/control"
+Package: vigyan-pro
+Version: ${VERSION}
+Section: science
+Priority: optional
+Architecture: amd64
+Maintainer: Shreyansh Lab <contact@experimentlab.in>
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.1, curl
+Homepage: https://experimentlab.in
+Description: Sovereign Offline STEM Workstation with Embedded llama-server & SymPy CAS
+ Vigyan Pro is an enterprise obsidian-grade sovereign desktop workstation
+ featuring native KaTeX proofs, in-memory axiomatic physics/math grounding,
+ SymPy CAS, and embedded 100% offline llama-server AI inference.
+EOF
+
+# DEBIAN postinst script
+cat <<'EOF' > "$DEB_STAGE/DEBIAN/postinst"
+#!/bin/sh
+set -e
+if which update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications || true
+fi
+if which gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q /usr/share/icons/hicolor || true
+fi
+exit 0
+EOF
+chmod 755 "$DEB_STAGE/DEBIAN/postinst"
+
+# DEBIAN postrm script
+cat <<'EOF' > "$DEB_STAGE/DEBIAN/postrm"
+#!/bin/sh
+set -e
+if which update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications || true
+fi
+exit 0
+EOF
+chmod 755 "$DEB_STAGE/DEBIAN/postrm"
+
+DEB_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_amd64.deb"
+
+if which dpkg-deb >/dev/null 2>&1; then
+    dpkg-deb -Zgzip -z1 --build --root-owner-group "$DEB_STAGE" "$DEB_OUTPUT"
+else
+    echo "==> dpkg-deb not found. Creating Debian package via universal ar/tar..."
+    TMP_PKG="$SCRIPT_DIR/.deb_tmp"
+    rm -rf "$TMP_PKG"
+    mkdir -p "$TMP_PKG"
+    echo "2.0" > "$TMP_PKG/debian-binary"
+    tar --use-compress-program="gzip -1" -cf "$TMP_PKG/control.tar.gz" -C "$DEB_STAGE/DEBIAN" .
+    tar --use-compress-program="gzip -1" -cf "$TMP_PKG/data.tar.gz" --exclude='./DEBIAN' -C "$DEB_STAGE" .
+    (cd "$TMP_PKG" && ar rcs "$DEB_OUTPUT" debian-binary control.tar.gz data.tar.gz)
+    rm -rf "$TMP_PKG"
+fi
+
+rm -rf "$DEB_STAGE"
+echo "✓ Debian Package Built: $DEB_OUTPUT"
+
+# ------------------------------------------------------------------------------
+# 2. BUILD LINUX PORTABLE ARCHIVE (.tar.gz)
+# ------------------------------------------------------------------------------
+echo "==> Staging Portable Linux Archive..."
+TAR_STAGE="$SCRIPT_DIR/.build_tar/vigyan-pro"
+rm -rf "$SCRIPT_DIR/.build_tar"
+mkdir -p "$TAR_STAGE"
+
+cp -r "$SCRIPT_DIR/src" "$TAR_STAGE/"
+cp -r "$SCRIPT_DIR/assets" "$TAR_STAGE/"
+cp -r "$SCRIPT_DIR/bin" "$TAR_STAGE/"
+chmod -R a+rX "$TAR_STAGE/src"
+chmod -R a+rX "$TAR_STAGE/assets"
+chmod -R a+rX "$TAR_STAGE/bin"
+find "$TAR_STAGE/src" -type f \( -name "*.sh" -o -name "launch_*.py" -o -name "run.py" \) -exec chmod +x {} +
+chmod +x "$TAR_STAGE/bin/vigyan-pro"
+if [ -f "$TAR_STAGE/bin/vigyan" ]; then
+    chmod +x "$TAR_STAGE/bin/vigyan"
+fi
+
+if [ -n "$LLAMA_SERVER_SRC" ]; then
+    cp -L "$LLAMA_SERVER_SRC" "$TAR_STAGE/bin/llama-server"
+    chmod +x "$TAR_STAGE/bin/llama-server"
+fi
+
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model into Linux package..."
+    mkdir -p "$TAR_STAGE/models"
+    cp "$MODEL_SOURCE" "$TAR_STAGE/models/"
+fi
+
+cat <<'EOF' > "$TAR_STAGE/launch.sh"
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/bin/vigyan-pro" "$@"
+EOF
+chmod +x "$TAR_STAGE/launch.sh"
+
+cat <<'EOF' > "$TAR_STAGE/vigyan.sh"
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/bin/vigyan" "$@"
+EOF
+chmod +x "$TAR_STAGE/vigyan.sh"
+
+TAR_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64.tar.gz"
+tar --use-compress-program="gzip -1" -cf "$TAR_OUTPUT" -C "$SCRIPT_DIR/.build_tar" vigyan-pro
+echo "✓ Linux Archive Built: $TAR_OUTPUT"
+
+TAR_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_linux_x86_64_bundled.tar.gz"
+ln -f "$TAR_OUTPUT" "$TAR_BUNDLED_OUTPUT" 2>/dev/null || cp "$TAR_OUTPUT" "$TAR_BUNDLED_OUTPUT"
+rm -rf "$SCRIPT_DIR/.build_tar"
+
+# ------------------------------------------------------------------------------
+# 3. BUILD WINDOWS PORTABLE ARCHIVE (.zip)
+# ------------------------------------------------------------------------------
+echo "==> Staging Portable Windows Archive..."
+WIN_STAGE="$SCRIPT_DIR/.build_win/vigyan-pro"
+rm -rf "$SCRIPT_DIR/.build_win"
+mkdir -p "$WIN_STAGE"
+
+cp -r "$SCRIPT_DIR/src" "$WIN_STAGE/"
+cp -r "$SCRIPT_DIR/assets" "$WIN_STAGE/"
+mkdir -p "$WIN_STAGE/bin"
+
+if [ -f "$HOME/.vigyan/cache/llama_win.zip" ]; then
+    echo "==> Bundling native Windows x64 llama-server & runtime DLLs..."
+    unzip -q -o "$HOME/.vigyan/cache/llama_win.zip" -d "$WIN_STAGE/bin/"
+elif [ -f "/tmp/llama_win.zip" ]; then
+    echo "==> Bundling native Windows x64 llama-server & runtime DLLs..."
+    unzip -q -o "/tmp/llama_win.zip" -d "$WIN_STAGE/bin/"
+elif [ -f "$SCRIPT_DIR/bin/llama-server.exe" ]; then
+    cp "$SCRIPT_DIR/bin/llama-server.exe" "$WIN_STAGE/bin/"
+    cp "$SCRIPT_DIR/bin/"*.dll "$WIN_STAGE/bin/" 2>/dev/null || true
+fi
+
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model into Windows package..."
+    mkdir -p "$WIN_STAGE/models"
+    cp "$MODEL_SOURCE" "$WIN_STAGE/models/"
+fi
+
+if [ -d "$SCRIPT_DIR/bin/python" ]; then
+    echo "==> Bundling self-contained Python runtime for Windows..."
+    cp -r "$SCRIPT_DIR/bin/python" "$WIN_STAGE/bin/"
+fi
+
+cat <<'EOF' > "$WIN_STAGE/Vigyan-Pro.bat"
+@echo off
+setlocal EnableDelayedExpansion
+title Vigyan Pro
+
+:: Check if running from unextracted zip / %TEMP% directory
+set "CURRENT_DIR=%~dp0"
+echo !CURRENT_DIR! | findstr /i "\\AppData\\Local\\Temp\\" >nul 2>&1
+if %ERRORLEVEL% equ 0 goto :UNEXTRACTED_ERROR
+
+if not exist "%~dp0src\launch_win.bat" goto :UNEXTRACTED_ERROR
+
+cd /d "%~dp0"
+call "%~dp0src\launch_win.bat" %*
+exit /b %ERRORLEVEL%
+
+:UNEXTRACTED_ERROR
+color 0C
+echo ===============================================================================
+echo  [ERROR] Vigyan Pro is running directly from an unextracted ZIP archive!
+echo ===============================================================================
+echo.
+echo  Windows opened this file from the virtual ZIP preview folder without extracting.
+echo.
+echo  To run Vigyan Pro properly:
+echo    1. Close this window.
+echo    2. Right-click the downloaded .zip file and select 'Extract All...'.
+echo    3. Open the extracted folder and double-click Vigyan-Pro.bat.
+echo.
+echo ===============================================================================
+pause
+exit /b 1
+EOF
+
+cat <<'EOF' > "$WIN_STAGE/Vigyan-CLI.bat"
+@echo off
+setlocal EnableDelayedExpansion
+title Vigyan Pro CLI
+
+:: Check if running from unextracted zip / %TEMP% directory
+set "CURRENT_DIR=%~dp0"
+echo !CURRENT_DIR! | findstr /i "\\AppData\\Local\\Temp\\" >nul 2>&1
+if %ERRORLEVEL% equ 0 goto :UNEXTRACTED_ERROR
+
+if not exist "%~dp0src\vigyan_cli.py" goto :UNEXTRACTED_ERROR
+
+cd /d "%~dp0"
+
+:: Auto-detect Python executable
+set "PYTHON_CMD="
+if exist "%~dp0bin\python\python.exe" (
+    set "PYTHON_CMD=%~dp0bin\python\python.exe"
+    goto :PYTHON_FOUND
+)
+if exist "%~dp0.venv\Scripts\python.exe" (
+    set "PYTHON_CMD=%~dp0.venv\Scripts\python.exe"
+    goto :PYTHON_FOUND
+)
+where py >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    set "PYTHON_CMD=py"
+    goto :PYTHON_FOUND
+)
+where python >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    set "PYTHON_CMD=python"
+    goto :PYTHON_FOUND
+)
+
+:PYTHON_NOT_FOUND
+color 0C
+echo ===============================================================================
+echo  [ERROR] Python executable not found on your system!
+echo ===============================================================================
+echo.
+echo  Python 3.10+ is required. Install via Windows Package Manager:
+echo    winget install Python.Python.3.12
+echo.
+echo  Or download from https://www.python.org/downloads/
+echo  (Ensure "Add python.exe to PATH" is checked during installation)
+echo.
+echo ===============================================================================
+pause
+exit /b 1
+
+:PYTHON_FOUND
+"%PYTHON_CMD%" "%~dp0src\vigyan_cli.py" %*
+exit /b %ERRORLEVEL%
+
+:UNEXTRACTED_ERROR
+color 0C
+echo ===============================================================================
+echo  [ERROR] Vigyan Pro CLI is running directly from an unextracted ZIP archive!
+echo ===============================================================================
+echo.
+echo  Windows opened this file from the virtual ZIP preview folder without extracting.
+echo.
+echo  To run Vigyan Pro CLI properly:
+echo    1. Close this window.
+echo    2. Right-click the downloaded .zip file and select 'Extract All...'.
+echo    3. Open the extracted folder and double-click Vigyan-CLI.bat.
+echo.
+echo ===============================================================================
+pause
+exit /b 1
+EOF
+
+WIN_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64.zip"
+if which zip >/dev/null 2>&1; then
+    (cd "$SCRIPT_DIR/.build_win" && zip -1 -r -q "$WIN_OUTPUT" vigyan-pro)
+else
+    python3 -c "import shutil; shutil.make_archive('$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64', 'zip', '$SCRIPT_DIR/.build_win', 'vigyan-pro')"
+fi
+echo "✓ Windows Archive Built: $WIN_OUTPUT"
+
+WIN_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_windows_x86_64_bundled.zip"
+ln -f "$WIN_OUTPUT" "$WIN_BUNDLED_OUTPUT" 2>/dev/null || cp "$WIN_OUTPUT" "$WIN_BUNDLED_OUTPUT"
+rm -rf "$SCRIPT_DIR/.build_win"
+
+# ------------------------------------------------------------------------------
+# 4. BUILD MACOS PORTABLE ARCHIVE (.tar.gz)
+# ------------------------------------------------------------------------------
+echo "==> Staging Portable macOS Archive..."
+MAC_STAGE="$SCRIPT_DIR/.build_mac/vigyan-pro"
+rm -rf "$SCRIPT_DIR/.build_mac"
+mkdir -p "$MAC_STAGE"
+
+cp -r "$SCRIPT_DIR/src" "$MAC_STAGE/"
+cp -r "$SCRIPT_DIR/assets" "$MAC_STAGE/"
+mkdir -p "$MAC_STAGE/bin"
+chmod -R a+rX "$MAC_STAGE/src"
+chmod -R a+rX "$MAC_STAGE/assets"
+find "$MAC_STAGE/src" -type f \( -name "*.sh" -o -name "launch_*.py" -o -name "run.py" \) -exec chmod +x {} +
+if [ -f "$SCRIPT_DIR/bin/vigyan" ]; then
+    cp "$SCRIPT_DIR/bin/vigyan" "$MAC_STAGE/bin/vigyan"
+    chmod +x "$MAC_STAGE/bin/vigyan"
+fi
+
+if [ -f "$HOME/.vigyan/cache/llama_mac.tar.gz" ]; then
+    echo "==> Bundling native macOS Apple Silicon/Universal llama-server & dylibs..."
+    mkdir -p /tmp/mac_extract
+    tar -zxf "$HOME/.vigyan/cache/llama_mac.tar.gz" -C /tmp/mac_extract 2>/dev/null || true
+    cp -R /tmp/mac_extract/llama-*/* "$MAC_STAGE/bin/" 2>/dev/null || true
+    chmod +x "$MAC_STAGE/bin/llama-server" 2>/dev/null || true
+    rm -rf /tmp/mac_extract
+elif [ -f "/tmp/llama_mac.tar.gz" ]; then
+    echo "==> Bundling native macOS Apple Silicon/Universal llama-server & dylibs..."
+    mkdir -p /tmp/mac_extract
+    tar -zxf "/tmp/llama_mac.tar.gz" -C /tmp/mac_extract 2>/dev/null || true
+    cp -R /tmp/mac_extract/llama-*/* "$MAC_STAGE/bin/" 2>/dev/null || true
+    chmod +x "$MAC_STAGE/bin/llama-server" 2>/dev/null || true
+    rm -rf /tmp/mac_extract
+elif [ -f "$SCRIPT_DIR/bin/llama-server-mac" ]; then
+    cp "$SCRIPT_DIR/bin/llama-server-mac" "$MAC_STAGE/bin/llama-server"
+    cp "$SCRIPT_DIR/bin/"*.dylib "$MAC_STAGE/bin/" 2>/dev/null || true
+fi
+
+if [ "$BUNDLE_WEIGHTS" = true ] && [ -f "$MODEL_SOURCE" ]; then
+    echo "==> Bundling sovereign model into macOS package..."
+    mkdir -p "$MAC_STAGE/models"
+    cp "$MODEL_SOURCE" "$MAC_STAGE/models/"
+fi
+
+cat <<'EOF' > "$MAC_STAGE/launch.sh"
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/src/launch_mac.sh" "$@"
+EOF
+chmod +x "$MAC_STAGE/launch.sh"
+
+cat <<'EOF' > "$MAC_STAGE/vigyan.sh"
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$DIR/bin/vigyan" "$@"
+EOF
+chmod +x "$MAC_STAGE/vigyan.sh"
+
+cat <<'EOF' > "$MAC_STAGE/Vigyan-Pro.command"
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$DIR/src/launch_mac.sh" "$@"
+EOF
+chmod +x "$MAC_STAGE/Vigyan-Pro.command"
+
+# Native macOS .app Bundle Structure
+APP_BUNDLE="$MAC_STAGE/Vigyan Pro.app"
+mkdir -p "$APP_BUNDLE/Contents/MacOS"
+mkdir -p "$APP_BUNDLE/Contents/Resources"
+if [ -f "$SCRIPT_DIR/assets/icons/AppIcon.icns" ]; then
+    cp "$SCRIPT_DIR/assets/icons/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/"
+fi
+
+cat <<EOF > "$APP_BUNDLE/Contents/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Vigyan-Pro</string>
+    <key>CFBundleIdentifier</key>
+    <string>in.experimentlab.vigyanpro</string>
+    <key>CFBundleName</key>
+    <string>Vigyan Pro</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${VERSION}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+cat <<'EOF' > "$APP_BUNDLE/Contents/MacOS/Vigyan-Pro"
+#!/usr/bin/env bash
+BUNDLE_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+exec "$BUNDLE_DIR/src/launch_mac.sh" "$@"
+EOF
+chmod +x "$APP_BUNDLE/Contents/MacOS/Vigyan-Pro"
+
+MAC_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal.tar.gz"
+tar --use-compress-program="gzip -1" -cf "$MAC_OUTPUT" -C "$SCRIPT_DIR/.build_mac" vigyan-pro
+echo "✓ macOS Archive Built: $MAC_OUTPUT"
+
+MAC_BUNDLED_OUTPUT="$DIST_DIR/vigyan-pro_${VERSION}_macos_universal_bundled.tar.gz"
+ln -f "$MAC_OUTPUT" "$MAC_BUNDLED_OUTPUT" 2>/dev/null || cp "$MAC_OUTPUT" "$MAC_BUNDLED_OUTPUT"
+rm -rf "$SCRIPT_DIR/.build_mac"
+
+# ------------------------------------------------------------------------------
+# 5. GENERATE CRYPTOGRAPHIC SHA-256 CHECKSUMS
+# ------------------------------------------------------------------------------
+echo "==> Generating Cryptographic SHA-256 Checksums for Enterprise Security Audit..."
+(cd "$DIST_DIR" && sha256sum vigyan-pro_${VERSION}_* > SHA256SUMS)
+echo "✓ Enterprise SHA256SUMS generated:"
+cat "$DIST_DIR/SHA256SUMS"
+
+echo "========================================================"
+echo "  Enterprise Multi-OS Packaging Complete!"
+ls -lh "$DIST_DIR"
+echo "========================================================"

@@ -1,0 +1,77 @@
+name: Vigyan Workstation CI & Air-Gap Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Verify Build, Tests & Air-Gap Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-gi \
+            gir1.2-gtk-3.0 \
+            gir1.2-webkit2-4.1 \
+            xvfb \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            poppler-utils \
+            util-linux
+
+      - name: Install Python Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest sympy psutil pillow anyio huggingface_hub hypothesis
+
+      - name: Setup Bun (Frontend Runtime)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build Svelte 5 Frontend
+        run: |
+          cd frontend
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Prepare Headless Test Fixtures
+        run: |
+          # 1. Ensure pre-compiled server binary has execution bit if present
+          if [ -f "bin/llama-server" ]; then
+            chmod +x bin/llama-server
+          fi
+          
+          # 2. Provision lightweight mock GGUF model for discovery tests without downloading 2.5 GB
+          mkdir -p ~/.vigyan/models models
+          echo "GGUF_MOCK_TEST_HEADER" > ~/.vigyan/models/gemma-4-e4b-qat-q4-0.gguf
+          echo "GGUF_MOCK_TEST_HEADER" > models/gemma-4-e4b-qat-q4-0.gguf
+
+      - name: Run Pytest Suite Headlessly
+        env:
+          VIGYAN_MODEL_PATH: models/gemma-4-e4b-qat-q4-0.gguf
+        run: |
+          xvfb-run -a pytest tests/ -v
+
+      - name: Air-Gap Zero-Egress Audit
+        run: |
+          echo "Auditing distribution bundle for forbidden remote external egress..."
+          if grep -E 'https?://(cdn|fonts\.googleapis|unpkg|cdnjs)' frontend/index.html src/dist/index.html src/dist/assets/*.js; then
+            echo "ERROR: Remote CDN detected. Violates 100% Air-Gapped Zero-Cloud Guarantee."
+            exit 1
+          fi
+          echo "SUCCESS: 100% Air-Gapped compliance verified across all frontend and built assets."

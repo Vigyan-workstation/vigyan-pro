@@ -1,0 +1,52 @@
+/dist/
+frontend/dist/
+frontend/node_modules/
+!src/dist/
+.build_deb/
+.build_tar/
+.deb_tmp/
+.build_mac/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local environments, secrets and tool caches
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.mypy_cache/
+.coverage
+.ruff_cache/
+
+# Heavy Foundation Models & Binaries (Never commit to Git)
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+models/
+src/models/
+
+# Vector & Graph Databases
+*.db
+*.sqlite
+*.sqlite3
+*.kuzu
+kuzu_db/
+*.lancedb/
+lancedb_data/
+
+# Package & Build Archives
+build/
+*.egg-info/
+*.deb
+*.tar.gz
+*.zip
+
+# Compiled local binaries
+bin/llama-server*
+bin/*.so*
